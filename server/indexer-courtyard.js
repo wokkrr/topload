@@ -25,7 +25,7 @@ const STABLES = new Set([
 ]);
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const ZERO = '0x0000000000000000000000000000000000000000';
-const BACKFILL_WINDOW = 40_000; // Polygon ~2s blocks ≈ 22h per window
+const BACKFILL_WINDOW = 15_000; // Polygon ~2s blocks ≈ 8h per window — busiest contract, keep runs short
 const CATEGORY_TO_IP = { 'Pokemon': 'PKMN', 'Pokémon': 'PKMN', 'One Piece': 'OP', 'YuGiOh': 'YGO', 'Yu-Gi-Oh': 'YGO', 'Yu-Gi-Oh!': 'YGO', 'Magic: The Gathering': null };
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 

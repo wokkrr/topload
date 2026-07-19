@@ -15,6 +15,10 @@ export function openDb(path = join(__dirname, '..', 'data', 'topload.db')) {
   // Multiple indexers/backfills may run concurrently — queue for the write
   // lock (up to 60s) instead of failing instantly with SQLITE_BUSY.
   db.exec('PRAGMA busy_timeout = 60000;');
+  // No mmap: concurrent processes checkpointing/truncating the WAL can SIGBUS
+  // a memory-mapped reader (observed as 'zsh: bus error' during parallel
+  // backfills). Plain read syscalls are immune and barely slower here.
+  db.exec('PRAGMA mmap_size = 0;');
   db.exec(readFileSync(join(__dirname, 'schema.sql'), 'utf8'));
   migrate(db);
   return db;
