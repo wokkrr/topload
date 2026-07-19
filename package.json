@@ -13,6 +13,7 @@
     "probe:pricecharting": "node --env-file-if-exists=.env server/probe-pricecharting.js",
     "probe:gacha": "node --env-file-if-exists=.env server/probe-gacha.js",
     "probe:solana": "node --env-file-if-exists=.env server/probe-solana.js",
+    "probe:base": "node --env-file-if-exists=.env server/probe-base.js",
     "solana:dry": "node --env-file-if-exists=.env server/indexer-solana.js --dry",
     "solana:backfill": "node --env-file-if-exists=.env server/indexer-solana.js --backfill",
     "import:pc": "node --env-file-if-exists=.env server/import-pricecharting-csv.js",
