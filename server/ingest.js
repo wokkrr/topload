@@ -167,8 +167,18 @@ async function runLive(db, today) {
   try {
     const cc = makeCollectorCryptAdapter();
     const listings = await cc.fetchListings({ seenAt: today, maxPages: Number(process.env.CC_MAX_PAGES ?? 20) });
-    const universe = db.prepare(`SELECT id, name, number, set_name FROM cards`).all();
-    const matches = matchListings(listings, universe);
+    // Franchise-scoped matching: a One Piece listing may only match OP cards.
+    const CATEGORY_TO_IP = { 'Pokemon': 'PKMN', 'One Piece': 'OP', 'YuGiOh': 'YGO', 'Yu-Gi-Oh': 'YGO' };
+    const universeByIp = {};
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+      (universeByIp[c.ip] ??= []).push(c);
+    }
+    const matches = new Map();
+    for (const [category, ip] of Object.entries(CATEGORY_TO_IP)) {
+      const subset = listings.filter(l => l.category === category);
+      if (!subset.length || !universeByIp[ip]) continue;
+      for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
+    }
     db.exec(`DELETE FROM gacha_listings WHERE platform = 'collectorcrypt'`); // snapshot refresh
     const insL = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings

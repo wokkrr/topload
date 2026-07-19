@@ -42,14 +42,19 @@ export function makeCollectorCryptAdapter({
         for (const c of json.filterNFtCard ?? []) {
           if (!c.listing) continue;                      // browsing includes unlisted vault cards
           if (categories.length && !categories.includes(c.category)) continue;
+          if (c.type && c.type !== 'Card') continue;     // skip cases/boxes/sealed
           const priceNum = parseFloat(c.listing.price);
           if (!Number.isFinite(priceNum) || priceNum <= 0) continue;
+          // Structured grade fields are missing on some listings — fall back to
+          // parsing the title ('... PSA 10 ...') before giving up and calling it raw.
+          let grade = normalizeGrade(c.gradingCompany, c.gradeNum ?? c.grade);
+          if (grade === 'raw') grade = gradeFromTitle(c.itemName);
           out.push({
             platform: 'collectorcrypt',
             external_id: String(c.nftAddress ?? c.id),
             item_name: c.itemName ?? '',
             category: c.category ?? null,
-            grade: normalizeGrade(c.gradingCompany, c.gradeNum ?? c.grade),
+            grade,
             price_cents: Math.round(priceNum * 100),    // USDC ≈ USD
             currency: c.listing.currency ?? 'USDC',
             listed_at: c.listing.createdAt ?? null,
@@ -69,10 +74,21 @@ export function makeCollectorCryptAdapter({
   };
 }
 
-/** 'PSA' + 10 → 'PSA10'; 'CGC' + 9.5 → 'CGC9.5'; missing → 'raw'. */
+const COMPANY_ALIASES = { BECKETT: 'BGS' };
+
+/** 'PSA' + 10 → 'PSA10'; 'Beckett' + 9.5 → 'BGS9.5'; missing → 'raw'. */
 export function normalizeGrade(company, gradeNum) {
   if (!company || gradeNum == null || gradeNum === '') return 'raw';
   const n = typeof gradeNum === 'number' ? gradeNum : parseFloat(gradeNum);
   if (!Number.isFinite(n)) return 'raw';
-  return `${String(company).toUpperCase().replace(/[^A-Z]/g, '')}${n % 1 === 0 ? n : n.toFixed(1)}`;
+  let co = String(company).toUpperCase().replace(/[^A-Z]/g, '');
+  co = COMPANY_ALIASES[co] ?? co;
+  return `${co}${n % 1 === 0 ? n : n.toFixed(1)}`;
+}
+
+/** Parse 'PSA 10' / 'BGS 9.5' / 'CGC 10' out of a listing title; else 'raw'. */
+export function gradeFromTitle(title) {
+  const m = /\b(PSA|BGS|CGC|SGC|BECKETT)\s*([0-9]{1,2}(?:\.5)?)\b/i.exec(title ?? '');
+  if (!m) return 'raw';
+  return normalizeGrade(m[1], parseFloat(m[2]));
 }

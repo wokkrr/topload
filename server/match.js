@@ -17,7 +17,12 @@ export function matchListing(itemName, cards) {
   let best = null, bestScore = 0;
   for (const card of cards) {
     const name = norm(stripParen(card.name ?? ''));
-    if (!name || !title.includes(name)) continue;
+    if (!name) continue;
+    // Short names ('N', 'Mew') must match as whole words — substring matching
+    // lets the Pokémon trainer 'N' match every listing containing the letter n.
+    if (name.length < 5) {
+      if (!new RegExp(`(^|\\s)${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(title)) continue;
+    } else if (!title.includes(name)) continue;
 
     // Collector number: our format '199/165' — accept '199/165', '#199', ' 199 '.
     const numFull = norm(card.number ?? '');

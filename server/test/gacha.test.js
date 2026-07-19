@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeCollectorCryptAdapter, normalizeGrade } from '../adapters/collectorcrypt.js';
+import { makeCollectorCryptAdapter, normalizeGrade, gradeFromTitle } from '../adapters/collectorcrypt.js';
 import { matchListing } from '../match.js';
 
 const jsonRes = (body) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
@@ -35,8 +35,25 @@ describe('collectorcrypt adapter (fixtures)', () => {
     expect(normalizeGrade('PSA', 10)).toBe('PSA10');
     expect(normalizeGrade('CGC', 9.5)).toBe('CGC9.5');
     expect(normalizeGrade('psa', '9')).toBe('PSA9');
+    expect(normalizeGrade('Beckett', 9.5)).toBe('BGS9.5');
     expect(normalizeGrade(null, 10)).toBe('raw');
     expect(normalizeGrade('PSA', null)).toBe('raw');
+  });
+
+  it('falls back to parsing the grade from the title', () => {
+    expect(gradeFromTitle('2022 #001 Monkey D. Luffy PSA 10 One Piece Starter Deck')).toBe('PSA10');
+    expect(gradeFromTitle('Zoro MANGA ART SEC BGS 9.5 Wings of the Captain')).toBe('BGS9.5');
+    expect(gradeFromTitle('Charizard Base Set near mint')).toBe('raw');
+  });
+
+  it('title-grade fallback applies when structured fields are missing', async () => {
+    const page = { totalPages: 1, filterNFtCard: [
+      { id: 'x1', itemName: '2022 #001 Luffy PSA 10 One Piece', nftAddress: 'M1', category: 'One Piece',
+        listing: { price: '3550', currency: 'USDC' } }, // no gradingCompany/gradeNum
+    ]};
+    const cc = makeCollectorCryptAdapter({ fetchImpl: () => jsonRes(page), throttleMs: 0 });
+    const [l] = await cc.fetchListings({ seenAt: '2026-07-19' });
+    expect(l.grade).toBe('PSA10');
   });
 });
 
@@ -70,5 +87,13 @@ describe('listing→card matcher', () => {
   it('does not cross-match different cards sharing a number token', () => {
     // 'Mew ex' title must not match Charizard even though both are 151 cards.
     expect(matchListing('Pokemon 151 Mew ex #205 PSA 10', cards)).toBe('pkmn-sv3pt5-mew-ex-205');
+  });
+
+  it('short names only match as whole words (the trainer-N bug)', () => {
+    const withN = [...cards, { id: 'pkmn-trainer-n', name: 'N', number: '100/101', set_name: 'Noble Victories' }];
+    // 'Nami' contains 'n' but must NOT match the trainer card N.
+    expect(matchListing('2022 #OP01016 Nami ALT ART BGS 10 One Piece Romance Dawn 100', withN)).toBeNull();
+    // Genuine whole-word N listing still matches.
+    expect(matchListing('Pokemon Noble Victories N #100/101 Trainer PSA 10', withN)).toBe('pkmn-trainer-n');
   });
 });
