@@ -22,6 +22,8 @@
     "base:backfill": "node --env-file-if-exists=.env server/indexer-base.js --backfill",
     "phyg:dry": "node --env-file-if-exists=.env server/indexer-phygitals.js --dry",
     "phyg:backfill": "node --env-file-if-exists=.env server/indexer-phygitals.js --backfill",
+    "yard:dry": "node --env-file-if-exists=.env server/indexer-courtyard.js --dry",
+    "yard:backfill": "node --env-file-if-exists=.env server/indexer-courtyard.js --backfill",
     "import:pc": "node --env-file-if-exists=.env server/import-pricecharting-csv.js",
     "rematch": "node --env-file-if-exists=.env server/rematch.js",
     "api": "node --env-file-if-exists=.env server/api.js",

@@ -26,8 +26,8 @@ export const PLATFORMS = [
     url: 'https://mnstr.xyz',
   },
   {
-    id: 'courtyard', name: 'Courtyard', chain: 'Polygon', status: 'next',
-    access: 'Kaleb-priority #4. No public API; needs a Polygon NFT data provider (Alchemy-class key).',
+    id: 'courtyard', name: 'Courtyard', chain: 'Polygon', status: 'live',
+    access: 'Sales indexed on-chain (escrow-pattern secondary sales; mints excluded). $99M lifetime volume. Listings TBD.',
     url: 'https://courtyard.io',
   },
   {

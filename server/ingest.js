@@ -226,6 +226,15 @@ async function runLive(db, today) {
       console.warn(`[ingest] phygitals indexer failed: ${e.message}`);
     }
   }
+  if (process.env.ALCHEMY_API_KEY) {
+    try {
+      const { runCourtyardIndexer } = await import('./indexer-courtyard.js');
+      const idx = await runCourtyardIndexer(db, {});
+      summary.courtyardSales = idx.inserted;
+    } catch (e) {
+      console.warn(`[ingest] courtyard indexer failed: ${e.message}`);
+    }
+  }
 
   return summary;
 }
