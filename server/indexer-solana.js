@@ -72,11 +72,12 @@ function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, th
   };
   return {
     /** Parsed transactions for an address, newest first. `before` = signature cursor. */
-    async parsedTxs(address, { before, limit = 100 } = {}) {
+    async parsedTxs(address, { before, limit = 100, type } = {}) {
       return throttled(async () => {
         const url = new URL(`https://api.helius.xyz/v0/addresses/${address}/transactions`);
         url.searchParams.set('api-key', apiKey);
         url.searchParams.set('limit', String(limit));
+        if (type) url.searchParams.set('type', type);
         if (before) url.searchParams.set('before', before);
         const res = await fetchImpl(url);
         if (!res.ok) throw new Error(`helius parsedTxs → ${res.status}`);
@@ -159,7 +160,9 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
 
   for (let page = 0; page < maxPages && !reachedKnown; page++) {
     let txs;
-    try { txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before }); }
+    // type=NFT_SALE: server-side filter — the program firehose is ~94% bid
+    // noise (measured 2026-07-19: 935/1000 bids in a six-minute window).
+    try { txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before, type: 'NFT_SALE' }); }
     catch (e) { console.warn(`[solana] page fetch failed: ${e.message}`); break; }
     if (!txs.length) { if (backfill) setState('cc_backfill_done', '1'); break; }
     summary.pages++;
