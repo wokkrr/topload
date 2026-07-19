@@ -14,6 +14,7 @@
     "probe:gacha": "node --env-file-if-exists=.env server/probe-gacha.js",
     "probe:solana": "node --env-file-if-exists=.env server/probe-solana.js",
     "probe:base": "node --env-file-if-exists=.env server/probe-base.js",
+    "probe:mint": "node --env-file-if-exists=.env server/probe-mint.js",
     "solana:dry": "node --env-file-if-exists=.env server/indexer-solana.js --dry",
     "solana:backfill": "node --env-file-if-exists=.env server/indexer-solana.js --backfill",
     "base:dry": "node --env-file-if-exists=.env server/indexer-base.js --dry",
