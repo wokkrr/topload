@@ -12,6 +12,7 @@
     "ingest": "node --env-file-if-exists=.env server/ingest.js",
     "probe:pricecharting": "node --env-file-if-exists=.env server/probe-pricecharting.js",
     "probe:gacha": "node --env-file-if-exists=.env server/probe-gacha.js",
+    "probe:solana": "node --env-file-if-exists=.env server/probe-solana.js",
     "import:pc": "node --env-file-if-exists=.env server/import-pricecharting-csv.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
