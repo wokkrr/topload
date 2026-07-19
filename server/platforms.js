@@ -25,11 +25,8 @@ export const PLATFORMS = [
     access: 'Fanatics Collect integration (Apr 2026). Solana program indexing candidate.',
     url: 'https://www.phygitals.com',
   },
-  {
-    id: 'ripfun', name: 'RIP.FUN', chain: 'Base', status: 'recon',
-    access: 'Access path unmapped; Base chain indexing candidate.',
-    url: 'https://rip.fun',
-  },
+  // RIP.FUN (Base) removed from the roster 2026-07-19 (Kaleb: low usage vs
+  // the others right now) — re-add here when volumes justify it.
   {
     id: 'mnstr', name: 'MNSTR', chain: 'Solana', status: 'recon',
     access: 'Marketplace live (PKMN; OP soon), FMV sorting. No public API found; on-chain candidate + outreach.',
