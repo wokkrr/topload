@@ -4,7 +4,7 @@ import { api } from './data/client.js';
 import { IndexChart } from './ui/IndexChart.jsx';
 import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
-import { MoversTable, BasketTable, CardsTable, GachaPlaceholder } from './ui/tables.jsx';
+import { MoversTable, BasketTable, CardsTable, GachaDesk } from './ui/tables.jsx';
 
 const TABS = ['Cards', 'Indexes', 'Movers', 'Basket', 'Gacha Desk'];
 const RANGES = [7, 30, 90];
@@ -17,10 +17,12 @@ export default function App() {
   const [movers, setMovers] = useState(null);
   const [basket, setBasket] = useState(null);
   const [cards, setCards] = useState(null);
+  const [gacha, setGacha] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => { api.cards().then(setCards).catch(e => setErr(String(e))); }, []);
+  useEffect(() => { api.gacha().then(setGacha).catch(() => setGacha([])); }, []);
   useEffect(() => { api.indexes(days).then(setIndexes).catch(e => setErr(String(e))); }, [days]);
   useEffect(() => { api.movers(1).then(setMovers).catch(e => setErr(String(e))); }, []);
   useEffect(() => { api.basket(basketIp).then(setBasket).catch(e => setErr(String(e))); }, [basketIp]);
@@ -95,7 +97,7 @@ export default function App() {
           </section>
         )}
 
-        {!selectedCard && tab === 'Gacha Desk' && <GachaPlaceholder />}
+        {!selectedCard && tab === 'Gacha Desk' && <GachaDesk listings={gacha} onSelect={setSelectedCard} />}
       </main>
     </div>
   );

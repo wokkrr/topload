@@ -45,6 +45,24 @@ CREATE TABLE IF NOT EXISTS oracle_prices (
   PRIMARY KEY (card_id, grade, as_of)
 );
 
+-- Current gacha/vault marketplace listings (snapshot, refreshed each ingest).
+-- Asking prices — NEVER oracle input; used for the aggregator + comp-deltas.
+CREATE TABLE IF NOT EXISTS gacha_listings (
+  platform    TEXT NOT NULL,               -- 'collectorcrypt', ...
+  external_id TEXT NOT NULL,               -- platform-side id (nft address / db id)
+  card_id     TEXT,                        -- matched card in our universe (nullable)
+  item_name   TEXT NOT NULL,
+  category    TEXT,                        -- 'Pokemon', ...
+  grade       TEXT,                        -- normalized: 'PSA10', 'CGC9.5', 'raw'
+  price_cents INTEGER NOT NULL,            -- listing ask (USDC ≈ USD)
+  currency    TEXT NOT NULL DEFAULT 'USDC',
+  listed_at   TEXT,
+  image       TEXT,
+  nft_address TEXT,
+  seen_at     TEXT NOT NULL,               -- snapshot timestamp (ISO date)
+  PRIMARY KEY (platform, external_id)
+);
+
 -- Daily observations of external solds-derived price series (not raw sales).
 -- Kept separate from `sales` so the solds-only invariant of that table holds.
 CREATE TABLE IF NOT EXISTS external_marks (

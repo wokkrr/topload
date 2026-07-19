@@ -17,6 +17,8 @@ import { openDb } from './db.js';
 import { makeDemoAdapter } from './adapters/demo.js';
 import { makePokemonTcgAdapter } from './adapters/pokemontcg.js';
 import { makePriceChartingAdapter } from './adapters/pricecharting.js';
+import { makeCollectorCryptAdapter } from './adapters/collectorcrypt.js';
+import { matchListings } from './match.js';
 import { opCardRecords } from './universe.js';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
 import { refreshIndexes } from './indexes.js';
@@ -121,8 +123,31 @@ async function runLive(db, today) {
     for (const m of marks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
   }
 
-  // 3. Raw solds: slot for eBay Marketplace Insights when access is granted.
-  //    (Gacha on-chain sales land here in build step 2 — they're public data.)
+  // 3. Gacha listings: Collector Crypt current listings (asking prices → aggregator only).
+  try {
+    const cc = makeCollectorCryptAdapter();
+    const listings = await cc.fetchListings({ seenAt: today, maxPages: Number(process.env.CC_MAX_PAGES ?? 20) });
+    const universe = db.prepare(`SELECT id, name, number, set_name FROM cards`).all();
+    const matches = matchListings(listings, universe);
+    db.exec(`DELETE FROM gacha_listings WHERE platform = 'collectorcrypt'`); // snapshot refresh
+    const insL = db.prepare(
+      `INSERT OR REPLACE INTO gacha_listings
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, nft_address, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const l of listings) {
+      insL.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.nft_address, l.seen_at);
+    }
+    summary.gachaListings = listings.length;
+    summary.gachaMatched = matches.size;
+    console.log(`[ingest] collectorcrypt listings: ${listings.length} (${matches.size} matched to tracked cards)`);
+  } catch (e) {
+    console.warn(`[ingest] collectorcrypt fetch failed: ${e.message}`);
+  }
+
+  // 4. Raw solds: slot for eBay Marketplace Insights when access is granted.
+  //    (Gacha on-chain SALES indexing lands next — that's self-collected solds.)
 
   return summary;
 }

@@ -16,6 +16,8 @@ export const api = {
   movers: (window = 1) => get(`/api/movers?window=${window}`),
   /** current basket membership with marks */
   basket: (index = 'PKMN') => get(`/api/basket?index=${index}`),
+  /** gacha listings with grade-matched oracle comps */
+  gacha: () => get('/api/gacha'),
   /** screener: all tracked cards with latest marks */
   cards: (ip) => get(`/api/cards${ip ? `?ip=${ip}` : ''}`),
   /** card meta + latest mark per grade */

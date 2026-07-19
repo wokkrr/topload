@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "ingest": "node --env-file-if-exists=.env server/ingest.js",
     "probe:pricecharting": "node --env-file-if-exists=.env server/probe-pricecharting.js",
+    "probe:gacha": "node --env-file-if-exists=.env server/probe-gacha.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
   },

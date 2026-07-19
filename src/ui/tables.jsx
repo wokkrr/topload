@@ -93,12 +93,48 @@ export function CardsTable({ cards, onSelect }) {
   );
 }
 
-export function GachaPlaceholder() {
+export function GachaDesk({ listings, onSelect }) {
+  if (!listings) return <Empty label="gacha" />;
+  if (!listings.length) {
+    return (
+      <div style={{ padding: '48px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>
+        <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>No gacha listings yet</div>
+        Run `npm run ingest` — live mode pulls current Collector Crypt listings (Pokémon + One Piece slabs).
+      </div>
+    );
+  }
+  const matched = listings.filter(l => l.delta_pct != null);
   return (
-    <div style={{ padding: '48px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>
-      <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>Gacha Desk — build step 2</div>
-      Cross-platform on-chain listings (Collector Crypt, Phygitals, Courtyard, RIP.FUN) sorted by discount vs oracle comp,
-      with wallet-connect buys. Scope locked: listings + comp-delta only. Lands with the aggregator phase.
+    <div>
+      <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
+        {listings.length} live listings · Collector Crypt (Solana) · {matched.length} with grade-matched oracle comps ·
+        asking prices, never oracle input
+      </div>
+      <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
+        <thead><tr>
+          <th style={thL}>Listing</th><th style={thL}>Grade</th><th style={th}>Ask</th>
+          <th style={th}>Oracle comp</th><th style={th}>Δ vs comp</th><th style={th}>Comp conf</th>
+        </tr></thead>
+        <tbody>
+          {listings.map(l => (
+            <tr key={`${l.platform}|${l.external_id}`}
+                onClick={l.card_id ? () => onSelect?.(l.card_id) : undefined}
+                style={{ cursor: l.card_id ? 'pointer' : 'default' }}>
+              <td style={tdL}>
+                {l.ip && <IpDot ip={l.ip} />}{l.item_name}
+                {l.card_name && <span style={{ color: tokens.color.inkMuted }}> → {l.card_name}</span>}
+              </td>
+              <td style={tdL}>{l.grade}</td>
+              <td style={td}>{fmtUsd(l.price_cents)}</td>
+              <td style={td}>{l.comp_cents ? fmtUsd(l.comp_cents) : '—'}</td>
+              <td style={td}>{l.delta_pct != null
+                ? <span style={{ color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down }}>{fmtPct(l.delta_pct)}</span>
+                : <span style={{ color: tokens.color.inkMuted }}>no comp</span>}</td>
+              <td style={td}>{l.comp_confidence != null ? <Conf c={l.comp_confidence} /> : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

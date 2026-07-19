@@ -132,5 +132,24 @@ app.get('/api/cards/:id/series', (req, res) => {
   res.json(rows);
 });
 
+/** GET /api/gacha → current gacha listings with grade-matched oracle comps */
+app.get('/api/gacha', (req, res) => {
+  const rows = db.prepare(`
+    WITH latest AS (SELECT MAX(as_of) d FROM oracle_prices)
+    SELECT g.platform, g.external_id, g.card_id, g.item_name, g.category, g.grade,
+           g.price_cents, g.currency, g.listed_at, g.image, g.nft_address,
+           c.name AS card_name, c.ip,
+           o.price_cents AS comp_cents, o.confidence AS comp_confidence, o.basis AS comp_basis, o.source AS comp_source
+    FROM gacha_listings g
+    LEFT JOIN cards c ON c.id = g.card_id
+    LEFT JOIN latest
+    LEFT JOIN oracle_prices o ON o.card_id = g.card_id AND o.grade = g.grade AND o.as_of = latest.d
+    ORDER BY (o.price_cents IS NULL), CAST(g.price_cents AS REAL) / NULLIF(o.price_cents, 0) ASC, g.price_cents DESC`).all();
+  res.json(rows.map(r => ({
+    ...r,
+    delta_pct: r.comp_cents ? +((r.price_cents / r.comp_cents - 1) * 100).toFixed(2) : null,
+  })));
+});
+
 const port = process.env.PORT ?? 5174;
 app.listen(port, () => console.log(`[api] listening on :${port}`));
