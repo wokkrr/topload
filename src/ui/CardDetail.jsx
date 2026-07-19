@@ -34,18 +34,49 @@ export function CardDetail({ cardId, onBack }) {
   const cur = card.grades.find(g => g.grade === grade);
   const seriesColor = tokens.series[card.ip]?.data ?? tokens.color.ink;
 
+  // Range stats from the loaded window (token-page style).
+  const range = series?.length ? {
+    hi: Math.max(...series.map(p => p.price_cents)),
+    lo: Math.min(...series.map(p => p.price_cents)),
+    d7: series.length > 7 ? +((series[series.length - 1].price_cents / series[series.length - 8].price_cents - 1) * 100).toFixed(2) : null,
+    window: +((series[series.length - 1].price_cents / series[0].price_cents - 1) * 100).toFixed(2),
+  } : null;
+
   return (
     <section>
       <button onClick={onBack} style={backStyle}>← back</button>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '12px 0 2px' }}>
-        <h2 style={{ font: `20px ${tokens.font.display}`, margin: 0 }}>{card.name}</h2>
-        <span style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}` }}>
-          {card.set_name} {card.number} · {tokens.series[card.ip]?.label ?? card.ip}
-        </span>
+      {/* ── Hero: identity + big price + delta chips ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 32, margin: '14px 0 4px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+            <h2 style={{ font: `24px ${tokens.font.display}`, margin: 0 }}>{card.name}</h2>
+            <span style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}` }}>
+              {card.set_name} {card.number} · {tokens.series[card.ip]?.label ?? card.ip}
+            </span>
+          </div>
+          {cur && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 8 }}>
+              <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(cur.price_cents)}</span>
+              <DeltaChip label="1D" pct={cur.change_1d_pct} />
+              <DeltaChip label="7D" pct={range?.d7} />
+              <DeltaChip label="30D" pct={cur.change_30d_pct} />
+              <span style={{ font: `10px ${tokens.font.mono}`, color: cur.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary,
+                             border: `1px solid ${tokens.color.border}`, borderRadius: 3, padding: '2px 7px' }}>
+                {cur.basis === 'solds' ? 'RAW SOLDS' : 'EXTERNAL'} · CONF {(cur.confidence * 100).toFixed(0)}
+              </span>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 24, marginLeft: 'auto', flexWrap: 'wrap' }}>
+          {range && <Stat label={`${days}D high`} value={fmtUsd(range.hi)} />}
+          {range && <Stat label={`${days}D low`} value={fmtUsd(range.lo)} />}
+          {cur && <Stat label="Sales 7D / 30D" value={`${cur.sales_7d} / ${cur.sales_30d}`} />}
+          {range && <Stat label={`${days}D return`} value={fmtPct(range.window)} color={deltaColor(range.window)} />}
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 4, margin: '12px 0 16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, margin: '14px 0 16px', flexWrap: 'wrap' }}>
         {card.grades.map(g => (
           <button key={g.grade} onClick={() => setGrade(g.grade)} style={{
             background: grade === g.grade ? tokens.color.surfaceRaised : 'none',
@@ -64,18 +95,6 @@ export function CardDetail({ cardId, onBack }) {
           }}>{r}D</button>
         ))}
       </div>
-
-      {cur && (
-        <div style={{ display: 'flex', gap: 28, marginBottom: 16, flexWrap: 'wrap' }}>
-          <Stat label={`Oracle mark · ${grade}`} value={fmtUsd(cur.price_cents)} big />
-          <Stat label="Δ1D" value={fmtPct(cur.change_1d_pct)} color={deltaColor(cur.change_1d_pct)} />
-          <Stat label="Δ30D" value={fmtPct(cur.change_30d_pct)} color={deltaColor(cur.change_30d_pct)} />
-          <Stat label="Sales 7D / 30D" value={`${cur.sales_7d} / ${cur.sales_30d}`} />
-          <Stat label="Confidence" value={`${(cur.confidence * 100).toFixed(0)}`} />
-          <Stat label="Basis" value={cur.basis === 'solds' ? 'raw solds' : 'external (PC)'}
-                color={cur.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary} />
-        </div>
-      )}
 
       <MarkChart series={series} color={seriesColor} />
 
@@ -100,9 +119,64 @@ export function CardDetail({ cardId, onBack }) {
           ))}
         </tbody>
       </table>
+
+      {/* ── Breakdown / listings / catalysts ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginTop: 28 }}>
+        <Panel title="About this card">
+          <Row k="IP" v={tokens.series[card.ip]?.label ?? card.ip} />
+          <Row k="Set" v={card.set_name ?? '—'} />
+          <Row k="Number" v={card.number ?? '—'} />
+          <Row k="Rarity / variant" v={card.variant || '—'} />
+          <Row k="Grades tracked" v={card.grades.map(g => g.grade).join(', ')} />
+          <Row k="Marked as of" v={cur?.as_of ?? '—'} />
+        </Panel>
+        <Panel title="Live listings">
+          <div style={placeholderStyle}>
+            Aggregated eBay + gacha-platform listings with discount-vs-oracle
+            badges land here in build step 2 — every listing priced against the
+            mark above.
+          </div>
+        </Panel>
+        <Panel title="News & catalysts">
+          <div style={placeholderStyle}>
+            Reprints, set rotations, tournament results, grading-pop changes —
+            the "why it moved" column. Data source TBD; on the backlog after
+            live pricing.
+          </div>
+        </Panel>
+      </div>
     </section>
   );
 }
+
+function DeltaChip({ label, pct }) {
+  const c = pct == null ? tokens.color.inkMuted : pct >= 0 ? tokens.color.up : tokens.color.down;
+  return (
+    <span style={{ font: `12px ${tokens.font.mono}`, color: c }}>
+      <span style={{ color: tokens.color.inkMuted, fontSize: 10 }}>{label} </span>{fmtPct(pct)}
+    </span>
+  );
+}
+
+function Panel({ title, children }) {
+  return (
+    <div style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 8, background: tokens.color.surface, padding: '14px 16px' }}>
+      <div style={{ font: `13px ${tokens.font.display}`, color: tokens.color.ink, marginBottom: 10 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function Row({ k, v }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', font: `12px ${tokens.font.body}` }}>
+      <span style={{ color: tokens.color.inkMuted }}>{k}</span>
+      <span style={{ color: tokens.color.ink, font: `12px ${tokens.font.mono}`, textAlign: 'right' }}>{v}</span>
+    </div>
+  );
+}
+
+const placeholderStyle = { color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, lineHeight: 1.6 };
 
 function MarkChart({ series, color }) {
   const [hover, setHover] = useState(null);

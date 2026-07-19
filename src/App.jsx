@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { tokens } from './tokens.js';
 import { api } from './data/client.js';
 import { IndexChart } from './ui/IndexChart.jsx';
+import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
 import { MoversTable, BasketTable, GachaPlaceholder } from './ui/tables.jsx';
 
@@ -39,7 +40,9 @@ export default function App() {
           ))}
         </nav>
       </header>
-      <hr style={{ border: 'none', borderTop: `1px solid ${tokens.color.border}`, margin: '0 0 20px' }} />
+      <hr style={{ border: 'none', borderTop: `1px solid ${tokens.color.border}`, margin: 0 }} />
+      <TickerTape onSelect={setSelectedCard} />
+      <div style={{ height: 20 }} />
 
       <main style={{ padding: '0 28px 40px', maxWidth: 1000, margin: '0 auto' }}>
         {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 12 }}>{err}</div>}
