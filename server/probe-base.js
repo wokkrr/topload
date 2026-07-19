@@ -85,5 +85,42 @@ try {
   }
 } catch (e) { out.metadataSample = `ERROR: ${e.message}`; }
 
+// 5. Receipt anatomy for distinct recent txs — distinguishes marketplace sales
+//    (USDC buyer→seller) from Claw pulls (payment→treasury, cards from vault).
+const USDC_BASE = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
+const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+try {
+  const r = await rpc('alchemy_getAssetTransfers', [{
+    fromBlock: '0x0', toBlock: 'latest',
+    contractAddresses: [BEEZIE_BASE_CONTRACT],
+    category: ['erc721'], order: 'desc', maxCount: '0x28', withMetadata: true,
+  }]);
+  const hashes = [...new Set((r.transfers ?? []).map(t => t.hash))].slice(0, 6);
+  out.receipts = [];
+  for (const hash of hashes) {
+    const rec = await rpc('eth_getTransactionReceipt', [hash]);
+    const logs = rec?.logs ?? [];
+    const usdc = logs
+      .filter(l => l.address?.toLowerCase() === USDC_BASE && l.topics?.[0] === TRANSFER_TOPIC)
+      .map(l => ({
+        from: '0x' + l.topics[1].slice(26, 34),
+        to: '0x' + l.topics[2].slice(26, 34),
+        usd: parseInt(l.data, 16) / 1e6,
+      }));
+    const beezieMoves = logs.filter(l =>
+      l.address?.toLowerCase() === BEEZIE_BASE_CONTRACT && l.topics?.[0] === TRANSFER_TOPIC).length;
+    const otherLogAddrs = [...new Set(logs
+      .map(l => l.address?.toLowerCase())
+      .filter(a => a !== USDC_BASE && a !== BEEZIE_BASE_CONTRACT))].slice(0, 4);
+    out.receipts.push({
+      hash: hash.slice(0, 18),
+      txTo: rec?.to?.slice(0, 14),          // the contract users called — marketplace? claw?
+      nftMoves: beezieMoves,
+      usdcFlows: usdc.slice(0, 5),
+      otherContracts: otherLogAddrs.map(a => a.slice(0, 14)),
+    });
+  }
+} catch (e) { out.receipts = `ERROR: ${e.message}`; }
+
 console.log('\n===== PASTE EVERYTHING BELOW TO CLAUDE =====');
 console.log(JSON.stringify(out, null, 1));
