@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { tokens } from '../tokens.js';
 import { fmtUsd, fmtPct } from '../data/client.js';
 
@@ -146,6 +147,7 @@ export function PlatformStrip({ platforms }) {
 }
 
 export function GachaDesk({ listings, platforms, onSelect }) {
+  const [view, setView] = useState('table');
   if (!listings) return <Empty label="gacha" />;
   if (!listings.length) {
     return (
@@ -162,10 +164,24 @@ export function GachaDesk({ listings, platforms, onSelect }) {
   return (
     <div>
       <PlatformStrip platforms={platforms} />
-      <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
-        {listings.length} live listings · {matched.length} with grade-matched oracle comps ·
-        asking prices, never oracle input
+      <div style={{ display: 'flex', alignItems: 'center', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
+        <span>
+          {listings.length} live listings · {matched.length} with grade-matched oracle comps ·
+          asking prices, never oracle input
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+          {['table', 'grid'].map(v => (
+            <button key={v} onClick={() => setView(v)} style={{
+              background: view === v ? tokens.color.surfaceRaised : 'none',
+              border: `1px solid ${view === v ? tokens.color.inkMuted : tokens.color.border}`,
+              color: view === v ? tokens.color.ink : tokens.color.inkSecondary,
+              borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
+            }}>{v === 'table' ? 'Table' : 'Thumbnails'}</button>
+          ))}
+        </span>
       </div>
+      {view === 'grid' && <GachaGrid listings={listings} onSelect={onSelect} />}
+      {view === 'table' && <div>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
         <thead><tr>
           <th style={thL}>Listing</th><th style={thL}>Grade</th><th style={th}>Ask</th>
@@ -194,6 +210,59 @@ export function GachaDesk({ listings, platforms, onSelect }) {
           ))}
         </tbody>
       </table>
+      </div>}
+    </div>
+  );
+}
+
+/** Thumbnail grid — slabs as visual merchandise. */
+function GachaGrid({ listings, onSelect }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 14 }}>
+      {listings.map(l => (
+        <div key={`${l.platform}|${l.external_id}`}
+             onClick={l.card_id ? () => onSelect?.(l.card_id) : undefined}
+             title={l.item_name}
+             style={{
+               border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
+               background: tokens.color.surface, cursor: l.card_id ? 'pointer' : 'default',
+             }}>
+          <div style={{ position: 'relative', aspectRatio: '3/4', background: tokens.color.surfaceRaised }}>
+            {l.image
+              ? <img src={l.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `10px ${tokens.font.body}` }}>no photo</div>}
+            {l.image && l.image_kind === 'art' && (
+              <span style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
+                font: `600 8px ${tokens.font.body}`, letterSpacing: '0.06em',
+                color: tokens.color.ink, background: 'rgba(16,18,20,0.85)', padding: '2px 0',
+              }}>NOT ITEM · REFERENCE ART</span>
+            )}
+            <span style={{
+              position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`,
+              color: tokens.color.ink, background: 'rgba(16,18,20,0.85)',
+              borderRadius: 3, padding: '2px 6px',
+            }}>{l.grade}</span>
+            {l.delta_pct != null && (
+              <span style={{
+                position: 'absolute', top: 6, right: 6, font: `10px ${tokens.font.mono}`,
+                color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down,
+                background: 'rgba(16,18,20,0.85)', borderRadius: 3, padding: '2px 6px',
+              }}>{fmtPct(l.delta_pct)}</span>
+            )}
+          </div>
+          <div style={{ padding: '8px 10px' }}>
+            <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</div>
+            <div style={{
+              font: `10px ${tokens.font.body}`, color: tokens.color.inkSecondary, marginTop: 2,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{l.card_name ?? l.item_name}</div>
+            <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 1 }}>
+              {l.comp_cents ? `comp ${fmtUsd(l.comp_cents)}` : 'no comp'}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
