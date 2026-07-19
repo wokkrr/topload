@@ -66,13 +66,15 @@ CREATE TABLE IF NOT EXISTS gacha_listings (
 -- Daily observations of external solds-derived price series (not raw sales).
 -- Kept separate from `sales` so the solds-only invariant of that table holds.
 CREATE TABLE IF NOT EXISTS external_marks (
-  source      TEXT NOT NULL,               -- 'pricecharting'
-  card_id     TEXT NOT NULL,
-  grade       TEXT NOT NULL,
-  as_of       TEXT NOT NULL,
-  price_cents INTEGER NOT NULL,
+  source       TEXT NOT NULL,              -- 'pricecharting', 'tcgplayer'
+  card_id      TEXT NOT NULL,
+  grade        TEXT NOT NULL,
+  as_of        TEXT NOT NULL,
+  price_cents  INTEGER NOT NULL,
+  sales_volume INTEGER,                    -- source-reported liquidity (PC CSV); index weighting fallback
   PRIMARY KEY (source, card_id, grade, as_of)
 );
+CREATE INDEX IF NOT EXISTS idx_external_marks_card ON external_marks(card_id, grade, as_of);
 
 -- Rules-based basket membership, recorded per rebalance date.
 CREATE TABLE IF NOT EXISTS basket_members (

@@ -120,6 +120,7 @@ export function refreshOutlierFlags(db, opts = {}) {
   ).all();
   const upd = db.prepare(`UPDATE sales SET is_outlier = ?, outlier_reason = ? WHERE id = ?`);
   let flagged = 0;
+  db.exec('BEGIN');
   for (const { card_id, grade } of series) {
     const rows = db.prepare(
       `SELECT id, price_cents FROM sales WHERE card_id = ? AND grade = ? ORDER BY sold_at, id`
@@ -130,6 +131,7 @@ export function refreshOutlierFlags(db, opts = {}) {
       if (flags[i]) flagged++;
     }
   }
+  db.exec('COMMIT');
   return { series: series.length, flagged };
 }
 
@@ -161,6 +163,7 @@ export function refreshOracle(db, dates, opts = {}) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   let written = 0, externalUsed = 0;
+  db.exec('BEGIN');
 
   // Pass 1: first-class marks from raw solds.
   const soldsSeries = db.prepare(`SELECT DISTINCT card_id, grade FROM sales WHERE is_outlier = 0`).all();
@@ -184,30 +187,43 @@ export function refreshOracle(db, dates, opts = {}) {
   }
 
   // Pass 2: external bootstrap where no solds mark exists — best source wins.
-  const extSeries = db.prepare(`SELECT DISTINCT card_id, grade FROM external_marks`).all();
-  for (const { card_id, grade } of extSeries) {
-    const obs = db.prepare(
-      `SELECT source, price_cents, as_of FROM external_marks WHERE card_id = ? AND grade = ? ORDER BY as_of`
-    ).all(card_id, grade);
-    for (const asOf of dates) {
-      if (marked.has(`${card_id}|${grade}|${asOf}`)) continue;
-      // Freshest observation per source at or before asOf, no older than 7 days.
-      const bySource = new Map();
-      for (const o of obs) { if (o.as_of <= asOf) bySource.set(o.source, o); }
-      let best = null, bestMeta = null;
-      for (const [source, o] of bySource) {
-        const meta = EXTERNAL_SOURCES[source] ?? { discount: 0.4, priority: 99 };
-        const staleDays = Math.round((new Date(asOf) - new Date(o.as_of)) / DAY_MS);
-        if (staleDays > 7) continue;
-        if (!best || meta.priority < bestMeta.priority) { best = { ...o, staleDays }; bestMeta = meta; }
-      }
-      if (!best) continue;
-      const confidence = +(bestMeta.discount * (1 - best.staleDays / 14)).toFixed(4);
-      ins.run(card_id, grade, asOf, best.price_cents, 0, 0, confidence, 'external', best.source);
-      externalUsed++;
-      written++;
-    }
+  // Set-based (one statement per date): per-series loops don't scale to a
+  // full-catalog import (183k series × query ≈ 40 min; this ≈ 1 s).
+  const priCase = Object.entries(EXTERNAL_SOURCES)
+    .map(([s, m]) => `WHEN '${s}' THEN ${m.priority}`).join(' ');
+  const discCase = Object.entries(EXTERNAL_SOURCES)
+    .map(([s, m]) => `WHEN '${s}' THEN ${m.discount}`).join(' ');
+  const extStmt = db.prepare(`
+    WITH latest AS (
+      SELECT card_id, grade, source, MAX(as_of) AS obs_date
+      FROM external_marks WHERE as_of <= :asOf
+      GROUP BY card_id, grade, source
+    ),
+    fresh AS (
+      SELECT l.*, CAST(julianday(:asOf) - julianday(l.obs_date) AS INTEGER) AS stale,
+             CASE l.source ${priCase} ELSE 99 END AS pri,
+             CASE l.source ${discCase} ELSE 0.4 END AS disc
+      FROM latest l
+      WHERE julianday(:asOf) - julianday(l.obs_date) <= 7
+    ),
+    best AS (
+      SELECT f.* FROM fresh f
+      WHERE NOT EXISTS (SELECT 1 FROM fresh f2 WHERE f2.card_id = f.card_id AND f2.grade = f.grade AND f2.pri < f.pri)
+        AND NOT EXISTS (SELECT 1 FROM oracle_prices op
+                        WHERE op.card_id = f.card_id AND op.grade = f.grade AND op.as_of = :asOf AND op.basis = 'solds')
+    )
+    INSERT OR REPLACE INTO oracle_prices (card_id, grade, as_of, price_cents, sales_7d, sales_30d, confidence, basis, source)
+    SELECT b.card_id, b.grade, :asOf, em.price_cents, 0, 0,
+           ROUND(b.disc * (1 - b.stale / 14.0), 4), 'external', b.source
+    FROM best b
+    JOIN external_marks em
+      ON em.card_id = b.card_id AND em.grade = b.grade AND em.source = b.source AND em.as_of = b.obs_date`);
+  for (const asOf of dates) {
+    const r = extStmt.run({ asOf });
+    externalUsed += Number(r.changes);
+    written += Number(r.changes);
   }
 
-  return { series: soldsSeries.length + extSeries.length, marks: written, externalMarks: externalUsed };
+  db.exec('COMMIT');
+  return { series: soldsSeries.length, marks: written, externalMarks: externalUsed };
 }

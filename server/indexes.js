@@ -20,6 +20,7 @@ export const INDEX_DEFAULTS = {
   minConfidence: 0.3,
   rebalanceDays: 30,
   volumeLookbackDays: 90,
+  maxWeight: 0.10,   // per-constituent cap — one $21M Pikachu must not BE the index
 };
 
 // ---------- pure math ----------
@@ -29,18 +30,27 @@ export const INDEX_DEFAULTS = {
  * @param {{card_id:string, grade:string, sales_90d:number, confidence:number, price_cents:number, weekly_sales:number}[]} candidates
  * @returns {{card_id:string, grade:string, weight:number}[]} weights sum to 1
  */
-export function selectBasket(candidates, { topN = INDEX_DEFAULTS.topN, minConfidence = INDEX_DEFAULTS.minConfidence } = {}) {
+export function selectBasket(candidates, { topN = INDEX_DEFAULTS.topN, minConfidence = INDEX_DEFAULTS.minConfidence, maxWeight = INDEX_DEFAULTS.maxWeight } = {}) {
   const eligible = candidates
     .filter(c => c.confidence >= minConfidence && c.sales_90d > 0 && c.price_cents > 0)
     .sort((a, b) => b.sales_90d - a.sales_90d || b.price_cents - a.price_cents)
     .slice(0, topN);
   const totalLiq = eligible.reduce((a, c) => a + c.price_cents * c.weekly_sales, 0);
   if (totalLiq === 0) return [];
-  return eligible.map(c => ({
-    card_id: c.card_id,
-    grade: c.grade,
-    weight: (c.price_cents * c.weekly_sales) / totalLiq,
-  }));
+  let weights = eligible.map(c => (c.price_cents * c.weekly_sales) / totalLiq);
+
+  // Cap-and-redistribute (standard capped-weight method, iterated to stability).
+  if (maxWeight && weights.length > 1 / maxWeight) {
+    for (let iter = 0; iter < 20; iter++) {
+      const over = weights.map(w => w > maxWeight);
+      if (!over.some(Boolean)) break;
+      const excess = weights.reduce((a, w, i) => a + (over[i] ? w - maxWeight : 0), 0);
+      const underSum = weights.reduce((a, w, i) => a + (over[i] ? 0 : w), 0);
+      weights = weights.map((w, i) => over[i] ? maxWeight : (underSum > 0 ? w + (w / underSum) * excess : w));
+    }
+  }
+
+  return eligible.map((c, i) => ({ card_id: c.card_id, grade: c.grade, weight: weights[i] }));
 }
 
 /**
@@ -108,15 +118,26 @@ export function refreshIndexes(db, opts = {}) {
   const dates = isoDaysBetween(range.lo, range.hi);
   const ips = db.prepare(`SELECT DISTINCT ip FROM cards`).all().map(r => r.ip);
 
+  // Liquidity: prefer raw-solds counts; fall back to source-reported sales_volume
+  // (PriceCharting CSV) so indexes work in the external-bootstrap era. The
+  // volume window is ~90d-ish, so weekly ≈ volume/13.
   const candStmt = db.prepare(`
+    WITH vol AS (
+      SELECT em.card_id, em.grade, em.sales_volume
+      FROM external_marks em
+      JOIN (SELECT card_id, grade, MAX(as_of) mx FROM external_marks GROUP BY card_id, grade) l
+        ON l.card_id = em.card_id AND l.grade = em.grade AND l.mx = em.as_of
+      WHERE em.sales_volume IS NOT NULL
+    )
     SELECT op.card_id, op.grade, op.price_cents, op.confidence,
-           op.sales_30d * 3 AS sales_90d_est,   -- fallback if window shorter than 90d
-           (op.sales_7d) AS weekly_sales,
-           (SELECT COUNT(*) FROM sales s
+           COALESCE(NULLIF((SELECT COUNT(*) FROM sales s
              WHERE s.card_id = op.card_id AND s.grade = op.grade AND s.is_outlier = 0
-               AND s.sold_at >= date(op.as_of, '-90 day') AND s.sold_at <= op.as_of) AS sales_90d
+               AND s.sold_at >= date(op.as_of, '-90 day') AND s.sold_at <= op.as_of), 0),
+             vol.sales_volume, 0) AS sales_90d,
+           COALESCE(NULLIF(op.sales_7d, 0), vol.sales_volume / 13.0, 0) AS weekly_sales
     FROM oracle_prices op
     JOIN cards c ON c.id = op.card_id
+    LEFT JOIN vol ON vol.card_id = op.card_id AND vol.grade = op.grade
     WHERE c.ip = ? AND op.as_of = ?`);
   const priceStmt = db.prepare(`
     SELECT op.card_id, op.grade, op.price_cents
@@ -126,6 +147,7 @@ export function refreshIndexes(db, opts = {}) {
   const insValue = db.prepare(`INSERT OR REPLACE INTO index_values (index_id, as_of, value, raw_level) VALUES (?, ?, ?, ?)`);
 
   let points = 0;
+  db.exec('BEGIN');
   for (const ip of ips) {
     // Rebalance schedule: first date, then every rebalanceDays.
     const rebalanceDates = dates.filter((_, i) => i % o.rebalanceDays === 0);
@@ -154,5 +176,6 @@ export function refreshIndexes(db, opts = {}) {
     const series = computeIndexSeries(dates, pricesAt, basketAt);
     for (const row of series) { insValue.run(ip, row.as_of, row.value, row.raw_level); points++; }
   }
+  db.exec('COMMIT');
   return { indexes: ips.length, points };
 }

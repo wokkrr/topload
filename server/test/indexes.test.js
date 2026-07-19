@@ -15,6 +15,15 @@ describe('selectBasket', () => {
     expect(basket.map(b => b.card_id)).toEqual(['b']);
   });
 
+  it('caps any single constituent at maxWeight and redistributes', () => {
+    const cands = [cand('whale', 100, 100000, 50)]; // enormous dollar volume
+    for (let i = 0; i < 24; i++) cands.push(cand(`c${i}`, 50, 100, 5));
+    const basket = selectBasket(cands, { topN: 25, maxWeight: 0.10 });
+    const whale = basket.find(b => b.card_id === 'whale');
+    expect(whale.weight).toBeLessThanOrEqual(0.10 + 1e-9);
+    expect(basket.reduce((a, b) => a + b.weight, 0)).toBeCloseTo(1, 6);
+  });
+
   it('weights by dollar liquidity (price × weekly sales) and sums to 1', () => {
     const basket = selectBasket([cand('a', 100, 100, 10), cand('b', 90, 100, 5)], { topN: 2 });
     const wa = basket.find(b => b.card_id === 'a').weight;

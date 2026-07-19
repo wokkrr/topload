@@ -71,8 +71,9 @@ app.get('/api/basket', (req, res) => {
   })));
 });
 
-/** GET /api/cards?ip=PKMN → screener: every tracked card with its latest mark(s) */
+/** GET /api/cards?ip=PKMN&limit=300 → screener: tracked cards with latest marks */
 app.get('/api/cards', (req, res) => {
+  const limit = Math.min(2000, parseInt(req.query.limit ?? '300', 10));
   const ipFilter = req.query.ip ? `AND c.ip = ?` : '';
   const args = req.query.ip ? [req.query.ip] : [];
   const rows = db.prepare(`
@@ -88,7 +89,7 @@ app.get('/api/cards', (req, res) => {
     LEFT JOIN oracle_prices o1 ON o1.card_id = o.card_id AND o1.grade = o.grade AND o1.as_of = date(latest.d, '-1 day')
     LEFT JOIN oracle_prices o30 ON o30.card_id = o.card_id AND o30.grade = o.grade AND o30.as_of = date(latest.d, '-30 day')
     WHERE 1=1 ${ipFilter}
-    ORDER BY o.price_cents DESC`).all(...args);
+    ORDER BY o.price_cents DESC LIMIT ${limit}`).all(...args);
   res.json(rows.map(r => ({
     ...r,
     change_1d_pct: r.price_1d ? +((r.price_cents / r.price_1d - 1) * 100).toFixed(2) : null,

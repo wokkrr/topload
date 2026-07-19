@@ -25,6 +25,7 @@ export const tokens = {
   series: {
     PKMN: { label: 'Pokémon', brand: '#C9A96A', data: '#B98A2B' },
     OP:   { label: 'One Piece', brand: '#7FA6C9', data: '#4689C2' },
+    YGO:  { label: 'Yu-Gi-Oh', brand: '#C77FB4', data: '#B25F9E' }, // validated triple w/ brass+slate on graphite
   },
   font: {
     display: `'Libre Caslon Text', Georgia, serif`,
