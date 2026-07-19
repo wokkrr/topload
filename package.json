@@ -16,6 +16,7 @@
     "solana:dry": "node --env-file-if-exists=.env server/indexer-solana.js --dry",
     "solana:backfill": "node --env-file-if-exists=.env server/indexer-solana.js --backfill",
     "import:pc": "node --env-file-if-exists=.env server/import-pricecharting-csv.js",
+    "rematch": "node --env-file-if-exists=.env server/rematch.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
   },

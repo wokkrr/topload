@@ -89,6 +89,29 @@ describe('listing→card matcher', () => {
     expect(matchListing('Pokemon 151 Mew ex #205 PSA 10', cards)).toBe('pkmn-sv3pt5-mew-ex-205');
   });
 
+  it('rejects deck-name traps: card names appearing after the grade token', () => {
+    const withChar = [...cards, { id: 'pkmn-charizard-clc', name: 'Charizard', number: '011', set_name: 'Classic' }];
+    // Electrode listing whose DECK is named after Charizard — must not match Charizard.
+    expect(matchListing('2023 #011 Electrode PSA 10 Clc-Trading Card Game Classic Charizard & Ho-Oh EX Deck', withChar)).toBeNull();
+  });
+
+  it('requires set evidence: same name+number in a different set must not match', () => {
+    const goldStars = [
+      { id: 'pkmn-pop5-umbreon-gold-star-17', name: 'Umbreon Gold Star', number: '17', set_name: 'Pokemon POP Series 5' },
+      { id: 'pkmn-celebrations-umbreon-gold-star-17', name: 'Umbreon Gold Star', number: '17', set_name: 'Pokemon Celebrations' },
+    ];
+    // The $107k 2005 original must NOT catch the Celebrations reprint listing…
+    expect(matchListing('2021 #17 Umbreon-Gold Star PSA 10 Celebrations Classic Collection Pokemon', goldStars))
+      .toBe('pkmn-celebrations-umbreon-gold-star-17');
+    // …and with no set evidence at all, the honest answer is no match.
+    expect(matchListing('Umbreon Gold Star #17 PSA 10', goldStars)).toBeNull();
+  });
+
+  it('compares collector numbers zero-insensitively', () => {
+    const c = [{ id: 'pkmn-svp-magneton-159', name: 'Magneton', number: '159', set_name: 'SVP Black Star Promos' }];
+    expect(matchListing('2024 #159 Magneton PSA 10 Svp EN-SV Black Star Promo Pokemon', c)).toBe('pkmn-svp-magneton-159');
+  });
+
   it('short names only match as whole words (the trainer-N bug)', () => {
     const withN = [...cards, { id: 'pkmn-trainer-n', name: 'N', number: '100/101', set_name: 'Noble Victories' }];
     // 'Nami' contains 'n' but must NOT match the trainer card N.

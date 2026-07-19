@@ -1,0 +1,59 @@
+/**
+ * Maintenance: rebuild all listing→card attribution with the current (strict)
+ * matcher, and purge data attributed under older, looser rules.
+ *
+ * Run after any matcher change: npm run rematch
+ * Then re-run `npm run solana:backfill` to re-ingest on-chain sales with
+ * clean attribution (cursors are reset here on purpose).
+ */
+import { openDb } from './db.js';
+import { matchListing } from './match.js';
+
+const CATEGORY_TO_IP = { 'Pokemon': 'PKMN', 'One Piece': 'OP', 'YuGiOh': 'YGO', 'Yu-Gi-Oh': 'YGO' };
+
+const db = openDb();
+const universeByIp = {};
+for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+  (universeByIp[c.ip] ??= []).push(c);
+}
+
+db.exec('BEGIN');
+
+// 1. Gacha listings: re-match every row, franchise-scoped.
+let listingsMatched = 0, listingsCleared = 0;
+const updListing = db.prepare(`UPDATE gacha_listings SET card_id = ? WHERE platform = ? AND external_id = ?`);
+for (const l of db.prepare(`SELECT platform, external_id, item_name, category, card_id FROM gacha_listings`).all()) {
+  const ip = CATEGORY_TO_IP[l.category];
+  const hit = ip ? matchListing(l.item_name, universeByIp[ip] ?? []) : null;
+  updListing.run(hit, l.platform, l.external_id);
+  if (hit) listingsMatched++;
+  else if (l.card_id) listingsCleared++;
+}
+
+// 2. NFT registry: re-match from stored item_name (overwrites old attributions,
+//    including clearing ones the strict matcher no longer stands behind).
+let regMatched = 0, regCleared = 0;
+const updReg = db.prepare(`UPDATE nft_registry SET card_id = ? WHERE mint = ?`);
+for (const r of db.prepare(`SELECT mint, item_name, category, card_id FROM nft_registry`).all()) {
+  const ip = CATEGORY_TO_IP[r.category];
+  const hit = ip && r.item_name ? matchListing(r.item_name, universeByIp[ip] ?? []) : null;
+  updReg.run(hit, r.mint);
+  if (hit) regMatched++;
+  else if (r.card_id) regCleared++;
+}
+
+// 3. On-chain sales: attributions predate the strict matcher — purge and reset
+//    cursors so backfill re-walks the same history with clean attribution.
+const purged = db.prepare(`SELECT COUNT(*) n FROM sales WHERE source = 'collectorcrypt'`).get().n;
+db.exec(`DELETE FROM sales WHERE source = 'collectorcrypt'`);
+db.exec(`DELETE FROM oracle_prices WHERE basis = 'solds'`);
+db.exec(`DELETE FROM indexer_state WHERE key IN ('cc_newest_sig', 'cc_backfill_before', 'cc_backfill_done')`);
+
+db.exec('COMMIT');
+
+console.log('[rematch]', JSON.stringify({
+  listings: { matched: listingsMatched, cleared: listingsCleared },
+  registry: { matched: regMatched, cleared: regCleared },
+  onchainSalesPurged: purged,
+  next: 'run `npm run solana:backfill` to re-ingest sales with clean attribution',
+}, null, 1));
