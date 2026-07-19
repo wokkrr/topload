@@ -39,9 +39,27 @@ export function decodeSale(tx) {
   const tt = tx.tokenTransfers ?? [];
   const nftMoves = tt.filter(t => t.mint && t.mint !== USDC && Number(t.tokenAmount) === 1);
   const usdcMoves = tt.filter(t => t.mint === USDC && Number(t.tokenAmount) > 0);
-  if (nftMoves.length !== 1 || usdcMoves.length === 0) return null;
+  if (usdcMoves.length === 0) return null;
 
-  const nft = nftMoves[0];
+  // Identify the slab: visible SPL transfer when present; otherwise the parsed
+  // NFT event (CC's vaulted slabs often move by mechanisms that don't emit a
+  // standard transfer — verified live 2026-07-19: 8/10 sales were event-only).
+  let mint = null, seller = null, buyer = null;
+  if (nftMoves.length === 1) {
+    ({ mint, fromUserAccount: seller, toUserAccount: buyer } = nftMoves[0]);
+  } else if (nftMoves.length === 0) {
+    const ev = tx.events?.nft;
+    const evNfts = (ev?.nfts ?? []).filter(n => n?.mint && n.mint !== USDC);
+    if (evNfts.length === 1) {
+      mint = evNfts[0].mint;
+      seller = ev.seller ?? null;
+      buyer = ev.buyer ?? null;
+    }
+  }
+  if (!mint) return null; // multi-NFT batches and unidentifiable sales are skipped
+
+  // Price: the largest total USDC outflow from a single payer — covers direct
+  // buys (buyer pays seller + fee) and escrow settles (escrow pays out 100%).
   const outflows = {};
   for (const u of usdcMoves) {
     outflows[u.fromUserAccount] = (outflows[u.fromUserAccount] ?? 0) + Number(u.tokenAmount);
@@ -52,9 +70,9 @@ export function decodeSale(tx) {
   return {
     signature: tx.signature,
     sold_at: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : null,
-    mint: nft.mint,
-    seller: nft.fromUserAccount ?? null,
-    buyer: nft.toUserAccount ?? null,
+    mint,
+    seller: seller ?? null,
+    buyer: buyer ?? null,
     price_cents: Math.round(price * 100),
   };
 }
@@ -80,6 +98,7 @@ function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, th
         if (type) url.searchParams.set('type', type);
         if (before) url.searchParams.set('before', before);
         const res = await fetchImpl(url);
+        if (res.status === 404) return []; // Helius: end of (filtered) results
         if (!res.ok) throw new Error(`helius parsedTxs → ${res.status}`);
         return res.json();
       });

@@ -32,6 +32,19 @@ describe('decodeSale', () => {
     expect(decodeSale(tx).price_cents).toBe(10000);
   });
 
+  it('decodes event-only sales (vaulted slab, no visible NFT transfer — the common CC case)', () => {
+    const tx = {
+      signature: 'sig3', timestamp: 1784486953,
+      tokenTransfers: [
+        { mint: USDC, tokenAmount: 68.5902, fromUserAccount: 'BuyerCV', toUserAccount: 'SellerEo' },
+        { mint: USDC, tokenAmount: 1.3998, fromUserAccount: 'BuyerCV', toUserAccount: 'FeeWallet' },
+      ],
+      events: { nft: { buyer: 'BuyerCV', seller: 'SellerEo', nfts: [{ mint: MINT }] } },
+    };
+    const sale = decodeSale(tx);
+    expect(sale).toMatchObject({ mint: MINT, buyer: 'BuyerCV', seller: 'SellerEo', price_cents: 6999 });
+  });
+
   it('rejects transfers with no USDC (vault moves, gifts)', () => {
     expect(decodeSale({ signature: 's', timestamp: 1, tokenTransfers: [
       { mint: MINT, tokenAmount: 1, fromUserAccount: 'A', toUserAccount: 'B' },
