@@ -208,6 +208,15 @@ async function runLive(db, today) {
       console.warn(`[ingest] solana indexer failed: ${e.message}`);
     }
   }
+  if (process.env.ALCHEMY_API_KEY) {
+    try {
+      const { runBaseIndexer } = await import('./indexer-base.js');
+      const idx = await runBaseIndexer(db, {});
+      summary.beezieSales = idx.inserted;
+    } catch (e) {
+      console.warn(`[ingest] base indexer failed: ${e.message}`);
+    }
+  }
 
   return summary;
 }
