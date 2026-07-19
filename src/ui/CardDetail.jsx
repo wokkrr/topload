@@ -173,11 +173,23 @@ export function CardDetail({ cardId, onBack }) {
           <Row k="Grades tracked" v={card.grades.map(g => g.grade).join(', ')} />
           <Row k="Marked as of" v={cur?.as_of ?? '—'} />
         </Panel>
-        <Panel title="Live listings">
-          <div style={placeholderStyle}>
-            Aggregated eBay + gacha-platform listings with discount-vs-oracle
-            badges land here in build step 2 — every listing priced against the
-            mark above.
+        <Panel title="Where to buy">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {marketLinks(card).map(l => (
+              <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                border: `1px solid ${tokens.color.border}`, borderRadius: 6, padding: '8px 12px',
+                color: tokens.color.ink, textDecoration: 'none', font: `12px ${tokens.font.body}`,
+                background: tokens.color.surfaceRaised,
+              }}>
+                <span>{l.label}</span>
+                <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}` }}>{l.note} ↗</span>
+              </a>
+            ))}
+            <div style={{ ...placeholderStyle, fontSize: 10, marginTop: 2 }}>
+              Search links routed by exact card + set + number. In-app gacha
+              listings appear on the Gacha Desk when this card is live there.
+            </div>
           </div>
         </Panel>
         <Panel title="News & catalysts">
@@ -220,6 +232,24 @@ function Row({ k, v }) {
 }
 
 const placeholderStyle = { color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, lineHeight: 1.6 };
+
+/**
+ * Outbound buy-routing — the FOMO model: research here, execute anywhere.
+ * Plain search deep links for now; affiliate params (TCGplayer partner,
+ * eBay EPN campid) wrap these URLs once those accounts are approved.
+ */
+const TCG_LINES = { PKMN: 'pokemon', OP: 'one-piece-card-game', YGO: 'yugioh' };
+function marketLinks(card) {
+  const num = (card.number ?? '').split('/')[0];
+  const q = encodeURIComponent(`${card.name} ${num}`.trim());
+  const qFull = encodeURIComponent(`${card.name} ${card.set_name ?? ''} ${num}`.trim());
+  const line = TCG_LINES[card.ip] ?? 'all';
+  return [
+    { label: 'TCGplayer', note: 'live listings', url: `https://www.tcgplayer.com/search/${line}/product?q=${q}&view=grid` },
+    { label: 'eBay', note: 'live listings', url: `https://www.ebay.com/sch/i.html?_nkw=${qFull}` },
+    { label: 'eBay · sold', note: 'recent comps', url: `https://www.ebay.com/sch/i.html?_nkw=${qFull}&LH_Sold=1&LH_Complete=1` },
+  ];
+}
 
 function MarkChart({ series, color }) {
   const [hover, setHover] = useState(null);
