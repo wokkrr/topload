@@ -246,5 +246,21 @@ export async function ingest({ db = null, dates = null } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  // --if-stale: exit quietly when today's PriceCharting import already landed.
+  // Lets cron fire at several times a day (9am/12pm/6pm) as fallbacks for a
+  // sleeping Mac — the first successful run wins, later slots no-op.
+  if (process.argv.includes('--if-stale')) {
+    try {
+      const db = openDb();
+      const today = new Date().toISOString().slice(0, 10);
+      const done = db.prepare(
+        `SELECT COUNT(*) n FROM external_marks WHERE source = 'pricecharting' AND as_of = ?`
+      ).get(today).n;
+      if (done > 0) {
+        console.log(`[ingest] --if-stale: today's pricecharting data already imported (${done} marks) — skipping`);
+        process.exit(0);
+      }
+    } catch { /* no db yet → proceed with full ingest */ }
+  }
   ingest().catch(e => { console.error(e); process.exit(1); });
 }
