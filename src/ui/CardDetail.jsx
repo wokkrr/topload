@@ -49,10 +49,21 @@ export function CardDetail({ cardId, onBack }) {
       {/* ── Hero: card art + identity + big price + delta chips ── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24, margin: '14px 0 4px', flexWrap: 'wrap' }}>
         {card.image && (
-          <img src={card.image} alt={card.name} style={{
-            height: 130, borderRadius: 6, border: `1px solid ${tokens.color.border}`,
-            background: tokens.color.surfaceRaised, alignSelf: 'flex-start',
-          }} />
+          <span style={{ position: 'relative', alignSelf: 'flex-start', lineHeight: 0 }}
+                title={card.image_kind === 'listing' ? 'Sample slab photo from a marketplace listing — not a specific item for sale' : undefined}>
+            <img src={card.image} alt={card.name} style={{
+              height: 130, borderRadius: 6, border: `1px solid ${tokens.color.border}`,
+              background: tokens.color.surfaceRaised,
+            }} />
+            {card.image_kind === 'listing' && (
+              <span style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
+                font: `600 8px ${tokens.font.body}`, letterSpacing: '0.06em',
+                color: tokens.color.inkSecondary, background: 'rgba(16,18,20,0.85)',
+                borderRadius: '0 0 6px 6px', padding: '3px 2px',
+              }}>SAMPLE PHOTO</span>
+            )}
+          </span>
         )}
         <div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>

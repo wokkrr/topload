@@ -82,6 +82,8 @@ app.get('/api/cards', (req, res) => {
     )
     SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
            COALESCE(c.image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1)) AS image,
+           CASE WHEN c.image IS NOT NULL THEN 'official'
+                WHEN EXISTS (SELECT 1 FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL) THEN 'listing' END AS image_kind,
            o.grade, o.price_cents, o.confidence, o.basis, o.source, o.sales_7d,
            o1.price_cents AS price_1d, o30.price_cents AS price_30d
     FROM latest
@@ -102,7 +104,9 @@ app.get('/api/cards', (req, res) => {
 app.get('/api/cards/:id', (req, res) => {
   const card = db.prepare(`
     SELECT id, ip, name, set_name, number, variant,
-           COALESCE(image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1)) AS image
+           COALESCE(image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1)) AS image,
+           CASE WHEN image IS NOT NULL THEN 'official'
+                WHEN EXISTS (SELECT 1 FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL) THEN 'listing' END AS image_kind
     FROM cards WHERE id = ?`).get(req.params.id);
   if (!card) return res.status(404).json({ error: 'unknown card' });
   const grades = db.prepare(`
@@ -146,7 +150,9 @@ app.get('/api/gacha', (req, res) => {
   const rows = db.prepare(`
     WITH latest AS (SELECT MAX(as_of) d FROM oracle_prices)
     SELECT g.platform, g.external_id, g.card_id, g.item_name, g.category, g.grade,
-           g.price_cents, g.currency, g.listed_at, g.image, g.nft_address,
+           g.price_cents, g.currency, g.listed_at, g.nft_address,
+           COALESCE(g.image, c.image) AS image,
+           CASE WHEN g.image IS NOT NULL THEN 'actual' WHEN c.image IS NOT NULL THEN 'art' END AS image_kind,
            c.name AS card_name, c.ip,
            o.price_cents AS comp_cents, o.confidence AS comp_confidence, o.basis AS comp_basis, o.source AS comp_source
     FROM gacha_listings g
