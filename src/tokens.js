@@ -39,7 +39,8 @@ export function applyTheme(mode) {
 }
 
 export function initialTheme() {
-  try { return localStorage.getItem('topload-theme') ?? 'dark'; } catch { return 'dark'; }
+  // Light is the default (Kaleb, 2026-07-19); a saved choice still wins.
+  try { return localStorage.getItem('topload-theme') ?? 'light'; } catch { return 'light'; }
 }
 
 const v = (name) => `var(--${name})`;

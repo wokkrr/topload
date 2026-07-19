@@ -44,10 +44,6 @@ export default function App() {
           Topload <span style={{ color: tokens.color.inkMuted, fontSize: 12, fontFamily: tokens.font.mono }}>card terminal · v2</span>
         </h1>
         <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto', alignItems: 'center' }}>
-          <button onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} style={{
-            background: 'none', border: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary,
-            borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, cursor: 'pointer', marginRight: 8,
-          }}>{theme === 'dark' ? '☀' : '☾'}</button>
           {TABS.map(t => (
             <button key={t} onClick={() => { setTab(t); setSelectedCard(null); }} style={{
               background: tab === t ? tokens.color.surfaceRaised : 'none',
@@ -56,6 +52,10 @@ export default function App() {
               padding: '8px 14px', font: `13px ${tokens.font.body}`, cursor: 'pointer', borderRadius: '4px 4px 0 0',
             }}>{t}</button>
           ))}
+          <button onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} style={{
+            background: 'none', border: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary,
+            borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, cursor: 'pointer', marginLeft: 16,
+          }}>{theme === 'dark' ? '☀' : '☾'}</button>
         </nav>
       </header>
       <hr style={{ border: 'none', borderTop: `1px solid ${tokens.color.border}`, margin: 0 }} />
