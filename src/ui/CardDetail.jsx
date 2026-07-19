@@ -59,7 +59,7 @@ export function CardDetail({ cardId, onBack }) {
               <span style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
                 font: `600 8px ${tokens.font.body}`, letterSpacing: '0.06em',
-                color: tokens.color.inkSecondary, background: 'rgba(16,18,20,0.85)',
+                color: tokens.color.inkSecondary, background: tokens.color.overlay,
                 borderRadius: '0 0 6px 6px', padding: '3px 2px',
               }}>SAMPLE PHOTO</span>
             )}

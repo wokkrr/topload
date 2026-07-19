@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { tokens } from './tokens.js';
+import { tokens, applyTheme, initialTheme } from './tokens.js';
 import { api } from './data/client.js';
 import { IndexChart } from './ui/IndexChart.jsx';
 import { TickerTape } from './ui/TickerTape.jsx';
@@ -22,7 +22,14 @@ export default function App() {
   const [gacha, setGacha] = useState(null);
   const [platforms, setPlatforms] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
+  const [theme, setTheme] = useState(initialTheme());
   const [err, setErr] = useState(null);
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    setTheme(next);
+  };
 
   useEffect(() => { api.gacha().then(setGacha).catch(() => setGacha([])); }, []);
   useEffect(() => { api.platforms().then(setPlatforms).catch(() => setPlatforms([])); }, []);
@@ -36,7 +43,11 @@ export default function App() {
         <h1 style={{ font: `22px ${tokens.font.display}`, margin: 0, letterSpacing: '0.5px' }}>
           Topload <span style={{ color: tokens.color.inkMuted, fontSize: 12, fontFamily: tokens.font.mono }}>card terminal · v2</span>
         </h1>
-        <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+        <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto', alignItems: 'center' }}>
+          <button onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} style={{
+            background: 'none', border: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary,
+            borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, cursor: 'pointer', marginRight: 8,
+          }}>{theme === 'dark' ? '☀' : '☾'}</button>
           {TABS.map(t => (
             <button key={t} onClick={() => { setTab(t); setSelectedCard(null); }} style={{
               background: tab === t ? tokens.color.surfaceRaised : 'none',

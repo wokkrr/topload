@@ -42,7 +42,7 @@ export const Thumb = ({ src, size = 34, badge = null }) => {
         <span style={{
           position: 'absolute', bottom: 1, left: 1, right: 1, textAlign: 'center',
           font: `600 6.5px ${tokens.font.body}`, letterSpacing: '0.06em',
-          color: tokens.color.ink, background: 'rgba(16,18,20,0.82)',
+          color: tokens.color.ink, background: tokens.color.overlay,
           borderRadius: '0 0 2px 2px', padding: '1px 0',
         }}>{badge}</span>
       )}
@@ -235,19 +235,19 @@ function GachaGrid({ listings, onSelect }) {
               <span style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
                 font: `600 8px ${tokens.font.body}`, letterSpacing: '0.06em',
-                color: tokens.color.ink, background: 'rgba(16,18,20,0.85)', padding: '2px 0',
+                color: tokens.color.ink, background: tokens.color.overlay, padding: '2px 0',
               }}>NOT ITEM · REFERENCE ART</span>
             )}
             <span style={{
               position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`,
-              color: tokens.color.ink, background: 'rgba(16,18,20,0.85)',
+              color: tokens.color.ink, background: tokens.color.overlay,
               borderRadius: 3, padding: '2px 6px',
             }}>{l.grade}</span>
             {l.delta_pct != null && (
               <span style={{
                 position: 'absolute', top: 6, right: 6, font: `10px ${tokens.font.mono}`,
                 color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down,
-                background: 'rgba(16,18,20,0.85)', borderRadius: 3, padding: '2px 6px',
+                background: tokens.color.overlay, borderRadius: 3, padding: '2px 6px',
               }}>{fmtPct(l.delta_pct)}</span>
             )}
           </div>
