@@ -3,9 +3,13 @@
  * Vite dev server proxies /api → here (see vite.config.js).
  */
 import express from 'express';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { openDb } from './db.js';
 import { PLATFORMS } from './platforms.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
 const app = express();
 
@@ -204,5 +208,14 @@ app.get('/api/gacha', (req, res) => {
   })));
 });
 
+// Production: serve the built UI from the same process (VPS mode) — /api/*
+// stays API, everything else falls through to the SPA.
+const dist = join(__dirname, '..', 'dist');
+if (existsSync(join(dist, 'index.html'))) {
+  app.use(express.static(dist));
+  app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(join(dist, 'index.html')));
+  console.log('[api] serving built UI from dist/');
+}
+
 const port = process.env.PORT ?? 5174;
-app.listen(port, () => console.log(`[api] listening on :${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`[api] listening on :${port}`));
