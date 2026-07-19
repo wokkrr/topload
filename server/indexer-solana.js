@@ -35,46 +35,67 @@ const CATEGORY_TO_IP = { 'Pokemon': 'PKMN', 'One Piece': 'OP', 'YuGiOh': 'YGO', 
  * token moving (the slab) plus USDC moving, price = the largest total USDC
  * outflow from a single account (buyer or escrow paying out 100%).
  */
+const KNOWN_PROGRAMS = new Set([
+  CC_MARKETPLACE_PROGRAM, USDC,
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  'CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d', // MPL Core
+  'ComputeBudget111111111111111111111111111111',
+  '11111111111111111111111111111111',
+]);
+
 export function decodeSale(tx) {
   const tt = tx.tokenTransfers ?? [];
+  const ev = tx.events?.nft;
   const nftMoves = tt.filter(t => t.mint && t.mint !== USDC && Number(t.tokenAmount) === 1);
   const usdcMoves = tt.filter(t => t.mint === USDC && Number(t.tokenAmount) > 0);
-  if (usdcMoves.length === 0) return null;
 
-  // Identify the slab: visible SPL transfer when present; otherwise the parsed
-  // NFT event (CC's vaulted slabs often move by mechanisms that don't emit a
-  // standard transfer — verified live 2026-07-19: 8/10 sales were event-only).
-  let mint = null, seller = null, buyer = null;
-  if (nftMoves.length === 1) {
-    ({ mint, fromUserAccount: seller, toUserAccount: buyer } = nftMoves[0]);
-  } else if (nftMoves.length === 0) {
-    const ev = tx.events?.nft;
-    const evNfts = (ev?.nfts ?? []).filter(n => n?.mint && n.mint !== USDC);
-    if (evNfts.length === 1) {
-      mint = evNfts[0].mint;
-      seller = ev.seller ?? null;
-      buyer = ev.buyer ?? null;
+  // Price: largest total USDC outflow from a single payer (buyer or escrow
+  // paying out 100%); fall back to the parsed event amount (USDC, 6dp — CC
+  // is a USDC-only market; verified against money flows live).
+  let price = 0;
+  if (usdcMoves.length) {
+    const outflows = {};
+    for (const u of usdcMoves) {
+      outflows[u.fromUserAccount] = (outflows[u.fromUserAccount] ?? 0) + Number(u.tokenAmount);
     }
+    price = Math.max(...Object.values(outflows));
+  } else if (ev?.amount > 0) {
+    price = Number(ev.amount) / 1e6;
   }
-  if (!mint) return null; // multi-NFT batches and unidentifiable sales are skipped
-
-  // Price: the largest total USDC outflow from a single payer — covers direct
-  // buys (buyer pays seller + fee) and escrow settles (escrow pays out 100%).
-  const outflows = {};
-  for (const u of usdcMoves) {
-    outflows[u.fromUserAccount] = (outflows[u.fromUserAccount] ?? 0) + Number(u.tokenAmount);
-  }
-  const price = Math.max(...Object.values(outflows));
   if (!Number.isFinite(price) || price <= 0) return null;
 
-  return {
+  const base = {
     signature: tx.signature,
     sold_at: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : null,
-    mint,
-    seller: seller ?? null,
-    buyer: buyer ?? null,
+    seller: ev?.seller ?? null,
+    buyer: ev?.buyer ?? null,
     price_cents: Math.round(price * 100),
   };
+
+  // Slab identity, in order of certainty:
+  // 1. A visible SPL transfer of the slab (non-vaulted pNFTs).
+  if (nftMoves.length === 1) {
+    return { ...base, mint: nftMoves[0].mint, seller: nftMoves[0].fromUserAccount ?? base.seller, buyer: nftMoves[0].toUserAccount ?? base.buyer, candidates: null };
+  }
+  if (nftMoves.length > 1) return null; // ambiguous batch
+
+  // 2. The parsed event names the asset (rare for CC, but free when present).
+  const evNfts = (ev?.nfts ?? []).filter(n => n?.mint && n.mint !== USDC);
+  if (evNfts.length === 1) return { ...base, mint: evNfts[0].mint, candidates: null };
+
+  // 3. Vaulted MPL Core sales: the asset hides in the marketplace instruction's
+  //    account list. Positions 6 and 8 vary per sale (verified live 2026-07-19);
+  //    return both as candidates — the caller resolves which is the real asset
+  //    via registry membership or a DAS lookup.
+  if (tx.type === 'NFT_SALE') {
+    const cc = (tx.instructions ?? []).find(i => i.programId === CC_MARKETPLACE_PROGRAM);
+    const accts = cc?.accounts ?? [];
+    const exclude = new Set([base.buyer, base.seller, ...KNOWN_PROGRAMS]);
+    const candidates = [accts[8], accts[6]].filter(a => a && !exclude.has(a));
+    if (candidates.length) return { ...base, mint: null, candidates: [...new Set(candidates)] };
+  }
+  return null;
 }
 
 // ---------- helius client ----------
@@ -99,11 +120,12 @@ function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, th
         if (before) url.searchParams.set('before', before);
         const res = await fetchImpl(url);
         if (res.status === 404) {
-          // Filtered scans 404 when their bounded window has no matches; the
-          // body sometimes carries pagination hints — surface it once.
+          // Filtered scans 404 when their bounded window has no matches — the
+          // body carries a continuation signature to keep walking from.
           const body = await res.text().catch(() => '');
-          if (!makeHelius._logged404) { makeHelius._logged404 = true; console.warn(`[solana] 404 body: ${body.slice(0, 300)}`); }
-          return { _emptyFiltered: true, _body: body };
+          const hint = /`?before-signature`?[^1-9A-HJ-NP-Za-km-z]*([1-9A-HJ-NP-Za-km-z]{60,90})/.exec(body)?.[1]
+            ?? /([1-9A-HJ-NP-Za-km-z]{80,90})/.exec(body)?.[1];
+          return { _continueBefore: hint ?? null };
         }
         if (!res.ok) throw new Error(`helius parsedTxs → ${res.status}`);
         return res.json();
@@ -134,13 +156,34 @@ function universeByIp(db) {
   return by;
 }
 
+/**
+ * Vaulted Core sales don't name their asset — decodeSale returns candidate
+ * accounts instead. The real asset is whichever candidate is a known slab
+ * (registry) or resolves via DAS with metadata; listing PDAs resolve to
+ * nothing and get cached as non-assets for the rest of the run.
+ */
+async function resolveCandidates(db, helius, candidates, notAsset) {
+  for (const c of candidates) {
+    if (db.prepare(`SELECT mint FROM nft_registry WHERE mint = ?`).get(c)) return { mint: c, asset: null };
+  }
+  for (const c of candidates) {
+    if (notAsset.has(c)) continue;
+    try {
+      const a = await helius.getAsset(c);
+      if (a?.content?.metadata?.name) return { mint: c, asset: a };
+    } catch { /* fall through */ }
+    notAsset.add(c);
+  }
+  return { mint: null, asset: null };
+}
+
 /** Resolve a mint to {card_id, grade} via registry, else DAS metadata match. */
-async function attributeMint(db, helius, mint, universe, gradeFromTitle) {
+async function attributeMint(db, helius, mint, universe, gradeFromTitle, preloadedAsset = null) {
   const reg = db.prepare(`SELECT card_id, grade FROM nft_registry WHERE mint = ?`).get(mint);
   if (reg?.card_id) return { card_id: reg.card_id, grade: reg.grade ?? 'raw', how: 'registry' };
 
-  let asset = null;
-  try { asset = await helius.getAsset(mint); } catch { /* rpc hiccup → unattributed */ }
+  let asset = preloadedAsset;
+  if (!asset) { try { asset = await helius.getAsset(mint); } catch { /* rpc hiccup → unattributed */ } }
   const name = asset?.content?.metadata?.name ?? '';
   if (!name) return null;
   const attrs = Object.fromEntries((asset?.content?.metadata?.attributes ?? []).map(a => [String(a.trait_type ?? '').toLowerCase(), a.value]));
@@ -176,6 +219,7 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
   );
   const newestSeen = getState('cc_newest_sig');
   const backfillCursor = getState('cc_backfill_before');
+  const notAssetCache = new Set(); // listing PDAs etc. — non-assets, per run
 
   const summary = { pages: 0, txs: 0, decoded: 0, attributed: 0, inserted: 0, unattributed: 0, dryExamples: [] };
   const diag = dry ? { types: {}, sources: {}, withTokenTransfers: 0, withNftEvents: 0, withCompressed: 0, timeSpan: [null, null], rawSaleSamples: [] } : null;
@@ -183,32 +227,19 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
   let newestThisRun = null;
   let reachedKnown = false;
 
-  let filterMode = true; // server-side NFT_SALE filter; falls back per-run if flaky
   for (let page = 0; page < maxPages && !reachedKnown; page++) {
     let txs;
-    // type=NFT_SALE: server-side filter — the program firehose is ~94% bid
-    // noise (measured 2026-07-19: 935/1000 bids in a six-minute window). The
-    // filtered endpoint intermittently 404s on windows with no matches, so an
-    // empty/404 first page triggers one retry, then unfiltered pages with
-    // client-side filtering (bounded by maxPages either way).
+    // type=NFT_SALE server-side filter (the program firehose is ~94% bid
+    // noise). Windows with no matches return a continuation signature via 404;
+    // follow it — each hop still counts as a page to bound API spend.
     try {
-      txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before, type: filterMode ? 'NFT_SALE' : undefined });
-      if (txs?._emptyFiltered || (filterMode && Array.isArray(txs) && txs.length === 0)) {
-        if (page === 0 && filterMode) {
-          await sleep(1500);
-          txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before, type: 'NFT_SALE' });
-        }
-        if (txs?._emptyFiltered || (Array.isArray(txs) && txs.length === 0)) {
-          if (filterMode) {
-            console.warn('[solana] filtered scan empty — falling back to unfiltered pages (client-side filter)');
-            filterMode = false;
-            txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before });
-          }
-        }
+      txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before, type: 'NFT_SALE' });
+      if (txs?._continueBefore !== undefined) {
+        if (!txs._continueBefore) { if (backfill) setState('cc_backfill_done', '1'); break; }
+        before = txs._continueBefore;
+        summary.pages++;
+        continue;
       }
-      if (txs?._emptyFiltered) txs = [];
-      // Unfiltered mode needs no explicit filter: decodeSale rejects bids and
-      // listings naturally (no USDC flows), and the cursor walks all txs.
     } catch (e) { console.warn(`[solana] page fetch failed: ${e.message}`); break; }
     if (!txs.length) { if (backfill) setState('cc_backfill_done', '1'); break; }
     summary.pages++;
@@ -246,13 +277,31 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
 
       if (dry) {
         if (summary.dryExamples.length < 8) {
-          const reg = db.prepare(`SELECT card_id, item_name, grade FROM nft_registry WHERE mint = ?`).get(sale.mint);
-          summary.dryExamples.push({ ...sale, mint: sale.mint.slice(0, 12), registry: reg ?? 'not-in-registry' });
+          const resolved = sale.mint
+            ? { mint: sale.mint, how: 'direct' }
+            : await resolveCandidates(db, h, sale.candidates ?? [], notAssetCache).then(r => ({ mint: r.mint, how: r.mint ? 'resolved' : 'unresolved', asset_name: r.asset?.content?.metadata?.name }));
+          const reg = resolved.mint ? db.prepare(`SELECT card_id, item_name, grade FROM nft_registry WHERE mint = ?`).get(resolved.mint) : null;
+          summary.dryExamples.push({
+            ...sale,
+            mint: resolved.mint?.slice(0, 12) ?? null,
+            resolution: resolved.how,
+            asset_name: resolved.asset_name ?? undefined,
+            candidates: sale.candidates?.map(c => c.slice(0, 8)),
+            registry: reg ?? 'not-in-registry',
+          });
         }
         continue;
       }
 
-      const attr = await attributeMint(db, h, sale.mint, universe, gradeFromTitle);
+      let mint = sale.mint, preloadedAsset = null;
+      if (!mint && sale.candidates?.length) {
+        const r = await resolveCandidates(db, h, sale.candidates, notAssetCache);
+        mint = r.mint;
+        preloadedAsset = r.asset;
+      }
+      if (!mint) { summary.unattributed++; continue; }
+
+      const attr = await attributeMint(db, h, mint, universe, gradeFromTitle, preloadedAsset);
       if (!attr) { summary.unattributed++; continue; }
       summary.attributed++;
       const r = insSale.run(attr.card_id, attr.grade, sale.price_cents, sale.sold_at, sale.signature);

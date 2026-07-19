@@ -45,6 +45,42 @@ describe('decodeSale', () => {
     expect(sale).toMatchObject({ mint: MINT, buyer: 'BuyerCV', seller: 'SellerEo', price_cents: 6999 });
   });
 
+  it('returns candidates for vaulted Core sales (empty event nfts, no transfers of the slab)', () => {
+    // Modeled on live INSTANT_SALE captures: USDC flows only, events.nft.nfts=[],
+    // slab hidden at CC instruction accounts[6]/[8].
+    const CCM = 'CcmRKTuZCGJBWQwMHvDYApBRvSZNHqGJXkznqpDTSQUr';
+    const tx = {
+      signature: 'sig4', timestamp: 1784488010, type: 'NFT_SALE',
+      tokenTransfers: [
+        { mint: USDC, tokenAmount: 33.31, fromUserAccount: 'Buyer7zV', toUserAccount: 'Seller398' },
+        { mint: USDC, tokenAmount: 0.68, fromUserAccount: 'Buyer7zV', toUserAccount: 'FeeW' },
+      ],
+      events: { nft: { amount: 33990000, buyer: 'Buyer7zV', seller: 'Seller398', nfts: [] } },
+      instructions: [{ programId: CCM, accounts: [
+        'Buyer7zV', 'Seller398', 'Seller398', 'Buyer7zV', 'StateConst', 'GlobalConst',
+        'ListingPDA111', 'CollectionCC', 'AssetCore222', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      ] }],
+    };
+    const sale = decodeSale(tx);
+    expect(sale.mint).toBeNull();
+    expect(sale.candidates).toEqual(['AssetCore222', 'ListingPDA111']);
+    expect(sale.price_cents).toBe(3399);
+    expect(sale.buyer).toBe('Buyer7zV');
+  });
+
+  it('prices from the event amount when no USDC transfers are visible', () => {
+    const CCM = 'CcmRKTuZCGJBWQwMHvDYApBRvSZNHqGJXkznqpDTSQUr';
+    const tx = {
+      signature: 'sig5', timestamp: 1784488010, type: 'NFT_SALE',
+      tokenTransfers: [],
+      events: { nft: { amount: 125000000, buyer: 'B', seller: 'S', nfts: [] } },
+      instructions: [{ programId: CCM, accounts: ['B', 'S', 'S', 'B', 'c4', 'c5', 'Cand6', 'Coll', 'Cand8'] }],
+    };
+    const sale = decodeSale(tx);
+    expect(sale.price_cents).toBe(12500);
+    expect(sale.candidates).toEqual(['Cand8', 'Cand6']);
+  });
+
   it('rejects transfers with no USDC (vault moves, gifts)', () => {
     expect(decodeSale({ signature: 's', timestamp: 1, tokenTransfers: [
       { mint: MINT, tokenAmount: 1, fromUserAccount: 'A', toUserAccount: 'B' },
