@@ -200,11 +200,20 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
           if (!diag.timeSpan[1]) diag.timeSpan[1] = tx.timestamp;
           diag.timeSpan[0] = tx.timestamp;
         }
-        if ((tx.type === 'NFT_SALE' || tx.events?.nft?.amount) && diag.rawSaleSamples.length < 2) {
-          diag.rawSaleSamples.push(JSON.stringify(tx).slice(0, 1800));
-        }
       }
       const sale = decodeSale(tx);
+      if (diag && tx.type === 'NFT_SALE' && !sale && diag.rawSaleSamples.length < 3) {
+        // Surgical dump for UNDECODED sales: where does the slab's identity live?
+        const cc = (tx.instructions ?? []).find(i => i.programId === CC_MARKETPLACE_PROGRAM);
+        diag.rawSaleSamples.push({
+          signature: tx.signature?.slice(0, 24),
+          description: tx.description?.slice(0, 140),
+          events: tx.events ?? null,
+          ccInstructionAccounts: cc?.accounts ?? null,
+          ccInnerPrograms: (cc?.innerInstructions ?? []).map(i => i.programId),
+          allAccounts: (tx.accountData ?? []).map(a => a.account),
+        });
+      }
       if (!sale || !sale.sold_at) continue;
       summary.decoded++;
 
@@ -244,6 +253,12 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
   if (diag) {
     diag.timeSpan = diag.timeSpan.map(t => t ? new Date(t * 1000).toISOString() : null);
     console.log('[solana:diag]', JSON.stringify(diag, null, 1));
+    try {
+      const { writeFileSync, mkdirSync } = await import('node:fs');
+      mkdirSync('data', { recursive: true });
+      writeFileSync('data/solana-diag.json', JSON.stringify(diag, null, 2));
+      console.log('[solana:diag] full dump also written to data/solana-diag.json');
+    } catch { /* best effort */ }
   }
   console.log('[solana]', JSON.stringify(summary, null, dry ? 1 : 0));
   return summary;
