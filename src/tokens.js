@@ -29,7 +29,9 @@ export const tokens = {
   },
   font: {
     display: `'Libre Caslon Text', Georgia, serif`,
-    mono: `'IBM Plex Mono', ui-monospace, monospace`,
+    // VCR OSD Mono: retro CRT data font (placeholder per Kaleb, self-hosted
+    // in public/fonts, freeware). IBM Plex Mono as fallback.
+    mono: `'VCR OSD Mono', 'IBM Plex Mono', ui-monospace, monospace`,
     body: `'Inter', system-ui, sans-serif`,
   },
   radius: { sm: '4px', md: '8px' },
