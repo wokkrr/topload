@@ -20,8 +20,17 @@ export const api = {
   gacha: () => get('/api/gacha'),
   /** aggregator platform coverage map */
   platforms: () => get('/api/platforms'),
-  /** screener: all tracked cards with latest marks */
-  cards: (ip) => get(`/api/cards${ip ? `?ip=${ip}` : ''}`),
+  /** screener: tracked cards with latest marks (q/ip/grade/sort filters) */
+  cards: ({ q, ip, grade, sort, limit } = {}) => {
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (ip) p.set('ip', ip);
+    if (grade) p.set('grade', grade);
+    if (sort) p.set('sort', sort);
+    if (limit) p.set('limit', limit);
+    const qs = p.toString();
+    return get(`/api/cards${qs ? `?${qs}` : ''}`);
+  },
   /** card meta + latest mark per grade */
   card: (id) => get(`/api/cards/${encodeURIComponent(id)}`),
   /** oracle mark history for one card */

@@ -4,7 +4,8 @@ import { api } from './data/client.js';
 import { IndexChart } from './ui/IndexChart.jsx';
 import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
-import { MoversTable, BasketTable, CardsTable, GachaDesk } from './ui/tables.jsx';
+import { MoversTable, BasketTable, GachaDesk } from './ui/tables.jsx';
+import { Screener } from './ui/Screener.jsx';
 
 // 'Indexes' removed from nav for now (Kaleb, 2026-07-19) — computation still
 // runs nightly and the ticker still shows levels; re-add here to revisit.
@@ -18,13 +19,11 @@ export default function App() {
   const [indexes, setIndexes] = useState(null);
   const [movers, setMovers] = useState(null);
   const [basket, setBasket] = useState(null);
-  const [cards, setCards] = useState(null);
   const [gacha, setGacha] = useState(null);
   const [platforms, setPlatforms] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [err, setErr] = useState(null);
 
-  useEffect(() => { api.cards().then(setCards).catch(e => setErr(String(e))); }, []);
   useEffect(() => { api.gacha().then(setGacha).catch(() => setGacha([])); }, []);
   useEffect(() => { api.platforms().then(setPlatforms).catch(() => setPlatforms([])); }, []);
   useEffect(() => { api.indexes(days).then(setIndexes).catch(e => setErr(String(e))); }, [days]);
@@ -78,7 +77,7 @@ export default function App() {
           </section>
         )}
 
-        {!selectedCard && tab === 'Cards' && <CardsTable cards={cards} onSelect={setSelectedCard} />}
+        {!selectedCard && tab === 'Cards' && <Screener onSelect={setSelectedCard} />}
 
         {!selectedCard && tab === 'Movers' && <MoversTable movers={movers} onSelect={setSelectedCard} />}
 

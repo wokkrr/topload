@@ -71,11 +71,27 @@ app.get('/api/basket', (req, res) => {
   })));
 });
 
-/** GET /api/cards?ip=PKMN&limit=300 → screener: tracked cards with latest marks */
+/** GET /api/cards?q=charizard&ip=PKMN&grade=PSA10&sort=price&limit=100 → screener */
 app.get('/api/cards', (req, res) => {
-  const limit = Math.min(2000, parseInt(req.query.limit ?? '300', 10));
-  const ipFilter = req.query.ip ? `AND c.ip = ?` : '';
-  const args = req.query.ip ? [req.query.ip] : [];
+  const limit = Math.min(2000, parseInt(req.query.limit ?? '100', 10));
+  const clauses = [];
+  const args = [];
+  if (req.query.ip) { clauses.push(`c.ip = ?`); args.push(req.query.ip); }
+  if (req.query.grade) { clauses.push(`o.grade = ?`); args.push(req.query.grade); }
+  if (req.query.q) {
+    // Every word must appear somewhere in name/set/number.
+    for (const word of String(req.query.q).trim().split(/\s+/).slice(0, 6)) {
+      clauses.push(`(c.name LIKE ? OR c.set_name LIKE ? OR c.number LIKE ?)`);
+      const w = `%${word}%`;
+      args.push(w, w, w);
+    }
+  }
+  const ipFilter = clauses.length ? `AND ${clauses.join(' AND ')}` : '';
+  const sort = {
+    price: 'o.price_cents DESC',
+    change: 'ABS(COALESCE((o.price_cents * 1.0 / NULLIF(o1.price_cents, 0) - 1), 0)) DESC',
+    volume: 'o.sales_7d DESC, o.price_cents DESC',
+  }[req.query.sort] ?? 'o.price_cents DESC';
   const rows = db.prepare(`
     WITH latest AS (
       SELECT card_id, grade, MAX(as_of) d FROM oracle_prices GROUP BY card_id, grade
@@ -92,7 +108,7 @@ app.get('/api/cards', (req, res) => {
     LEFT JOIN oracle_prices o1 ON o1.card_id = o.card_id AND o1.grade = o.grade AND o1.as_of = date(latest.d, '-1 day')
     LEFT JOIN oracle_prices o30 ON o30.card_id = o.card_id AND o30.grade = o.grade AND o30.as_of = date(latest.d, '-30 day')
     WHERE 1=1 ${ipFilter}
-    ORDER BY o.price_cents DESC LIMIT ${limit}`).all(...args);
+    ORDER BY ${sort} LIMIT ${limit}`).all(...args);
   res.json(rows.map(r => ({
     ...r,
     change_1d_pct: r.price_1d ? +((r.price_cents / r.price_1d - 1) * 100).toFixed(2) : null,
