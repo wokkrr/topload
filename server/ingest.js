@@ -18,6 +18,7 @@ import { makeDemoAdapter } from './adapters/demo.js';
 import { makePokemonTcgAdapter } from './adapters/pokemontcg.js';
 import { makePriceChartingAdapter } from './adapters/pricecharting.js';
 import { makeCollectorCryptAdapter } from './adapters/collectorcrypt.js';
+import { runSolanaIndexer, registerListings } from './indexer-solana.js';
 import { importCsv } from './import-pricecharting-csv.js';
 import { matchListings } from './match.js';
 import { opCardRecords } from './universe.js';
@@ -192,13 +193,21 @@ async function runLive(db, today) {
     }
     summary.gachaListings = listings.length;
     summary.gachaMatched = matches.size;
+    summary.registered = registerListings(db, listings, matches);
     console.log(`[ingest] collectorcrypt listings: ${listings.length} (${matches.size} matched to tracked cards)`);
   } catch (e) {
     console.warn(`[ingest] collectorcrypt fetch failed: ${e.message}`);
   }
 
-  // 4. Raw solds: slot for eBay Marketplace Insights when access is granted.
-  //    (Gacha on-chain SALES indexing lands next — that's self-collected solds.)
+  // 4. Raw solds — on-chain gacha sales (self-collected, first-class oracle input).
+  if (process.env.HELIUS_API_KEY) {
+    try {
+      const idx = await runSolanaIndexer(db, { maxPages: Number(process.env.HELIUS_MAX_PAGES ?? 5) });
+      summary.onchainSales = idx.inserted;
+    } catch (e) {
+      console.warn(`[ingest] solana indexer failed: ${e.message}`);
+    }
+  }
 
   return summary;
 }

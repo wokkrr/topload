@@ -64,6 +64,26 @@ CREATE TABLE IF NOT EXISTS gacha_listings (
   PRIMARY KEY (platform, external_id)
 );
 
+-- Every slab NFT we have ever identified: mint → card mapping. Populated from
+-- listings snapshots (pre-sale) and DAS metadata lookups (post-hoc), so sales
+-- of long-gone listings can still be attributed to cards.
+CREATE TABLE IF NOT EXISTS nft_registry (
+  mint       TEXT PRIMARY KEY,
+  platform   TEXT NOT NULL,
+  card_id    TEXT,                         -- matched card (nullable = unattributed)
+  item_name  TEXT,
+  category   TEXT,
+  grade      TEXT,
+  first_seen TEXT NOT NULL,
+  last_seen  TEXT NOT NULL
+);
+
+-- Indexer bookkeeping (pagination cursors etc.).
+CREATE TABLE IF NOT EXISTS indexer_state (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
+
 -- Daily observations of external solds-derived price series (not raw sales).
 -- Kept separate from `sales` so the solds-only invariant of that table holds.
 CREATE TABLE IF NOT EXISTS external_marks (
