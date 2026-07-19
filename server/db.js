@@ -12,6 +12,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export function openDb(path = join(__dirname, '..', 'data', 'topload.db')) {
   const db = new DatabaseSync(path);
   db.exec('PRAGMA journal_mode = WAL;');
+  // Multiple indexers/backfills may run concurrently — queue for the write
+  // lock (up to 60s) instead of failing instantly with SQLITE_BUSY.
+  db.exec('PRAGMA busy_timeout = 60000;');
   db.exec(readFileSync(join(__dirname, 'schema.sql'), 'utf8'));
   migrate(db);
   return db;

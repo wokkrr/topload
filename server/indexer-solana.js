@@ -104,10 +104,16 @@ function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, th
   if (!apiKey) throw new Error('HELIUS_API_KEY not set');
   let last = 0;
   const throttled = async (fn) => {
-    const wait = last + throttleMs - Date.now();
-    if (wait > 0) await sleep(wait);
-    last = Date.now();
-    return fn();
+    for (let attempt = 0; ; attempt++) {
+      const wait = last + throttleMs - Date.now();
+      if (wait > 0) await sleep(wait);
+      last = Date.now();
+      try { return await fn(); } catch (e) {
+        // 429 = rate limit — back off and retry a few times before giving up.
+        if (String(e.message).includes('429') && attempt < 3) { await sleep(4000 * (attempt + 1)); continue; }
+        throw e;
+      }
+    }
   };
   return {
     /** Parsed transactions for an address, newest first. `before` = signature cursor. */

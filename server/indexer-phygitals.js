@@ -58,7 +58,18 @@ export function decodePhygSale(tx) {
 function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, throttleMs = 250 } = {}) {
   if (!apiKey) throw new Error('HELIUS_API_KEY not set');
   let last = 0;
-  const throttled = async (fn) => { const w = last + throttleMs - Date.now(); if (w > 0) await sleep(w); last = Date.now(); return fn(); };
+  const throttled = async (fn) => {
+    for (let attempt = 0; ; attempt++) {
+      const w = last + throttleMs - Date.now();
+      if (w > 0) await sleep(w);
+      last = Date.now();
+      try { return await fn(); } catch (e) {
+        // 429 = rate limit — back off and retry a few times before giving up.
+        if (String(e.message).includes('429') && attempt < 3) { await sleep(4000 * (attempt + 1)); continue; }
+        throw e;
+      }
+    }
+  };
   return {
     async parsedTxs(address, { before, limit = 100 } = {}) {
       return throttled(async () => {
