@@ -6,7 +6,9 @@ import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
 import { MoversTable, BasketTable, CardsTable, GachaDesk } from './ui/tables.jsx';
 
-const TABS = ['Cards', 'Indexes', 'Movers', 'Basket', 'Gacha Desk'];
+// 'Indexes' removed from nav for now (Kaleb, 2026-07-19) — computation still
+// runs nightly and the ticker still shows levels; re-add here to revisit.
+const TABS = ['Cards', 'Movers', 'Basket', 'Gacha Desk'];
 const RANGES = [7, 30, 90];
 
 export default function App() {
