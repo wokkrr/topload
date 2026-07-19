@@ -10,22 +10,11 @@ export function TickerTape({ onSelect }) {
   const [items, setItems] = useState(null);
 
   useEffect(() => {
-    Promise.all([api.indexes(7), api.movers(1)]).then(([idx, movers]) => {
+    // Index levels intentionally omitted (Kaleb: keep it simple; indexes are
+    // benched for now) — the strip is movers-only and hides when empty.
+    api.movers(1).then((movers) => {
       const out = [];
-      for (const d of idx) {
-        const s = d.series;
-        if (!s?.length) continue;
-        const last = s[s.length - 1].value;
-        const prev = s.length > 1 ? s[s.length - 2].value : last;
-        out.push({
-          key: `idx-${d.index_id}`,
-          label: tokens.series[d.index_id]?.label?.toUpperCase() ?? d.index_id,
-          value: last.toFixed(1),
-          pct: prev ? +((last / prev - 1) * 100).toFixed(2) : 0,
-          color: tokens.series[d.index_id]?.data,
-        });
-      }
-      for (const m of movers.slice(0, 8)) {
+      for (const m of movers.slice(0, 12)) {
         out.push({
           key: `${m.card_id}|${m.grade}`,
           label: `${shortName(m.name)} ${m.grade === 'raw' ? '' : m.grade}`.trim(),
