@@ -18,8 +18,10 @@ import { makeDemoAdapter } from './adapters/demo.js';
 import { makePokemonTcgAdapter } from './adapters/pokemontcg.js';
 import { makePriceChartingAdapter } from './adapters/pricecharting.js';
 import { makeCollectorCryptAdapter } from './adapters/collectorcrypt.js';
+import { importCsv } from './import-pricecharting-csv.js';
 import { matchListings } from './match.js';
 import { opCardRecords } from './universe.js';
+import { writeFileSync } from 'node:fs';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
 import { refreshIndexes } from './indexes.js';
 
@@ -71,10 +73,16 @@ async function runLive(db, today) {
   const summary = { mode: 'live', cards: 0, resolved: 0, externalMarks: 0, salesIngested: 0 };
   summary.demoPurged = purgeDemoData(db);
 
-  // 1. Card universe: PKMN metadata + manual OP list.
+  // 1. Card universe: PKMN metadata + manual OP list. Each source is
+  //    independently fault-tolerant — one API being down must not kill ingest.
   const ptcg = makePokemonTcgAdapter();
-  const pkmnCards = await ptcg.listCards();
-  summary.cards += upsertCards(db, pkmnCards);
+  let pkmnCards = [];
+  try {
+    pkmnCards = await ptcg.listCards();
+    summary.cards += upsertCards(db, pkmnCards);
+  } catch (e) {
+    console.warn(`[ingest] pokemontcg universe fetch failed: ${e.message}`);
+  }
   summary.cards += upsertCards(db, opCardRecords());
 
   const insMark = db.prepare(
@@ -84,15 +92,47 @@ async function runLive(db, today) {
   // 1b. Free price bootstrap: TCGplayer market snapshots via pokemontcg.io
   //     (raw grade, PKMN only — costs nothing, discounted hardest by the oracle).
   try {
-    const freeMarks = await ptcg.fetchExternalMarks(pkmnCards, today);
-    for (const m of freeMarks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
-    console.log(`[ingest] tcgplayer snapshot marks: ${freeMarks.length}`);
+    if (pkmnCards.length) {
+      const freeMarks = await ptcg.fetchExternalMarks(pkmnCards, today);
+      for (const m of freeMarks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
+      console.log(`[ingest] tcgplayer snapshot marks: ${freeMarks.length}`);
+    }
   } catch (e) {
     console.warn(`[ingest] tcgplayer snapshot fetch failed: ${e.message}`);
   }
 
-  // 2. PriceCharting: resolve ids (once per card), then today's external marks.
-  if (process.env.PRICECHARTING_API_KEY) {
+  // 2a. PriceCharting CSV auto-fetch (preferred bulk route, zero-touch daily).
+  //     .env: PC_CSV_URL_PKMN / PC_CSV_URL_YGO / PC_CSV_URL_OP — the download
+  //     links from pricecharting.com/subscriptions ("API/Download"); the files
+  //     regenerate server-side every 24h behind stable URLs.
+  const csvSources = [
+    ['PKMN', process.env.PC_CSV_URL_PKMN],
+    ['YGO', process.env.PC_CSV_URL_YGO],
+    ['OP', process.env.PC_CSV_URL_OP],
+  ].filter(([, url]) => url);
+  for (const [ip, url] of csvSources) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      if (!text.slice(0, 200).includes('product-name')) throw new Error('response is not a price-guide CSV (check the URL)');
+      mkdirSync(join(__dirname, '..', 'data', 'imports'), { recursive: true });
+      writeFileSync(join(__dirname, '..', 'data', 'imports', `${today}-${ip}.csv`), text);
+      const r = importCsv(db, {
+        text, ip, asOf: today,
+        minVolume: Number(process.env.PC_MIN_VOLUME ?? 10),
+        minPriceCents: Number(process.env.PC_MIN_PRICE_CENTS ?? 200),
+      });
+      summary.externalMarks += r.marks;
+      console.log(`[ingest] pricecharting csv ${ip}: ${JSON.stringify(r)}`);
+    } catch (e) {
+      console.warn(`[ingest] pricecharting csv ${ip} failed: ${e.message}`);
+    }
+  }
+
+  // 2b. PriceCharting per-card API — only used when no CSV URLs are configured
+  //     (the CSV route supersedes card-by-card resolution).
+  if (process.env.PRICECHARTING_API_KEY && csvSources.length === 0) {
     const pc = makePriceChartingAdapter();
     const resolveLimit = Number(process.env.PC_RESOLVE_LIMIT ?? 150);
     const unresolvedAll = db.prepare(
