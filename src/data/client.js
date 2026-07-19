@@ -36,6 +36,10 @@ export const api = {
   /** oracle mark history for one card */
   cardSeries: (id, grade = 'raw', days = 90) =>
     get(`/api/cards/${encodeURIComponent(id)}/series?grade=${grade}&days=${days}`),
+  /** recent raw solds for one card */
+  cardSales: (id) => get(`/api/cards/${encodeURIComponent(id)}/sales`),
+  /** global on-chain sales tape */
+  recentSales: () => get('/api/sales/recent'),
 };
 
 export const fmtUsd = (cents) =>

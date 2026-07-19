@@ -14,7 +14,10 @@ export function CardDetail({ cardId, onBack }) {
   const [grade, setGrade] = useState(null);
   const [days, setDays] = useState(90);
   const [series, setSeries] = useState(null);
+  const [sales, setSales] = useState(null);
   const [err, setErr] = useState(null);
+
+  useEffect(() => { api.cardSales(cardId).then(setSales).catch(() => setSales([])); }, [cardId]);
 
   useEffect(() => {
     api.card(cardId).then(c => {
@@ -137,8 +140,31 @@ export function CardDetail({ cardId, onBack }) {
         </tbody>
       </table>
 
-      {/* ── Breakdown / listings / catalysts ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginTop: 28 }}>
+      {/* ── Breakdown / sales / listings / catalysts ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 20, marginTop: 28 }}>
+        <Panel title="Recent sales">
+          {!sales?.length ? (
+            <div style={placeholderStyle}>
+              No recorded sales for this card yet — on-chain sales land here
+              first-hand as the Solana indexer walks Collector Crypt's history.
+            </div>
+          ) : (
+            <div>
+              {sales.slice(0, 8).map((s, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', font: `11px ${tokens.font.mono}`, opacity: s.is_outlier ? 0.45 : 1 }}
+                     title={s.is_outlier ? 'Flagged as outlier — excluded from oracle marks' : undefined}>
+                  <span style={{ color: tokens.color.inkMuted, minWidth: 62 }}>{s.sold_at?.slice(0, 10)}</span>
+                  <span style={{ color: tokens.color.inkSecondary, minWidth: 46 }}>{s.grade}</span>
+                  <span style={{ color: tokens.color.ink, marginLeft: 'auto' }}>{fmtUsd(s.price_cents)}</span>
+                  {s.is_outlier ? <span style={{ color: tokens.color.down, fontSize: 9 }}>⚑</span> : null}
+                </div>
+              ))}
+              <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 6 }}>
+                first-hand solds · {sales[0]?.source === 'collectorcrypt' ? 'Collector Crypt (Solana)' : sales[0]?.source}
+              </div>
+            </div>
+          )}
+        </Panel>
         <Panel title="About this card">
           <Row k="IP" v={tokens.series[card.ip]?.label ?? card.ip} />
           <Row k="Set" v={card.set_name ?? '—'} />

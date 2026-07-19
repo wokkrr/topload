@@ -146,6 +146,28 @@ app.get('/api/cards/:id', (req, res) => {
   });
 });
 
+/** GET /api/cards/:id/sales → recent raw solds for one card (all grades, newest first) */
+app.get('/api/cards/:id/sales', (req, res) => {
+  const limit = Math.min(100, parseInt(req.query.limit ?? '25', 10));
+  const rows = db.prepare(`
+    SELECT grade, price_cents, sold_at, source, is_outlier
+    FROM sales WHERE card_id = ?
+    ORDER BY sold_at DESC LIMIT ${limit}`).all(req.params.id);
+  res.json(rows);
+});
+
+/** GET /api/sales/recent → global raw-solds tape (on-chain first-hand data) */
+app.get('/api/sales/recent', (req, res) => {
+  const limit = Math.min(100, parseInt(req.query.limit ?? '20', 10));
+  const rows = db.prepare(`
+    SELECT s.grade, s.price_cents, s.sold_at, s.source, s.is_outlier,
+           c.id AS card_id, c.name, c.set_name, c.ip
+    FROM sales s JOIN cards c ON c.id = s.card_id
+    WHERE s.source != 'demo'
+    ORDER BY s.sold_at DESC LIMIT ${limit}`).all();
+  res.json(rows);
+});
+
 /** GET /api/cards/:id/series?grade=PSA10&days=90 → oracle mark history (with provenance) */
 app.get('/api/cards/:id/series', (req, res) => {
   const grade = req.query.grade ?? 'raw';

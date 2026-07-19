@@ -146,13 +146,45 @@ export function PlatformStrip({ platforms }) {
   );
 }
 
-export function GachaDesk({ listings, platforms, onSelect }) {
+/** Live on-chain sales tape — what actually traded, first-hand from the chain. */
+export function SalesTape({ sales, onSelect }) {
+  if (!sales?.length) return null;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+        On-chain sales · first-hand from Solana
+      </div>
+      <div style={{ display: 'flex', gap: 20, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 4, scrollbarWidth: 'thin' }}>
+        {sales.filter(s => !s.is_outlier).slice(0, 15).map((s, i) => (
+          <span key={i} onClick={() => onSelect?.(s.card_id)}
+                style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, cursor: 'pointer', flexShrink: 0 }}>
+            <IpDot ip={s.ip} />
+            <span style={{ color: tokens.color.ink }}>{s.name}</span>
+            {' '}{s.grade !== 'raw' ? s.grade : ''} <span style={{ color: tokens.color.ink }}>{fmtUsd(s.price_cents)}</span>
+            <span style={{ color: tokens.color.inkMuted }}> · {timeAgo(s.sold_at)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60 * 48) return `${Math.round(mins / 60)}h ago`;
+  return `${Math.round(mins / 1440)}d ago`;
+}
+
+export function GachaDesk({ listings, platforms, sales, onSelect }) {
   const [view, setView] = useState('table');
   if (!listings) return <Empty label="gacha" />;
   if (!listings.length) {
     return (
       <div>
         <PlatformStrip platforms={platforms} />
+        <SalesTape sales={sales} onSelect={onSelect} />
         <div style={{ padding: '32px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>
           <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>No gacha listings yet</div>
           Run `npm run ingest` — live mode pulls current Collector Crypt listings (Pokémon + One Piece slabs).
@@ -164,6 +196,7 @@ export function GachaDesk({ listings, platforms, onSelect }) {
   return (
     <div>
       <PlatformStrip platforms={platforms} />
+      <SalesTape sales={sales} onSelect={onSelect} />
       <div style={{ display: 'flex', alignItems: 'center', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
         <span>
           {listings.length} live listings · {matched.length} with grade-matched oracle comps ·
