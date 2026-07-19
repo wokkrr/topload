@@ -16,6 +16,8 @@ export const api = {
   movers: (window = 1) => get(`/api/movers?window=${window}`),
   /** current basket membership with marks */
   basket: (index = 'PKMN') => get(`/api/basket?index=${index}`),
+  /** card meta + latest mark per grade */
+  card: (id) => get(`/api/cards/${encodeURIComponent(id)}`),
   /** oracle mark history for one card */
   cardSeries: (id, grade = 'raw', days = 90) =>
     get(`/api/cards/${encodeURIComponent(id)}/series?grade=${grade}&days=${days}`),

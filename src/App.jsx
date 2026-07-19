@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { tokens } from './tokens.js';
 import { api } from './data/client.js';
 import { IndexChart } from './ui/IndexChart.jsx';
+import { CardDetail } from './ui/CardDetail.jsx';
 import { MoversTable, BasketTable, GachaPlaceholder } from './ui/tables.jsx';
 
 const TABS = ['Indexes', 'Movers', 'Basket', 'Gacha Desk'];
@@ -14,6 +15,7 @@ export default function App() {
   const [indexes, setIndexes] = useState(null);
   const [movers, setMovers] = useState(null);
   const [basket, setBasket] = useState(null);
+  const [selectedCard, setSelectedCard] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => { api.indexes(days).then(setIndexes).catch(e => setErr(String(e))); }, [days]);
@@ -28,7 +30,7 @@ export default function App() {
         </h1>
         <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
           {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
+            <button key={t} onClick={() => { setTab(t); setSelectedCard(null); }} style={{
               background: tab === t ? tokens.color.surfaceRaised : 'none',
               border: 'none', borderBottom: tab === t ? `2px solid ${tokens.color.brass}` : '2px solid transparent',
               color: tab === t ? tokens.color.ink : tokens.color.inkSecondary,
@@ -42,7 +44,11 @@ export default function App() {
       <main style={{ padding: '0 28px 40px', maxWidth: 1000, margin: '0 auto' }}>
         {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 12 }}>{err}</div>}
 
-        {tab === 'Indexes' && (
+        {selectedCard && (
+          <CardDetail cardId={selectedCard} onBack={() => setSelectedCard(null)} />
+        )}
+
+        {!selectedCard && tab === 'Indexes' && (
           <section>
             <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
               {RANGES.map(r => (
@@ -61,9 +67,9 @@ export default function App() {
           </section>
         )}
 
-        {tab === 'Movers' && <MoversTable movers={movers} />}
+        {!selectedCard && tab === 'Movers' && <MoversTable movers={movers} onSelect={setSelectedCard} />}
 
-        {tab === 'Basket' && (
+        {!selectedCard && tab === 'Basket' && (
           <section>
             <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
               {Object.entries(tokens.series).map(([id, s]) => (
@@ -78,11 +84,11 @@ export default function App() {
                 top-N by 90D volume · conf ≥ 30 · monthly rebalance
               </span>
             </div>
-            <BasketTable basket={basket} />
+            <BasketTable basket={basket} onSelect={setSelectedCard} />
           </section>
         )}
 
-        {tab === 'Gacha Desk' && <GachaPlaceholder />}
+        {!selectedCard && tab === 'Gacha Desk' && <GachaPlaceholder />}
       </main>
     </div>
   );

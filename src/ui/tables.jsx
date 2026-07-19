@@ -16,7 +16,7 @@ const Conf = ({ c }) => (
   <span style={{ color: c >= 0.6 ? tokens.color.ink : c >= 0.4 ? tokens.color.inkSecondary : tokens.color.inkMuted }}>{(c * 100).toFixed(0)}</span>
 );
 
-export function MoversTable({ movers }) {
+export function MoversTable({ movers, onSelect }) {
   if (!movers?.length) return <Empty label="movers" />;
   return (
     <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
@@ -26,7 +26,7 @@ export function MoversTable({ movers }) {
       </tr></thead>
       <tbody>
         {movers.map(m => (
-          <tr key={`${m.card_id}|${m.grade}`}>
+          <tr key={`${m.card_id}|${m.grade}`} onClick={() => onSelect?.(m.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
             <td style={tdL}><IpDot ip={m.ip} />{m.name} <span style={{ color: tokens.color.inkMuted }}>· {m.set_name}</span></td>
             <td style={tdL}>{m.grade}</td>
             <td style={td}>{fmtUsd(m.price_now)}</td>
@@ -40,7 +40,7 @@ export function MoversTable({ movers }) {
   );
 }
 
-export function BasketTable({ basket }) {
+export function BasketTable({ basket, onSelect }) {
   if (!basket?.length) return <Empty label="basket" />;
   return (
     <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
@@ -50,7 +50,7 @@ export function BasketTable({ basket }) {
       </tr></thead>
       <tbody>
         {basket.map(b => (
-          <tr key={`${b.card_id}|${b.grade}`}>
+          <tr key={`${b.card_id}|${b.grade}`} onClick={() => onSelect?.(b.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
             <td style={tdL}>{b.name} <span style={{ color: tokens.color.inkMuted }}>· {b.set_name} {b.number}</span></td>
             <td style={tdL}>{b.grade}</td>
             <td style={td}>{(b.weight * 100).toFixed(1)}%</td>

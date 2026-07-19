@@ -70,12 +70,37 @@ app.get('/api/basket', (req, res) => {
   })));
 });
 
-/** GET /api/cards/:id/series?grade=PSA10&days=90 → oracle mark history */
+/** GET /api/cards/:id → card meta + latest mark per grade (with provenance) */
+app.get('/api/cards/:id', (req, res) => {
+  const card = db.prepare(`SELECT id, ip, name, set_name, number, variant FROM cards WHERE id = ?`).get(req.params.id);
+  if (!card) return res.status(404).json({ error: 'unknown card' });
+  const grades = db.prepare(`
+    WITH latest AS (
+      SELECT grade, MAX(as_of) d FROM oracle_prices WHERE card_id = ? GROUP BY grade
+    )
+    SELECT o.grade, o.as_of, o.price_cents, o.confidence, o.basis, o.sales_7d, o.sales_30d,
+           o1.price_cents AS price_1d, o30.price_cents AS price_30d
+    FROM latest
+    JOIN oracle_prices o ON o.card_id = ? AND o.grade = latest.grade AND o.as_of = latest.d
+    LEFT JOIN oracle_prices o1 ON o1.card_id = o.card_id AND o1.grade = o.grade AND o1.as_of = date(latest.d, '-1 day')
+    LEFT JOIN oracle_prices o30 ON o30.card_id = o.card_id AND o30.grade = o.grade AND o30.as_of = date(latest.d, '-30 day')
+    ORDER BY o.price_cents DESC`).all(req.params.id, req.params.id);
+  res.json({
+    ...card,
+    grades: grades.map(g => ({
+      ...g,
+      change_1d_pct: g.price_1d ? +((g.price_cents / g.price_1d - 1) * 100).toFixed(2) : null,
+      change_30d_pct: g.price_30d ? +((g.price_cents / g.price_30d - 1) * 100).toFixed(2) : null,
+    })),
+  });
+});
+
+/** GET /api/cards/:id/series?grade=PSA10&days=90 → oracle mark history (with provenance) */
 app.get('/api/cards/:id/series', (req, res) => {
   const grade = req.query.grade ?? 'raw';
   const days = Math.min(365, parseInt(req.query.days ?? '90', 10));
   const rows = db.prepare(`
-    SELECT as_of, price_cents, confidence, sales_7d FROM oracle_prices
+    SELECT as_of, price_cents, confidence, basis, sales_7d FROM oracle_prices
     WHERE card_id = ? AND grade = ?
       AND as_of >= date((SELECT MAX(as_of) FROM oracle_prices), ?)
     ORDER BY as_of`).all(req.params.id, grade, `-${days} day`);
