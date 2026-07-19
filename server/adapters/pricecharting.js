@@ -35,10 +35,16 @@ export function makePriceChartingAdapter({
   apiKey = process.env.PRICECHARTING_API_KEY,
   baseUrl = 'https://www.pricecharting.com',
   fetchImpl = fetch,
+  throttleMs = Number(process.env.PC_THROTTLE_MS ?? 1100), // be a polite API citizen
 } = {}) {
   if (!apiKey) throw new Error('PRICECHARTING_API_KEY not set');
+  let lastCall = 0;
 
   async function getJson(path, params) {
+    const wait = lastCall + throttleMs - Date.now();
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    lastCall = Date.now();
+
     const url = new URL(path, baseUrl);
     url.searchParams.set('t', apiKey);
     for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, v);

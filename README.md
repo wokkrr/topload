@@ -83,3 +83,15 @@ src/
 2. Aggregator: live listings + comp-delta badges, eBay/TCGplayer affiliate deep links, wallet-connect gacha buys
 3. Portfolio: cost basis marked to oracle, physical + tokenized
 4. Selling facilitation: last, if ever
+
+## Nightly cron (macOS)
+
+```bash
+crontab -e
+# add (runs 2:30am daily; adjust node path via `which node`):
+30 2 * * * cd $HOME/Desktop/TOPLOAD && /usr/local/bin/node server/ingest.js >> data/ingest.log 2>&1
+```
+
+History accumulates one mark per day per (card, grade) — charts and movers fill
+in as the cron runs. PriceCharting's API serves current prices only (no
+backfill), so day one is a single point; movers appear on day two.

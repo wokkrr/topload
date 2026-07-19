@@ -49,8 +49,25 @@ function insertSales(db, sales) {
   return n;
 }
 
+/** If a demo run ever populated this DB, wipe synthetic data + derived tables. */
+function purgeDemoData(db) {
+  const demo = db.prepare(`SELECT COUNT(*) n FROM sales WHERE source = 'demo'`).get().n;
+  if (!demo) return 0;
+  db.exec(`
+    DELETE FROM sales WHERE source = 'demo';
+    DELETE FROM cards WHERE json_extract(external_ids, '$.pcQuery') IS NULL
+                        AND json_extract(external_ids, '$.ptcgio') IS NULL;
+    DELETE FROM oracle_prices WHERE card_id NOT IN (SELECT id FROM cards);
+    DELETE FROM basket_members WHERE card_id NOT IN (SELECT id FROM cards);
+    DELETE FROM index_values;
+  `);
+  console.log(`[ingest] purged ${demo} demo sales + derived rows (live mode)`);
+  return demo;
+}
+
 async function runLive(db, today) {
   const summary = { mode: 'live', cards: 0, resolved: 0, externalMarks: 0, salesIngested: 0 };
+  summary.demoPurged = purgeDemoData(db);
 
   // 1. Card universe: PKMN metadata + manual OP list.
   const ptcg = makePokemonTcgAdapter();
@@ -61,11 +78,16 @@ async function runLive(db, today) {
   // 2. PriceCharting: resolve ids (once per card), then today's external marks.
   if (process.env.PRICECHARTING_API_KEY) {
     const pc = makePriceChartingAdapter();
-    const unresolved = db.prepare(
+    const resolveLimit = Number(process.env.PC_RESOLVE_LIMIT ?? 150);
+    const unresolvedAll = db.prepare(
       `SELECT id, external_ids FROM cards
        WHERE json_extract(external_ids, '$.pricecharting') IS NULL
          AND json_extract(external_ids, '$.pcQuery') IS NOT NULL`
     ).all();
+    const unresolved = unresolvedAll.slice(0, resolveLimit);
+    if (unresolvedAll.length > resolveLimit) {
+      console.log(`[ingest] resolving ${resolveLimit}/${unresolvedAll.length} unresolved cards this run (throttled); the rest resolve on subsequent runs`);
+    }
     const setId = db.prepare(
       `UPDATE cards SET external_ids = json_set(external_ids, '$.pricecharting', ?) WHERE id = ?`
     );
