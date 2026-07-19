@@ -98,7 +98,13 @@ function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, th
         if (type) url.searchParams.set('type', type);
         if (before) url.searchParams.set('before', before);
         const res = await fetchImpl(url);
-        if (res.status === 404) return []; // Helius: end of (filtered) results
+        if (res.status === 404) {
+          // Filtered scans 404 when their bounded window has no matches; the
+          // body sometimes carries pagination hints — surface it once.
+          const body = await res.text().catch(() => '');
+          if (!makeHelius._logged404) { makeHelius._logged404 = true; console.warn(`[solana] 404 body: ${body.slice(0, 300)}`); }
+          return { _emptyFiltered: true, _body: body };
+        }
         if (!res.ok) throw new Error(`helius parsedTxs → ${res.status}`);
         return res.json();
       });
@@ -177,12 +183,33 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
   let newestThisRun = null;
   let reachedKnown = false;
 
+  let filterMode = true; // server-side NFT_SALE filter; falls back per-run if flaky
   for (let page = 0; page < maxPages && !reachedKnown; page++) {
     let txs;
     // type=NFT_SALE: server-side filter — the program firehose is ~94% bid
-    // noise (measured 2026-07-19: 935/1000 bids in a six-minute window).
-    try { txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before, type: 'NFT_SALE' }); }
-    catch (e) { console.warn(`[solana] page fetch failed: ${e.message}`); break; }
+    // noise (measured 2026-07-19: 935/1000 bids in a six-minute window). The
+    // filtered endpoint intermittently 404s on windows with no matches, so an
+    // empty/404 first page triggers one retry, then unfiltered pages with
+    // client-side filtering (bounded by maxPages either way).
+    try {
+      txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before, type: filterMode ? 'NFT_SALE' : undefined });
+      if (txs?._emptyFiltered || (filterMode && Array.isArray(txs) && txs.length === 0)) {
+        if (page === 0 && filterMode) {
+          await sleep(1500);
+          txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before, type: 'NFT_SALE' });
+        }
+        if (txs?._emptyFiltered || (Array.isArray(txs) && txs.length === 0)) {
+          if (filterMode) {
+            console.warn('[solana] filtered scan empty — falling back to unfiltered pages (client-side filter)');
+            filterMode = false;
+            txs = await h.parsedTxs(CC_MARKETPLACE_PROGRAM, { before });
+          }
+        }
+      }
+      if (txs?._emptyFiltered) txs = [];
+      // Unfiltered mode needs no explicit filter: decodeSale rejects bids and
+      // listings naturally (no USDC flows), and the cursor walks all txs.
+    } catch (e) { console.warn(`[solana] page fetch failed: ${e.message}`); break; }
     if (!txs.length) { if (backfill) setState('cc_backfill_done', '1'); break; }
     summary.pages++;
     summary.txs += txs.length;
