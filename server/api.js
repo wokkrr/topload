@@ -4,6 +4,7 @@
  */
 import express from 'express';
 import { openDb } from './db.js';
+import { PLATFORMS } from './platforms.js';
 
 const db = openDb();
 const app = express();
@@ -131,6 +132,9 @@ app.get('/api/cards/:id/series', (req, res) => {
     ORDER BY as_of`).all(req.params.id, grade, `-${days} day`);
   res.json(rows);
 });
+
+/** GET /api/platforms → aggregator coverage map */
+app.get('/api/platforms', (_req, res) => res.json(PLATFORMS));
 
 /** GET /api/gacha → current gacha listings with grade-matched oracle comps */
 app.get('/api/gacha', (req, res) => {

@@ -93,21 +93,44 @@ export function CardsTable({ cards, onSelect }) {
   );
 }
 
-export function GachaDesk({ listings, onSelect }) {
+export function PlatformStrip({ platforms }) {
+  if (!platforms?.length) return null;
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+      {platforms.map(p => (
+        <span key={p.id} title={`${p.chain} — ${p.access}`} style={{
+          font: `10px ${tokens.font.mono}`, padding: '3px 9px', borderRadius: 3,
+          border: `1px solid ${p.status === 'live' ? tokens.color.brass : tokens.color.border}`,
+          color: p.status === 'live' ? tokens.color.ink : tokens.color.inkMuted,
+          background: p.status === 'live' ? tokens.color.surfaceRaised : 'none',
+        }}>
+          {p.name.toUpperCase()} <span style={{ opacity: 0.7 }}>· {p.chain.split(' ')[0]}</span>
+          {p.status === 'live' ? ' ● LIVE' : p.status === 'next' ? ' · NEXT' : ' · RECON'}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function GachaDesk({ listings, platforms, onSelect }) {
   if (!listings) return <Empty label="gacha" />;
   if (!listings.length) {
     return (
-      <div style={{ padding: '48px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>
-        <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>No gacha listings yet</div>
-        Run `npm run ingest` — live mode pulls current Collector Crypt listings (Pokémon + One Piece slabs).
+      <div>
+        <PlatformStrip platforms={platforms} />
+        <div style={{ padding: '32px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>
+          <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>No gacha listings yet</div>
+          Run `npm run ingest` — live mode pulls current Collector Crypt listings (Pokémon + One Piece slabs).
+        </div>
       </div>
     );
   }
   const matched = listings.filter(l => l.delta_pct != null);
   return (
     <div>
+      <PlatformStrip platforms={platforms} />
       <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
-        {listings.length} live listings · Collector Crypt (Solana) · {matched.length} with grade-matched oracle comps ·
+        {listings.length} live listings · {matched.length} with grade-matched oracle comps ·
         asking prices, never oracle input
       </div>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>

@@ -18,11 +18,13 @@ export default function App() {
   const [basket, setBasket] = useState(null);
   const [cards, setCards] = useState(null);
   const [gacha, setGacha] = useState(null);
+  const [platforms, setPlatforms] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => { api.cards().then(setCards).catch(e => setErr(String(e))); }, []);
   useEffect(() => { api.gacha().then(setGacha).catch(() => setGacha([])); }, []);
+  useEffect(() => { api.platforms().then(setPlatforms).catch(() => setPlatforms([])); }, []);
   useEffect(() => { api.indexes(days).then(setIndexes).catch(e => setErr(String(e))); }, [days]);
   useEffect(() => { api.movers(1).then(setMovers).catch(e => setErr(String(e))); }, []);
   useEffect(() => { api.basket(basketIp).then(setBasket).catch(e => setErr(String(e))); }, [basketIp]);
@@ -97,7 +99,7 @@ export default function App() {
           </section>
         )}
 
-        {!selectedCard && tab === 'Gacha Desk' && <GachaDesk listings={gacha} onSelect={setSelectedCard} />}
+        {!selectedCard && tab === 'Gacha Desk' && <GachaDesk listings={gacha} platforms={platforms} onSelect={setSelectedCard} />}
       </main>
     </div>
   );

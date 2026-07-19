@@ -18,6 +18,8 @@ export const api = {
   basket: (index = 'PKMN') => get(`/api/basket?index=${index}`),
   /** gacha listings with grade-matched oracle comps */
   gacha: () => get('/api/gacha'),
+  /** aggregator platform coverage map */
+  platforms: () => get('/api/platforms'),
   /** screener: all tracked cards with latest marks */
   cards: (ip) => get(`/api/cards${ip ? `?ip=${ip}` : ''}`),
   /** card meta + latest mark per grade */
