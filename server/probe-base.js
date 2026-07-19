@@ -10,8 +10,12 @@ const KEY = process.env.ALCHEMY_API_KEY;
 if (!KEY) { console.error('ALCHEMY_API_KEY not set in .env'); process.exit(1); }
 
 export const BEEZIE_BASE_CONTRACT = '0xbb5ec6fd4b61723bd45c399840f1d868840ca16f';
-const RPC = `https://base-mainnet.g.alchemy.com/v2/${KEY}`;
-const NFT_API = `https://base-mainnet.g.alchemy.com/nft/v3/${KEY}`;
+// Generalized: `npm run probe:evm -- <network> <contract>` for any Alchemy
+// chain (e.g. polygon-mainnet 0x251be3a1… for Courtyard). Defaults = Beezie.
+const NETWORK = process.argv[2] ?? 'base-mainnet';
+const CONTRACT = (process.argv[3] ?? BEEZIE_BASE_CONTRACT).toLowerCase();
+const RPC = `https://${NETWORK}.g.alchemy.com/v2/${KEY}`;
+const NFT_API = `https://${NETWORK}.g.alchemy.com/nft/v3/${KEY}`;
 
 async function rpc(method, params) {
   const res = await fetch(RPC, {
@@ -24,7 +28,7 @@ async function rpc(method, params) {
   return json.result;
 }
 
-const out = { chain: 'base', contract: BEEZIE_BASE_CONTRACT };
+const out = { chain: NETWORK, contract: CONTRACT };
 
 // 1. Connectivity + chain head
 try {
@@ -35,7 +39,7 @@ try {
 try {
   const r = await rpc('alchemy_getAssetTransfers', [{
     fromBlock: '0x0', toBlock: 'latest',
-    contractAddresses: [BEEZIE_BASE_CONTRACT],
+    contractAddresses: [CONTRACT],
     category: ['erc721'], order: 'desc', maxCount: '0x32', withMetadata: true,
   }]);
   const t = r.transfers ?? [];
@@ -51,7 +55,7 @@ try {
 
 // 3. Parsed NFT sales endpoint — the shortcut if Alchemy supports it on Base
 try {
-  const res = await fetch(`${NFT_API}/getNFTSales?contractAddress=${BEEZIE_BASE_CONTRACT}&order=desc&limit=10`);
+  const res = await fetch(`${NFT_API}/getNFTSales?contractAddress=${CONTRACT}&order=desc&limit=10`);
   if (!res.ok) {
     out.salesEndpoint = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
   } else {
@@ -73,7 +77,7 @@ try {
 try {
   const tid = out.transfers?.samples?.[0]?.tokenId;
   if (tid != null) {
-    const res = await fetch(`${NFT_API}/getNFTMetadata?contractAddress=${BEEZIE_BASE_CONTRACT}&tokenId=${tid}`);
+    const res = await fetch(`${NFT_API}/getNFTMetadata?contractAddress=${CONTRACT}&tokenId=${tid}`);
     const json = await res.json();
     out.metadataSample = {
       tokenId: tid,
@@ -87,12 +91,16 @@ try {
 
 // 5. Receipt anatomy for distinct recent txs — distinguishes marketplace sales
 //    (USDC buyer→seller) from Claw pulls (payment→treasury, cards from vault).
-const USDC_BASE = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
+const STABLES = {
+  'base-mainnet': ['0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'],
+  'polygon-mainnet': ['0x3c499c542cef5e3811e1192ce70d8cc03d5c3359', '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'], // USDC + USDC.e
+};
+const USDC_SET = new Set(STABLES[NETWORK] ?? STABLES['base-mainnet']);
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 try {
   const r = await rpc('alchemy_getAssetTransfers', [{
     fromBlock: '0x0', toBlock: 'latest',
-    contractAddresses: [BEEZIE_BASE_CONTRACT],
+    contractAddresses: [CONTRACT],
     category: ['erc721'], order: 'desc', maxCount: '0x28', withMetadata: true,
   }]);
   const hashes = [...new Set((r.transfers ?? []).map(t => t.hash))].slice(0, 6);
@@ -101,17 +109,17 @@ try {
     const rec = await rpc('eth_getTransactionReceipt', [hash]);
     const logs = rec?.logs ?? [];
     const usdc = logs
-      .filter(l => l.address?.toLowerCase() === USDC_BASE && l.topics?.[0] === TRANSFER_TOPIC)
+      .filter(l => USDC_SET.has(l.address?.toLowerCase()) && l.topics?.[0] === TRANSFER_TOPIC)
       .map(l => ({
         from: '0x' + l.topics[1].slice(26, 34),
         to: '0x' + l.topics[2].slice(26, 34),
         usd: parseInt(l.data, 16) / 1e6,
       }));
     const beezieMoves = logs.filter(l =>
-      l.address?.toLowerCase() === BEEZIE_BASE_CONTRACT && l.topics?.[0] === TRANSFER_TOPIC).length;
+      l.address?.toLowerCase() === CONTRACT && l.topics?.[0] === TRANSFER_TOPIC).length;
     const otherLogAddrs = [...new Set(logs
       .map(l => l.address?.toLowerCase())
-      .filter(a => a !== USDC_BASE && a !== BEEZIE_BASE_CONTRACT))].slice(0, 4);
+      .filter(a => !USDC_SET.has(a) && a !== CONTRACT))].slice(0, 4);
     out.receipts.push({
       hash: hash.slice(0, 18),
       txTo: rec?.to?.slice(0, 14),          // the contract users called — marketplace? claw?
