@@ -78,7 +78,7 @@ app.get('/api/cards/:id', (req, res) => {
     WITH latest AS (
       SELECT grade, MAX(as_of) d FROM oracle_prices WHERE card_id = ? GROUP BY grade
     )
-    SELECT o.grade, o.as_of, o.price_cents, o.confidence, o.basis, o.sales_7d, o.sales_30d,
+    SELECT o.grade, o.as_of, o.price_cents, o.confidence, o.basis, o.source, o.sales_7d, o.sales_30d,
            o1.price_cents AS price_1d, o30.price_cents AS price_30d
     FROM latest
     JOIN oracle_prices o ON o.card_id = ? AND o.grade = latest.grade AND o.as_of = latest.d

@@ -63,7 +63,7 @@ export function CardDetail({ cardId, onBack }) {
               <DeltaChip label="30D" pct={cur.change_30d_pct} />
               <span style={{ font: `10px ${tokens.font.mono}`, color: cur.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary,
                              border: `1px solid ${tokens.color.border}`, borderRadius: 3, padding: '2px 7px' }}>
-                {cur.basis === 'solds' ? 'RAW SOLDS' : 'EXTERNAL'} · CONF {(cur.confidence * 100).toFixed(0)}
+                {cur.basis === 'solds' ? 'RAW SOLDS' : `EXT · ${(cur.source ?? 'src').toUpperCase().slice(0, 8)}`} · CONF {(cur.confidence * 100).toFixed(0)}
               </span>
             </div>
           )}
@@ -113,7 +113,7 @@ export function CardDetail({ cardId, onBack }) {
               <td style={td}>{g.sales_7d}</td>
               <td style={td}>{(g.confidence * 100).toFixed(0)}</td>
               <td style={{ ...tdL, color: g.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}` }}>
-                {g.basis === 'solds' ? 'solds' : 'ext'}
+                {g.basis === 'solds' ? 'solds' : `ext·${(g.source ?? '?').slice(0, 4)}`}
               </td>
             </tr>
           ))}

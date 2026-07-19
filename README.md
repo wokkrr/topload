@@ -18,9 +18,15 @@ npm run dev      # Vite UI on :5173 (proxies /api)
 npm test         # oracle + index math unit tests
 ```
 
-With no API keys set, ingest uses the deterministic **demo adapter** (seeded synthetic
-solds with planted outliers) so the whole pipeline runs offline. Copy `.env.example` →
-`.env` to go live. Nightly cron target: `npm run ingest`.
+With no `.env` at all, ingest uses the deterministic **demo adapter** (seeded synthetic
+solds with planted outliers) so the whole pipeline runs offline.
+
+**Free live path:** `cp .env.example .env` — the `TOPLOAD_MODE=live` line alone switches
+ingest to live mode with zero keys: PKMN metadata + free TCGplayer market-price
+snapshots via pokemontcg.io (raw cards only, source='tcgplayer', hardest confidence
+discount). **Paid path:** add `PRICECHARTING_API_KEY` for solds-derived per-grade prices
+(incl. PSA/BGS + One Piece); it automatically outranks the free source per card/grade/day.
+Nightly cron target: `npm run ingest`.
 
 ## Data sources — the real landscape (verified July 2026)
 

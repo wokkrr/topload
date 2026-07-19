@@ -8,9 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "ingest": "node server/ingest.js",
-    "probe:pricecharting": "node server/probe-pricecharting.js",
-    "api": "node server/api.js",
+    "ingest": "node --env-file-if-exists=.env server/ingest.js",
+    "probe:pricecharting": "node --env-file-if-exists=.env server/probe-pricecharting.js",
+    "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
   },
   "dependencies": {

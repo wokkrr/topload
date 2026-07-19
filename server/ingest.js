@@ -75,6 +75,20 @@ async function runLive(db, today) {
   summary.cards += upsertCards(db, pkmnCards);
   summary.cards += upsertCards(db, opCardRecords());
 
+  const insMark = db.prepare(
+    `INSERT OR REPLACE INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES (?, ?, ?, ?, ?)`
+  );
+
+  // 1b. Free price bootstrap: TCGplayer market snapshots via pokemontcg.io
+  //     (raw grade, PKMN only — costs nothing, discounted hardest by the oracle).
+  try {
+    const freeMarks = await ptcg.fetchExternalMarks(pkmnCards, today);
+    for (const m of freeMarks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
+    console.log(`[ingest] tcgplayer snapshot marks: ${freeMarks.length}`);
+  } catch (e) {
+    console.warn(`[ingest] tcgplayer snapshot fetch failed: ${e.message}`);
+  }
+
   // 2. PriceCharting: resolve ids (once per card), then today's external marks.
   if (process.env.PRICECHARTING_API_KEY) {
     const pc = makePriceChartingAdapter();
@@ -104,9 +118,6 @@ async function runLive(db, today) {
     const resolved = db.prepare(`SELECT id, external_ids FROM cards WHERE json_extract(external_ids, '$.pricecharting') IS NOT NULL`)
       .all().map(r => ({ id: r.id, external_ids: JSON.parse(r.external_ids) }));
     const marks = await pc.fetchExternalMarks(resolved, today);
-    const insMark = db.prepare(
-      `INSERT OR REPLACE INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES (?, ?, ?, ?, ?)`
-    );
     for (const m of marks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
   }
 
@@ -128,7 +139,9 @@ export async function ingest({ db = null, dates = null } = {}) {
   mkdirSync(join(__dirname, '..', 'data'), { recursive: true });
   const database = db ?? openDb();
   const today = new Date().toISOString().slice(0, 10);
-  const live = Boolean(process.env.PRICECHARTING_API_KEY || process.env.POKEMONTCG_API_KEY || process.env.EBAY_CLIENT_ID);
+  // Live mode: any API key present, or TOPLOAD_MODE=live (free path needs no key at all).
+  const live = process.env.TOPLOAD_MODE === 'live'
+    || Boolean(process.env.PRICECHARTING_API_KEY || process.env.POKEMONTCG_API_KEY || process.env.EBAY_CLIENT_ID);
 
   const sourceSummary = live ? await runLive(database, today) : await runDemo(database);
 

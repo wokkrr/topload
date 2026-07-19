@@ -133,20 +133,32 @@ export function refreshOutlierFlags(db, opts = {}) {
   return { series: series.length, flagged };
 }
 
-/** Confidence multiplier applied to external (non-raw-solds) marks. */
+/**
+ * External source registry. Lower priority number wins when multiple sources
+ * cover the same (card, grade, date). Discounts reflect how close each source
+ * is to real solds:
+ *  - pricecharting: derived from actual sold listings, per-grade → 0.7
+ *  - tcgplayer: pokemontcg.io's bundled TCGplayer *market price* snapshot —
+ *    asking-adjacent, raw only → 0.5 (free bootstrap tier)
+ */
+export const EXTERNAL_SOURCES = {
+  pricecharting: { discount: 0.7, priority: 1 },
+  tcgplayer: { discount: 0.5, priority: 2 },
+};
+/** Back-compat: default discount (pricecharting tier). */
 export const EXTERNAL_CONFIDENCE_DISCOUNT = 0.7;
 
 /**
  * Compute and persist oracle marks for every (card, grade) on each date in `dates`.
  * Priority per (card, grade, date):
  *   1. 'solds'    — computed from raw non-outlier sales when enough exist
- *   2. 'external' — latest external solds-derived observation within 7 days,
- *                   confidence = discount × staleness decay (bootstrap only)
+ *   2. 'external' — best-priority external observation within 7 days,
+ *                   confidence = per-source discount × staleness decay
  */
 export function refreshOracle(db, dates, opts = {}) {
   const ins = db.prepare(
-    `INSERT OR REPLACE INTO oracle_prices (card_id, grade, as_of, price_cents, sales_7d, sales_30d, confidence, basis)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR REPLACE INTO oracle_prices (card_id, grade, as_of, price_cents, sales_7d, sales_30d, confidence, basis, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   let written = 0, externalUsed = 0;
 
@@ -165,28 +177,33 @@ export function refreshOracle(db, dates, opts = {}) {
         const t = new Date(s.sold_at).getTime();
         return t < end && t >= end - days * DAY_MS;
       }).length;
-      ins.run(card_id, grade, asOf, mark.price_cents, count(7), count(30), mark.confidence, 'solds');
+      ins.run(card_id, grade, asOf, mark.price_cents, count(7), count(30), mark.confidence, 'solds', null);
       marked.add(`${card_id}|${grade}|${asOf}`);
       written++;
     }
   }
 
-  // Pass 2: external bootstrap where no solds mark exists.
+  // Pass 2: external bootstrap where no solds mark exists — best source wins.
   const extSeries = db.prepare(`SELECT DISTINCT card_id, grade FROM external_marks`).all();
   for (const { card_id, grade } of extSeries) {
     const obs = db.prepare(
-      `SELECT price_cents, as_of FROM external_marks WHERE card_id = ? AND grade = ? ORDER BY as_of`
+      `SELECT source, price_cents, as_of FROM external_marks WHERE card_id = ? AND grade = ? ORDER BY as_of`
     ).all(card_id, grade);
     for (const asOf of dates) {
       if (marked.has(`${card_id}|${grade}|${asOf}`)) continue;
-      // Latest observation at or before asOf, no older than 7 days.
-      let latest = null;
-      for (const o of obs) { if (o.as_of <= asOf) latest = o; else break; }
-      if (!latest) continue;
-      const staleDays = Math.round((new Date(asOf) - new Date(latest.as_of)) / DAY_MS);
-      if (staleDays > 7) continue;
-      const confidence = +(EXTERNAL_CONFIDENCE_DISCOUNT * (1 - staleDays / 14)).toFixed(4);
-      ins.run(card_id, grade, asOf, latest.price_cents, 0, 0, confidence, 'external');
+      // Freshest observation per source at or before asOf, no older than 7 days.
+      const bySource = new Map();
+      for (const o of obs) { if (o.as_of <= asOf) bySource.set(o.source, o); }
+      let best = null, bestMeta = null;
+      for (const [source, o] of bySource) {
+        const meta = EXTERNAL_SOURCES[source] ?? { discount: 0.4, priority: 99 };
+        const staleDays = Math.round((new Date(asOf) - new Date(o.as_of)) / DAY_MS);
+        if (staleDays > 7) continue;
+        if (!best || meta.priority < bestMeta.priority) { best = { ...o, staleDays }; bestMeta = meta; }
+      }
+      if (!best) continue;
+      const confidence = +(bestMeta.discount * (1 - best.staleDays / 14)).toFixed(4);
+      ins.run(card_id, grade, asOf, best.price_cents, 0, 0, confidence, 'external', best.source);
       externalUsed++;
       written++;
     }

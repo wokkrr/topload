@@ -53,9 +53,11 @@ describe('pokemontcg adapter (fixtures)', () => {
     totalCount: 2,
     data: [
       { name: 'Charizard ex', number: '199', rarity: 'Special Illustration Rare',
-        set: { id: 'sv3pt5', name: '151', printedTotal: 165 }, id: 'sv3pt5-199' },
+        set: { id: 'sv3pt5', name: '151', printedTotal: 165 }, id: 'sv3pt5-199',
+        tcgplayer: { prices: { holofoil: { market: 245.5, low: 200 } } } },
       { name: 'Energy', number: '12', rarity: 'Common',
-        set: { id: 'sv3pt5', name: '151', printedTotal: 165 }, id: 'sv3pt5-12' },
+        set: { id: 'sv3pt5', name: '151', printedTotal: 165 }, id: 'sv3pt5-12',
+        tcgplayer: { prices: { normal: { market: 0.25 } } } },
     ],
   };
 
@@ -70,6 +72,19 @@ describe('pokemontcg adapter (fixtures)', () => {
       id: 'pkmn-sv3pt5-charizard-ex-199', ip: 'PKMN', number: '199/165',
     });
     expect(cards[0].external_ids.pcQuery).toContain('Charizard ex');
+  });
+
+  it('maps TCGplayer market snapshots to raw external marks for tracked cards only', async () => {
+    const ptcg = makePokemonTcgAdapter({
+      fetchImpl: () => jsonRes(page),
+      sets: [{ ptcgioId: 'sv3pt5', label: '151' }],
+    });
+    const marks = await ptcg.fetchExternalMarks([{ id: 'pkmn-sv3pt5-charizard-ex-199' }], '2026-07-19');
+    expect(marks).toHaveLength(1); // untracked Energy card skipped
+    expect(marks[0]).toEqual({
+      source: 'tcgplayer', card_id: 'pkmn-sv3pt5-charizard-ex-199',
+      grade: 'raw', as_of: '2026-07-19', price_cents: 24550,
+    });
   });
 });
 
@@ -120,6 +135,28 @@ describe('oracle external-mark bootstrap', () => {
     expect(ext.confidence).toBeCloseTo(EXTERNAL_CONFIDENCE_DISCOUNT, 3); // fresh same-day
     expect(extStale.confidence).toBeLessThan(ext.confidence);            // staleness decay
     expect(res.externalMarks).toBeGreaterThan(0);
+  });
+
+  it('prefers pricecharting over tcgplayer and applies per-source discounts', () => {
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name) VALUES ('c1','PKMN','X')`).run();
+    const insExt = db.prepare(`INSERT INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES (?,'c1','raw',?,?)`);
+    insExt.run('tcgplayer', '2026-07-19', 20000);
+    insExt.run('pricecharting', '2026-07-19', 24000);
+
+    refreshOracle(db, ['2026-07-19']);
+    const mark = db.prepare(`SELECT * FROM oracle_prices WHERE grade='raw' AND as_of='2026-07-19'`).get();
+    expect(mark.source).toBe('pricecharting');       // higher priority wins
+    expect(mark.price_cents).toBe(24000);
+    expect(mark.confidence).toBeCloseTo(0.7, 3);
+
+    // tcgplayer-only card gets the harder discount
+    db.prepare(`INSERT INTO cards (id, ip, name) VALUES ('c2','PKMN','Y')`).run();
+    db.prepare(`INSERT INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES ('tcgplayer','c2','raw','2026-07-19', 5000)`).run();
+    refreshOracle(db, ['2026-07-19']);
+    const m2 = db.prepare(`SELECT * FROM oracle_prices WHERE card_id='c2'`).get();
+    expect(m2.source).toBe('tcgplayer');
+    expect(m2.confidence).toBeCloseTo(0.5, 3);
   });
 
   it('never lets an external mark override a solds mark', () => {

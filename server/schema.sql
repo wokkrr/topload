@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS oracle_prices (
   sales_30d   INTEGER NOT NULL,
   confidence  REAL NOT NULL,               -- 0..1, see oracle.js
   basis       TEXT NOT NULL DEFAULT 'solds',
+  source      TEXT,                        -- which external source, when basis='external'
   PRIMARY KEY (card_id, grade, as_of)
 );
 
