@@ -16,8 +16,18 @@ export const PLATFORMS = [
     url: 'https://collectorcrypt.com',
   },
   {
+    id: 'beezie', name: 'Beezie', chain: 'Flow + Solana', status: 'next',
+    access: 'Kaleb-priority #2. Solana side (May 2026) = Helius-indexable like CC; Flow side later. Docs have no API section; recon under way.',
+    url: 'https://beezie.com',
+  },
+  {
+    id: 'mnstr', name: 'MNSTR', chain: 'Solana', status: 'next',
+    access: 'Kaleb-priority #3. Marketplace live (PKMN; OP soon), FMV sorting. No public API; Helius program indexing candidate.',
+    url: 'https://mnstr.xyz',
+  },
+  {
     id: 'courtyard', name: 'Courtyard', chain: 'Polygon', status: 'next',
-    access: 'No public API; sales/listings readable via Polygon NFT indexers (Reservoir-class).',
+    access: 'Kaleb-priority #4. No public API; needs a Polygon NFT data provider (Alchemy-class key).',
     url: 'https://courtyard.io',
   },
   {
@@ -27,14 +37,4 @@ export const PLATFORMS = [
   },
   // RIP.FUN (Base) removed from the roster 2026-07-19 (Kaleb: low usage vs
   // the others right now) — re-add here when volumes justify it.
-  {
-    id: 'mnstr', name: 'MNSTR', chain: 'Solana', status: 'recon',
-    access: 'Marketplace live (PKMN; OP soon), FMV sorting. No public API found; on-chain candidate + outreach.',
-    url: 'https://mnstr.xyz',
-  },
-  {
-    id: 'beezie', name: 'Beezie', chain: 'Flow + Solana', status: 'recon',
-    access: 'Docs have no API section. Solana expansion May 2026; OpenSea/TAG partners. On-chain candidate + outreach.',
-    url: 'https://beezie.com',
-  },
 ];
