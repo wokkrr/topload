@@ -152,6 +152,7 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
   const backfillCursor = getState('cc_backfill_before');
 
   const summary = { pages: 0, txs: 0, decoded: 0, attributed: 0, inserted: 0, unattributed: 0, dryExamples: [] };
+  const diag = dry ? { types: {}, sources: {}, withTokenTransfers: 0, withNftEvents: 0, withCompressed: 0, timeSpan: [null, null], rawSaleSamples: [] } : null;
   let before = backfill ? (backfillCursor ?? undefined) : undefined;
   let newestThisRun = null;
   let reachedKnown = false;
@@ -167,6 +168,20 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
 
     for (const tx of txs) {
       if (!backfill && newestSeen && tx.signature === newestSeen) { reachedKnown = true; break; }
+      if (diag) {
+        diag.types[tx.type] = (diag.types[tx.type] ?? 0) + 1;
+        diag.sources[tx.source] = (diag.sources[tx.source] ?? 0) + 1;
+        if (tx.tokenTransfers?.length) diag.withTokenTransfers++;
+        if (tx.events?.nft) diag.withNftEvents++;
+        if (tx.events?.compressed?.length) diag.withCompressed++;
+        if (tx.timestamp) {
+          if (!diag.timeSpan[1]) diag.timeSpan[1] = tx.timestamp;
+          diag.timeSpan[0] = tx.timestamp;
+        }
+        if ((tx.type === 'NFT_SALE' || tx.events?.nft?.amount) && diag.rawSaleSamples.length < 2) {
+          diag.rawSaleSamples.push(JSON.stringify(tx).slice(0, 1800));
+        }
+      }
       const sale = decodeSale(tx);
       if (!sale || !sale.sold_at) continue;
       summary.decoded++;
@@ -203,6 +218,10 @@ export async function runSolanaIndexer(db, { dry = false, backfill = false, maxP
         refreshOracle(db, dates);
       }
     }
+  }
+  if (diag) {
+    diag.timeSpan = diag.timeSpan.map(t => t ? new Date(t * 1000).toISOString() : null);
+    console.log('[solana:diag]', JSON.stringify(diag, null, 1));
   }
   console.log('[solana]', JSON.stringify(summary, null, dry ? 1 : 0));
   return summary;
