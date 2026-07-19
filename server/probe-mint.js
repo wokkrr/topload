@@ -48,7 +48,9 @@ try {
     types[tx.type] = (types[tx.type] ?? 0) + 1;
     sources[tx.source] = (sources[tx.source] ?? 0) + 1;
     for (const i of tx.instructions ?? []) programs[i.programId] = (programs[i.programId] ?? 0) + 1;
-    if ((tx.type === 'NFT_SALE' || tx.events?.nft?.amount) && saleSamples.length < 2) {
+    // Sale-shaped even when unlabeled: any payment (tokens or native SOL) in the tx.
+    const paymentish = (tx.tokenTransfers?.length ?? 0) > 0 || (tx.nativeTransfers ?? []).some(n => n.amount > 1e7);
+    if ((tx.type === 'NFT_SALE' || tx.events?.nft?.amount || paymentish) && saleSamples.length < 3) {
       saleSamples.push({
         signature: tx.signature?.slice(0, 20), type: tx.type, source: tx.source,
         description: tx.description?.slice(0, 140),
@@ -60,6 +62,11 @@ try {
         tokenTransfers: (tx.tokenTransfers ?? []).slice(0, 4).map(t => ({
           mint: t.mint?.slice(0, 8), amt: t.tokenAmount, from: t.fromUserAccount?.slice(0, 8), to: t.toUserAccount?.slice(0, 8),
         })),
+        nativeTransfers: (tx.nativeTransfers ?? []).filter(n => n.amount > 1e6).slice(0, 4).map(n => ({
+          sol: +(n.amount / 1e9).toFixed(4), from: n.fromUserAccount?.slice(0, 8), to: n.toUserAccount?.slice(0, 8),
+        })),
+        instructionPrograms: [...new Set((tx.instructions ?? []).map(i => i.programId?.slice(0, 10)))],
+        coreAccounts: (tx.instructions ?? []).find(i => i.programId?.startsWith('CoREENxT'))?.accounts?.map(a => a?.slice(0, 8)) ?? null,
       });
     }
   }
