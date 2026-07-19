@@ -16,6 +16,20 @@ const Conf = ({ c }) => (
   <span style={{ color: c >= 0.6 ? tokens.color.ink : c >= 0.4 ? tokens.color.inkSecondary : tokens.color.inkMuted }}>{(c * 100).toFixed(0)}</span>
 );
 
+export const Thumb = ({ src, size = 34 }) => src ? (
+  <img src={src} alt="" loading="lazy" style={{
+    height: size, width: Math.round(size * 0.72), objectFit: 'cover', borderRadius: 3,
+    marginRight: 10, verticalAlign: 'middle', background: tokens.color.surfaceRaised,
+    border: `1px solid ${tokens.color.border}`, flexShrink: 0,
+  }} />
+) : (
+  <span style={{
+    display: 'inline-block', height: size, width: Math.round(size * 0.72), borderRadius: 3,
+    marginRight: 10, verticalAlign: 'middle', background: tokens.color.surfaceRaised,
+    border: `1px solid ${tokens.color.border}`,
+  }} />
+);
+
 export function MoversTable({ movers, onSelect }) {
   if (!movers?.length) return <Empty label="movers" />;
   return (
@@ -77,7 +91,7 @@ export function CardsTable({ cards, onSelect }) {
       <tbody>
         {cards.map(c => (
           <tr key={`${c.card_id}|${c.grade}`} onClick={() => onSelect?.(c.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
-            <td style={tdL}><IpDot ip={c.ip} />{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></td>
+            <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}><Thumb src={c.image} /><IpDot ip={c.ip} /><span>{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></span></td>
             <td style={tdL}>{c.grade}</td>
             <td style={td}>{fmtUsd(c.price_cents)}</td>
             <td style={td}><Delta pct={c.change_1d_pct} /></td>
@@ -143,9 +157,12 @@ export function GachaDesk({ listings, platforms, onSelect }) {
             <tr key={`${l.platform}|${l.external_id}`}
                 onClick={l.card_id ? () => onSelect?.(l.card_id) : undefined}
                 style={{ cursor: l.card_id ? 'pointer' : 'default' }}>
-              <td style={tdL}>
-                {l.ip && <IpDot ip={l.ip} />}{l.item_name}
-                {l.card_name && <span style={{ color: tokens.color.inkMuted }}> → {l.card_name}</span>}
+              <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}>
+                <Thumb src={l.image} size={42} />
+                <span>
+                  {l.ip && <IpDot ip={l.ip} />}{l.item_name}
+                  {l.card_name && <span style={{ color: tokens.color.inkMuted }}> → {l.card_name}</span>}
+                </span>
               </td>
               <td style={tdL}>{l.grade}</td>
               <td style={td}>{fmtUsd(l.price_cents)}</td>

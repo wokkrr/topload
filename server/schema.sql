@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS cards (
   set_name     TEXT,
   number       TEXT,
   variant      TEXT NOT NULL DEFAULT '',-- 'holo', 'alt-art', ...
+  image        TEXT,                    -- official card art URL (pokemontcg.io etc.)
   external_ids TEXT NOT NULL DEFAULT '{}' -- JSON: { pricecharting, ebayQuery, ptcgio, ... }
 );
 

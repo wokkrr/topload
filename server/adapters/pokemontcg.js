@@ -65,6 +65,7 @@ export function makePokemonTcgAdapter({
               set_name: c.set.name,
               number: `${c.number}/${c.set.printedTotal}`,
               variant: c.rarity,
+              image: c.images?.large ?? c.images?.small ?? null,
               external_ids: {
                 ptcgio: c.id,
                 // Seed queries for downstream resolution/search:

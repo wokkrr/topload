@@ -46,8 +46,14 @@ export function CardDetail({ cardId, onBack }) {
     <section>
       <button onClick={onBack} style={backStyle}>← back</button>
 
-      {/* ── Hero: identity + big price + delta chips ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 32, margin: '14px 0 4px', flexWrap: 'wrap' }}>
+      {/* ── Hero: card art + identity + big price + delta chips ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24, margin: '14px 0 4px', flexWrap: 'wrap' }}>
+        {card.image && (
+          <img src={card.image} alt={card.name} style={{
+            height: 130, borderRadius: 6, border: `1px solid ${tokens.color.border}`,
+            background: tokens.color.surfaceRaised, alignSelf: 'flex-start',
+          }} />
+        )}
         <div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
             <h2 style={{ font: `24px ${tokens.font.display}`, margin: 0 }}>{card.name}</h2>

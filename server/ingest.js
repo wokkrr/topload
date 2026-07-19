@@ -30,15 +30,16 @@ const DAY_MS = 86_400_000;
 
 function upsertCards(db, cards) {
   const ins = db.prepare(
-    `INSERT INTO cards (id, ip, name, set_name, number, variant, external_ids)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO cards (id, ip, name, set_name, number, variant, image, external_ids)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name, set_name = excluded.set_name, number = excluded.number,
        variant = excluded.variant,
+       image = COALESCE(excluded.image, cards.image),
        external_ids = json_patch(cards.external_ids, excluded.external_ids)`
   );
   for (const c of cards) {
-    ins.run(c.id, c.ip, c.name, c.set_name ?? null, c.number ?? null, c.variant ?? '', JSON.stringify(c.external_ids ?? {}));
+    ins.run(c.id, c.ip, c.name, c.set_name ?? null, c.number ?? null, c.variant ?? '', c.image ?? null, JSON.stringify(c.external_ids ?? {}));
   }
   return cards.length;
 }

@@ -21,6 +21,7 @@ export function openDb(path = join(__dirname, '..', 'data', 'topload.db')) {
 function migrate(db) {
   ensureColumn(db, 'external_marks', 'sales_volume', 'INTEGER');
   ensureColumn(db, 'oracle_prices', 'source', 'TEXT');
+  ensureColumn(db, 'cards', 'image', 'TEXT');
 }
 
 function ensureColumn(db, table, column, ddl) {

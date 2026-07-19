@@ -81,6 +81,7 @@ app.get('/api/cards', (req, res) => {
       SELECT card_id, grade, MAX(as_of) d FROM oracle_prices GROUP BY card_id, grade
     )
     SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
+           COALESCE(c.image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1)) AS image,
            o.grade, o.price_cents, o.confidence, o.basis, o.source, o.sales_7d,
            o1.price_cents AS price_1d, o30.price_cents AS price_30d
     FROM latest
@@ -99,7 +100,10 @@ app.get('/api/cards', (req, res) => {
 
 /** GET /api/cards/:id → card meta + latest mark per grade (with provenance) */
 app.get('/api/cards/:id', (req, res) => {
-  const card = db.prepare(`SELECT id, ip, name, set_name, number, variant FROM cards WHERE id = ?`).get(req.params.id);
+  const card = db.prepare(`
+    SELECT id, ip, name, set_name, number, variant,
+           COALESCE(image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1)) AS image
+    FROM cards WHERE id = ?`).get(req.params.id);
   if (!card) return res.status(404).json({ error: 'unknown card' });
   const grades = db.prepare(`
     WITH latest AS (
