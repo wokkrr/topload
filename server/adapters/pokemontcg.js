@@ -1,29 +1,54 @@
 /**
- * Pokémon TCG API adapter (free, metadata only): card names, sets, numbers,
- * images, ids. Seeds the PKMN card universe; never a price source.
- * Docs: https://pokemontcg.io  (X-Api-Key optional but raises rate limits)
+ * Pokémon TCG API adapter (free, metadata only): seeds the PKMN card universe.
+ * Never a price source. Docs: https://pokemontcg.io
+ * X-Api-Key (POKEMONTCG_API_KEY) optional but raises rate limits.
  */
-export function makePokemonTcgAdapter({ apiKey = process.env.POKEMONTCG_API_KEY } = {}) {
-  const base = 'https://api.pokemontcg.io/v2';
+import { PKMN_SETS, PKMN_RARITY_ALLOW } from '../universe.js';
+
+export function makePokemonTcgAdapter({
+  apiKey = process.env.POKEMONTCG_API_KEY,
+  baseUrl = 'https://api.pokemontcg.io/v2',
+  fetchImpl = fetch,
+  sets = PKMN_SETS,
+  rarityAllow = PKMN_RARITY_ALLOW,
+} = {}) {
   const headers = apiKey ? { 'X-Api-Key': apiKey } : {};
 
   return {
     name: 'pokemontcg',
 
-    /** Fetch cards for a set query, e.g. 'set.id:sv3pt5' (151). */
-    async listCards(q = 'set.id:sv3pt5') {
-      const res = await fetch(`${base}/cards?q=${encodeURIComponent(q)}&pageSize=250`, { headers });
-      if (!res.ok) throw new Error(`pokemontcg ${res.status}`);
-      const { data } = await res.json();
-      return data.map(c => ({
-        id: `pkmn-${c.set.id}-${c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${c.number}`,
-        ip: 'PKMN',
-        name: c.name,
-        set_name: c.set.name,
-        number: `${c.number}/${c.set.printedTotal}`,
-        variant: '',
-        external_ids: { ptcgio: c.id },
-      }));
+    /** Chase cards across the configured sets, shaped as CardRecords. */
+    async listCards() {
+      const out = [];
+      for (const set of sets) {
+        let page = 1, more = true;
+        while (more) {
+          const url = `${baseUrl}/cards?q=${encodeURIComponent(`set.id:${set.ptcgioId}`)}&page=${page}&pageSize=250`;
+          const res = await fetchImpl(url, { headers });
+          if (!res.ok) throw new Error(`pokemontcg ${set.ptcgioId} p${page} → ${res.status}`);
+          const { data, totalCount } = await res.json();
+          for (const c of data) {
+            if (!rarityAllow.includes(c.rarity)) continue;
+            out.push({
+              id: `pkmn-${c.set.id}-${c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${c.number}`,
+              ip: 'PKMN',
+              name: c.name,
+              set_name: c.set.name,
+              number: `${c.number}/${c.set.printedTotal}`,
+              variant: c.rarity,
+              external_ids: {
+                ptcgio: c.id,
+                // Seed queries for downstream resolution/search:
+                pcQuery: `${c.name} ${c.number} ${c.set.name} pokemon`,
+                ebayQuery: `pokemon ${c.name} ${c.number}/${c.set.printedTotal} ${c.set.name}`,
+              },
+            });
+          }
+          more = page * 250 < totalCount;
+          page++;
+        }
+      }
+      return out;
     },
 
     async fetchSales() { return []; }, // metadata source only

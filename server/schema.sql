@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS sales (
 );
 CREATE INDEX IF NOT EXISTS idx_sales_card_grade_date ON sales(card_id, grade, sold_at);
 
--- Daily oracle mark per (card, grade), computed from non-outlier solds.
+-- Daily oracle mark per (card, grade).
+-- basis: 'solds'    = computed here from raw non-outlier sales (first-class)
+--        'external' = trusted solds-derived series (e.g. PriceCharting) used as
+--                     bootstrap where raw solds aren't accessible; confidence is
+--                     discounted and provenance is never hidden.
 CREATE TABLE IF NOT EXISTS oracle_prices (
   card_id     TEXT NOT NULL,
   grade       TEXT NOT NULL,
@@ -36,7 +40,19 @@ CREATE TABLE IF NOT EXISTS oracle_prices (
   sales_7d    INTEGER NOT NULL,
   sales_30d   INTEGER NOT NULL,
   confidence  REAL NOT NULL,               -- 0..1, see oracle.js
+  basis       TEXT NOT NULL DEFAULT 'solds',
   PRIMARY KEY (card_id, grade, as_of)
+);
+
+-- Daily observations of external solds-derived price series (not raw sales).
+-- Kept separate from `sales` so the solds-only invariant of that table holds.
+CREATE TABLE IF NOT EXISTS external_marks (
+  source      TEXT NOT NULL,               -- 'pricecharting'
+  card_id     TEXT NOT NULL,
+  grade       TEXT NOT NULL,
+  as_of       TEXT NOT NULL,
+  price_cents INTEGER NOT NULL,
+  PRIMARY KEY (source, card_id, grade, as_of)
 );
 
 -- Rules-based basket membership, recorded per rebalance date.

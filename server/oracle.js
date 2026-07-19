@@ -133,15 +133,27 @@ export function refreshOutlierFlags(db, opts = {}) {
   return { series: series.length, flagged };
 }
 
-/** Compute and persist oracle marks for every (card, grade) on each date in `dates`. */
+/** Confidence multiplier applied to external (non-raw-solds) marks. */
+export const EXTERNAL_CONFIDENCE_DISCOUNT = 0.7;
+
+/**
+ * Compute and persist oracle marks for every (card, grade) on each date in `dates`.
+ * Priority per (card, grade, date):
+ *   1. 'solds'    — computed from raw non-outlier sales when enough exist
+ *   2. 'external' — latest external solds-derived observation within 7 days,
+ *                   confidence = discount × staleness decay (bootstrap only)
+ */
 export function refreshOracle(db, dates, opts = {}) {
-  const series = db.prepare(`SELECT DISTINCT card_id, grade FROM sales WHERE is_outlier = 0`).all();
   const ins = db.prepare(
-    `INSERT OR REPLACE INTO oracle_prices (card_id, grade, as_of, price_cents, sales_7d, sales_30d, confidence)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR REPLACE INTO oracle_prices (card_id, grade, as_of, price_cents, sales_7d, sales_30d, confidence, basis)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   );
-  let written = 0;
-  for (const { card_id, grade } of series) {
+  let written = 0, externalUsed = 0;
+
+  // Pass 1: first-class marks from raw solds.
+  const soldsSeries = db.prepare(`SELECT DISTINCT card_id, grade FROM sales WHERE is_outlier = 0`).all();
+  const marked = new Set();
+  for (const { card_id, grade } of soldsSeries) {
     const sales = db.prepare(
       `SELECT price_cents, sold_at FROM sales WHERE card_id = ? AND grade = ? AND is_outlier = 0 ORDER BY sold_at`
     ).all(card_id, grade);
@@ -153,9 +165,32 @@ export function refreshOracle(db, dates, opts = {}) {
         const t = new Date(s.sold_at).getTime();
         return t < end && t >= end - days * DAY_MS;
       }).length;
-      ins.run(card_id, grade, asOf, mark.price_cents, count(7), count(30), mark.confidence);
+      ins.run(card_id, grade, asOf, mark.price_cents, count(7), count(30), mark.confidence, 'solds');
+      marked.add(`${card_id}|${grade}|${asOf}`);
       written++;
     }
   }
-  return { series: series.length, marks: written };
+
+  // Pass 2: external bootstrap where no solds mark exists.
+  const extSeries = db.prepare(`SELECT DISTINCT card_id, grade FROM external_marks`).all();
+  for (const { card_id, grade } of extSeries) {
+    const obs = db.prepare(
+      `SELECT price_cents, as_of FROM external_marks WHERE card_id = ? AND grade = ? ORDER BY as_of`
+    ).all(card_id, grade);
+    for (const asOf of dates) {
+      if (marked.has(`${card_id}|${grade}|${asOf}`)) continue;
+      // Latest observation at or before asOf, no older than 7 days.
+      let latest = null;
+      for (const o of obs) { if (o.as_of <= asOf) latest = o; else break; }
+      if (!latest) continue;
+      const staleDays = Math.round((new Date(asOf) - new Date(latest.as_of)) / DAY_MS);
+      if (staleDays > 7) continue;
+      const confidence = +(EXTERNAL_CONFIDENCE_DISCOUNT * (1 - staleDays / 14)).toFixed(4);
+      ins.run(card_id, grade, asOf, latest.price_cents, 0, 0, confidence, 'external');
+      externalUsed++;
+      written++;
+    }
+  }
+
+  return { series: soldsSeries.length + extSeries.length, marks: written, externalMarks: externalUsed };
 }

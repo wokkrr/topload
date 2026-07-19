@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "ingest": "node server/ingest.js",
+    "probe:pricecharting": "node server/probe-pricecharting.js",
     "api": "node server/api.js",
     "test": "vitest run server/test"
   },

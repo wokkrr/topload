@@ -19,9 +19,26 @@ npm test         # oracle + index math unit tests
 ```
 
 With no API keys set, ingest uses the deterministic **demo adapter** (seeded synthetic
-solds with planted outliers) so the whole pipeline runs offline. Live adapters activate
-when keys exist: `EBAY_APP_ID`, `PRICECHARTING_API_KEY`, `POKEMONTCG_API_KEY`.
-Nightly cron target: `npm run ingest`.
+solds with planted outliers) so the whole pipeline runs offline. Copy `.env.example` →
+`.env` to go live. Nightly cron target: `npm run ingest`.
+
+## Data sources — the real landscape (verified July 2026)
+
+- **eBay solds are not directly accessible**: the Finding API was decommissioned
+  Feb 2025, the Browse API serves live listings only, and Marketplace Insights (the
+  actual solds API) is limited-release/partner-gated. An adapter slot exists
+  (`makeEbayInsightsAdapter`) — apply for access, don't depend on it.
+- **PriceCharting is the primary bootstrap** (`PRICECHARTING_API_KEY`): prices derived
+  from actual sold listings, split by grade. These land in `external_marks` (never in
+  `sales` — that table is raw solds only) and become oracle marks with
+  `basis='external'` and confidence discounted ×0.7 with staleness decay. Run
+  `npm run probe:pricecharting` once to verify the grade-field mapping live.
+- **pokemontcg.io** seeds the PKMN card universe (metadata, never prices); the OP
+  universe is a manual seed list in `server/universe.js`.
+- **eBay Browse + EPN** (`EBAY_CLIENT_ID/SECRET`, `EPN_CAMPAIGN_ID`) power aggregator
+  listings + affiliate deep links in build step 2. Listings never touch the oracle.
+- **On-chain gacha sales** (build step 2) are public data — they'll be the first raw
+  solds source that needs no gatekeeper.
 
 ## Architecture
 
