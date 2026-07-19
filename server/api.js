@@ -70,6 +70,31 @@ app.get('/api/basket', (req, res) => {
   })));
 });
 
+/** GET /api/cards?ip=PKMN → screener: every tracked card with its latest mark(s) */
+app.get('/api/cards', (req, res) => {
+  const ipFilter = req.query.ip ? `AND c.ip = ?` : '';
+  const args = req.query.ip ? [req.query.ip] : [];
+  const rows = db.prepare(`
+    WITH latest AS (
+      SELECT card_id, grade, MAX(as_of) d FROM oracle_prices GROUP BY card_id, grade
+    )
+    SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
+           o.grade, o.price_cents, o.confidence, o.basis, o.source, o.sales_7d,
+           o1.price_cents AS price_1d, o30.price_cents AS price_30d
+    FROM latest
+    JOIN oracle_prices o ON o.card_id = latest.card_id AND o.grade = latest.grade AND o.as_of = latest.d
+    JOIN cards c ON c.id = o.card_id
+    LEFT JOIN oracle_prices o1 ON o1.card_id = o.card_id AND o1.grade = o.grade AND o1.as_of = date(latest.d, '-1 day')
+    LEFT JOIN oracle_prices o30 ON o30.card_id = o.card_id AND o30.grade = o.grade AND o30.as_of = date(latest.d, '-30 day')
+    WHERE 1=1 ${ipFilter}
+    ORDER BY o.price_cents DESC`).all(...args);
+  res.json(rows.map(r => ({
+    ...r,
+    change_1d_pct: r.price_1d ? +((r.price_cents / r.price_1d - 1) * 100).toFixed(2) : null,
+    change_30d_pct: r.price_30d ? +((r.price_cents / r.price_30d - 1) * 100).toFixed(2) : null,
+  })));
+});
+
 /** GET /api/cards/:id → card meta + latest mark per grade (with provenance) */
 app.get('/api/cards/:id', (req, res) => {
   const card = db.prepare(`SELECT id, ip, name, set_name, number, variant FROM cards WHERE id = ?`).get(req.params.id);

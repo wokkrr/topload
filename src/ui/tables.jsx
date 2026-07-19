@@ -66,6 +66,33 @@ export function BasketTable({ basket, onSelect }) {
   );
 }
 
+export function CardsTable({ cards, onSelect }) {
+  if (!cards?.length) return <Empty label="card" />;
+  return (
+    <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
+      <thead><tr>
+        <th style={thL}>Card</th><th style={thL}>Grade</th><th style={th}>Mark</th>
+        <th style={th}>Δ1D</th><th style={th}>Δ30D</th><th style={th}>Conf</th><th style={thL}>Basis</th>
+      </tr></thead>
+      <tbody>
+        {cards.map(c => (
+          <tr key={`${c.card_id}|${c.grade}`} onClick={() => onSelect?.(c.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
+            <td style={tdL}><IpDot ip={c.ip} />{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></td>
+            <td style={tdL}>{c.grade}</td>
+            <td style={td}>{fmtUsd(c.price_cents)}</td>
+            <td style={td}><Delta pct={c.change_1d_pct} /></td>
+            <td style={td}><Delta pct={c.change_30d_pct} /></td>
+            <td style={td}><Conf c={c.confidence} /></td>
+            <td style={{ ...tdL, color: c.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}` }}>
+              {c.basis === 'solds' ? 'solds' : `ext·${(c.source ?? '?').slice(0, 4)}`}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export function GachaPlaceholder() {
   return (
     <div style={{ padding: '48px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>

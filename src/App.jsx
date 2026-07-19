@@ -4,21 +4,23 @@ import { api } from './data/client.js';
 import { IndexChart } from './ui/IndexChart.jsx';
 import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
-import { MoversTable, BasketTable, GachaPlaceholder } from './ui/tables.jsx';
+import { MoversTable, BasketTable, CardsTable, GachaPlaceholder } from './ui/tables.jsx';
 
-const TABS = ['Indexes', 'Movers', 'Basket', 'Gacha Desk'];
+const TABS = ['Cards', 'Indexes', 'Movers', 'Basket', 'Gacha Desk'];
 const RANGES = [7, 30, 90];
 
 export default function App() {
-  const [tab, setTab] = useState('Indexes');
+  const [tab, setTab] = useState('Cards');
   const [days, setDays] = useState(90);
   const [basketIp, setBasketIp] = useState('PKMN');
   const [indexes, setIndexes] = useState(null);
   const [movers, setMovers] = useState(null);
   const [basket, setBasket] = useState(null);
+  const [cards, setCards] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [err, setErr] = useState(null);
 
+  useEffect(() => { api.cards().then(setCards).catch(e => setErr(String(e))); }, []);
   useEffect(() => { api.indexes(days).then(setIndexes).catch(e => setErr(String(e))); }, [days]);
   useEffect(() => { api.movers(1).then(setMovers).catch(e => setErr(String(e))); }, []);
   useEffect(() => { api.basket(basketIp).then(setBasket).catch(e => setErr(String(e))); }, [basketIp]);
@@ -69,6 +71,8 @@ export default function App() {
             <IndexChart data={indexes} />
           </section>
         )}
+
+        {!selectedCard && tab === 'Cards' && <CardsTable cards={cards} onSelect={setSelectedCard} />}
 
         {!selectedCard && tab === 'Movers' && <MoversTable movers={movers} onSelect={setSelectedCard} />}
 
