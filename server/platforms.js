@@ -31,8 +31,8 @@ export const PLATFORMS = [
     url: 'https://courtyard.io',
   },
   {
-    id: 'phygitals', name: 'Phygitals', chain: 'Solana', status: 'recon',
-    access: 'Fanatics Collect integration (Apr 2026). Solana program indexing candidate.',
+    id: 'phygitals', name: 'Phygitals', chain: 'Solana', status: 'live',
+    access: 'Sales indexed on-chain via Core collection anchor (no marketplace program — direct USDC+Core composition). Fanatics-integrated. Listings TBD.',
     url: 'https://www.phygitals.com',
   },
   // RIP.FUN (Base) removed from the roster 2026-07-19 (Kaleb: low usage vs

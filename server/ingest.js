@@ -217,6 +217,15 @@ async function runLive(db, today) {
       console.warn(`[ingest] base indexer failed: ${e.message}`);
     }
   }
+  if (process.env.HELIUS_API_KEY) {
+    try {
+      const { runPhygitalsIndexer } = await import('./indexer-phygitals.js');
+      const idx = await runPhygitalsIndexer(db, { maxPages: Number(process.env.HELIUS_MAX_PAGES ?? 5) });
+      summary.phygitalsSales = idx.inserted;
+    } catch (e) {
+      console.warn(`[ingest] phygitals indexer failed: ${e.message}`);
+    }
+  }
 
   return summary;
 }
