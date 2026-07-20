@@ -53,10 +53,13 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
   const prev = idx > 0 ? nav[idx - 1] : null;
   const next = idx >= 0 && idx < nav.length - 1 ? nav[idx + 1] : null;
 
+  // Square boxes, glyph dead-center (Kaleb, 2026-07-20).
   const navBtn = (enabled) => ({
     background: 'none', border: `1px solid ${enabled ? tokens.color.inkMuted : tokens.color.border}`,
     color: enabled ? tokens.color.ink : tokens.color.inkMuted, cursor: enabled ? 'pointer' : 'default',
-    padding: '4px 12px', font: `13px ${tokens.font.mono}`, lineHeight: 1,
+    width: 28, height: 28, padding: 0, borderRadius: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    font: `15px ${tokens.font.mono}`, lineHeight: 1,
   });
 
   return (
