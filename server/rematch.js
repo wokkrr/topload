@@ -5,12 +5,19 @@
  * Run after any matcher change: npm run rematch
  * Then re-run `npm run solana:backfill` to re-ingest on-chain sales with
  * clean attribution (cursors are reset here on purpose).
+ *
+ * --listings-only : re-match gacha_listings + nft_registry ONLY, and leave
+ *   sales / cursors untouched. Use this after a CATALOG change (e.g. seeding
+ *   the canonical One Piece cards) where the matcher itself did NOT change and
+ *   sales are already correctly attributed (the seed re-points them). This is
+ *   the safe path — it never destroys on-chain sales or forces a full backfill.
  */
 import { openDb } from './db.js';
 import { matchListing } from './match.js';
 
 const CATEGORY_TO_IP = { 'Pokemon': 'PKMN', 'One Piece': 'OP', 'YuGiOh': 'YGO', 'Yu-Gi-Oh': 'YGO' };
 
+const listingsOnly = process.argv.includes('--listings-only');
 const db = openDb();
 const universeByIp = {};
 for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
@@ -46,16 +53,24 @@ for (const r of db.prepare(`SELECT mint, item_name, category, card_id FROM nft_r
 //    ALL sources and reset ALL cursors so backfills re-walk the same history
 //    with clean attribution. Registry keeps item_names, so re-attribution is
 //    instant (no metadata refetches); the nightly crons regrow the totals.
-const purged = db.prepare(`SELECT COUNT(*) n FROM sales`).get().n;
-db.exec(`DELETE FROM sales`);
-db.exec(`DELETE FROM oracle_prices WHERE basis = 'solds'`);
-db.exec(`DELETE FROM indexer_state`);
+//    SKIPPED in --listings-only mode: a catalog change doesn't invalidate sale
+//    attribution (the seed already re-points sales), so keep them.
+let purged = 0;
+if (!listingsOnly) {
+  purged = db.prepare(`SELECT COUNT(*) n FROM sales`).get().n;
+  db.exec(`DELETE FROM sales`);
+  db.exec(`DELETE FROM oracle_prices WHERE basis = 'solds'`);
+  db.exec(`DELETE FROM indexer_state`);
+}
 
 db.exec('COMMIT');
 
 console.log('[rematch]', JSON.stringify({
+  mode: listingsOnly ? 'listings-only (sales kept)' : 'full (sales purged)',
   listings: { matched: listingsMatched, cleared: listingsCleared },
   registry: { matched: regMatched, cleared: regCleared },
   onchainSalesPurged: purged,
-  next: 'backfills (manual or nightly cron) re-ingest sales with clean attribution',
+  next: listingsOnly
+    ? 'refresh oracle/latest_marks so newly-matched cards surface comps'
+    : 'backfills (manual or nightly cron) re-ingest sales with clean attribution',
 }, null, 1));
