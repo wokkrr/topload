@@ -54,12 +54,17 @@ const cents = (s) => {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
 };
 
-/** 'Charizard #6' → {name:'Charizard', number:'6'}; 'Ain OP07-002' → {name:'Ain', number:'OP07-002'} */
+/**
+ * 'Charizard #6' → {name:'Charizard', number:'6'}; 'Ain OP07-002' →
+ * {name:'Ain', number:'OP07-002'}; 'Boa Hancock P-066' → {name:'Boa Hancock',
+ * number:'P-066'} (single-letter promo codes — were being dropped, leaving
+ * 544 One Piece promos with null numbers + the code jammed in the name).
+ */
 export function splitProductName(productName) {
   const s = (productName ?? '').trim();
   let m = /^(.*?)\s*#([A-Za-z0-9/-]+)\s*$/.exec(s);
   if (m) return { name: m[1].trim(), number: m[2] };
-  m = /^(.*?)\s+([A-Z]{2,5}\d{0,3}-[A-Za-z0-9]+)\s*$/.exec(s);
+  m = /^(.*?)\s+([A-Z]{1,5}\d{0,3}-[A-Za-z0-9]+)\s*$/.exec(s);   // {1,5}: P-066, OP07-002, ST11-003
   if (m) return { name: m[1].trim(), number: m[2] };
   m = /^(.*?)\s+(\d{1,4}\/\d{1,4})\s*$/.exec(s);
   if (m) return { name: m[1].trim(), number: m[2] };
@@ -73,8 +78,13 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
      WHERE ip = ? AND json_extract(external_ids, '$.pricecharting') IS NULL`
   ).all(ip);
   const insCard = db.prepare(
+    // On re-import, re-apply the (now-better) name/number split — these ids are
+    // PC-created (op-pc<rowid>), so this never clobbers pokemontcg-seeded cards.
+    // Fixes the historical null-number promos in place on the next import.
     `INSERT INTO cards (id, ip, name, set_name, number, variant, external_ids) VALUES (?, ?, ?, ?, ?, '', ?)
-     ON CONFLICT(id) DO UPDATE SET external_ids = json_patch(cards.external_ids, excluded.external_ids)`
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name, number = excluded.number, set_name = excluded.set_name,
+       external_ids = json_patch(cards.external_ids, excluded.external_ids)`
   );
   const attachPc = db.prepare(`UPDATE cards SET external_ids = json_set(external_ids, '$.pricecharting', ?) WHERE id = ?`);
   const insMark = db.prepare(
