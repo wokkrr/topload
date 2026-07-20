@@ -7,11 +7,12 @@
  * Docs: https://pokemontcg.io — X-Api-Key optional but raises rate limits.
  */
 import { PKMN_SETS, PKMN_RARITY_ALLOW } from '../universe.js';
+import { timedFetch } from '../net.js';
 
 export function makePokemonTcgAdapter({
   apiKey = process.env.POKEMONTCG_API_KEY,
   baseUrl = 'https://api.pokemontcg.io/v2',
-  fetchImpl = fetch,
+  fetchImpl = timedFetch,
   sets = PKMN_SETS,
   rarityAllow = PKMN_RARITY_ALLOW,
 } = {}) {

@@ -19,6 +19,8 @@
  * LOB-001 ≡ LOB-E001 ≡ LOB-EN001).
  */
 
+import { timedFetch } from '../net.js';
+
 const API = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
 
 /**
@@ -63,7 +65,7 @@ export function mapCard(card, { language = 'English' } = {}) {
  * rawCards } — rawCards pre-slimmed for the committed snapshot (ownership).
  * NOTE: ~13k cards / tens of MB; run with --max-old-space-size on small boxes.
  */
-export async function fetchYugiohCatalog({ fetchImpl = fetch } = {}) {
+export async function fetchYugiohCatalog({ fetchImpl = timedFetch } = {}) {
   const res = await fetchImpl(API, { headers: { 'User-Agent': 'Topload-catalog/1.0' } });
   if (!res.ok) throw new Error(`ygoprodeck ${res.status}`);
   const body = await res.json();

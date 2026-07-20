@@ -11,6 +11,7 @@
  * → rules-based indexes. Idempotent throughout.
  */
 import { mkdirSync } from 'node:fs';
+import { timedFetch } from './net.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openDb } from './db.js';
@@ -130,7 +131,7 @@ async function runLive(db, today) {
   ].filter(([, url]) => url);
   for (const [ip, url] of csvSources) {
     try {
-      const res = await fetch(url);
+      const res = await timedFetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       if (!text.slice(0, 200).includes('product-name')) throw new Error('response is not a price-guide CSV (check the URL)');

@@ -17,6 +17,8 @@
  * user never has to read kanji (Kaleb's display model).
  */
 
+import { timedFetch } from '../net.js';
+
 const RAW = 'https://raw.githubusercontent.com/PokemonTCG/pokemon-tcg-data/master';
 
 /**
@@ -58,7 +60,7 @@ export function mapCard(card, set, { language = 'English' } = {}) {
  * source. Returns { rows, setCount, cardCount, rawSets, rawCards } — the raw
  * payloads are handed back so the seed can snapshot them verbatim (ownership).
  */
-export async function fetchPokemonCatalog({ fetchImpl = fetch, concurrency = 8 } = {}) {
+export async function fetchPokemonCatalog({ fetchImpl = timedFetch, concurrency = 8 } = {}) {
   const H = { 'User-Agent': 'Topload-catalog/1.0' };
   const sets = await fetchImpl(`${RAW}/sets/en.json`, { headers: H })
     .then(r => { if (!r.ok) throw new Error(`sets ${r.status}`); return r.json(); });

@@ -15,6 +15,7 @@
  * Modes: npm run base:dry | base:backfill; incremental runs ride ingest.
  */
 import { openDb } from './db.js';
+import { timedFetch } from './net.js';
 import { matchListing } from './match.js';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
 
@@ -85,7 +86,7 @@ export function metaToCard(meta) {
 
 // ---------- alchemy client ----------
 
-function makeAlchemy({ apiKey = process.env.ALCHEMY_API_KEY, fetchImpl = fetch, throttleMs = 250 } = {}) {
+function makeAlchemy({ apiKey = process.env.ALCHEMY_API_KEY, fetchImpl = timedFetch, throttleMs = 250 } = {}) {
   if (!apiKey) throw new Error('ALCHEMY_API_KEY not set');
   const RPC = `https://base-mainnet.g.alchemy.com/v2/${apiKey}`;
   const NFT = `https://base-mainnet.g.alchemy.com/nft/v3/${apiKey}`;

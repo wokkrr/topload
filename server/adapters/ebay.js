@@ -15,6 +15,8 @@
  * Env: EBAY_CLIENT_ID, EBAY_CLIENT_SECRET (Browse); EPN_CAMPAIGN_ID (affiliate).
  */
 
+import { timedFetch } from '../net.js';
+
 const OAUTH_URL = 'https://api.ebay.com/identity/v1/oauth2/token';
 const BROWSE_URL = 'https://api.ebay.com/buy/browse/v1/item_summary/search';
 
@@ -29,7 +31,7 @@ export function makeEbayBrowseAdapter({
   clientId = process.env.EBAY_CLIENT_ID,
   clientSecret = process.env.EBAY_CLIENT_SECRET,
   epnCampaignId = process.env.EPN_CAMPAIGN_ID,
-  fetchImpl = fetch,
+  fetchImpl = timedFetch,
 } = {}) {
   if (!clientId || !clientSecret) throw new Error('EBAY_CLIENT_ID / EBAY_CLIENT_SECRET not set');
   let token = null, tokenExp = 0;

@@ -13,6 +13,7 @@
  * (Sales for MNSTR come separately from the on-chain MegaETH indexer.)
  */
 import { normalizeGrade, gradeFromTitle } from './collectorcrypt.js';
+import { timedFetch } from '../net.js';
 
 const API = 'https://api.mnstr.xyz';
 
@@ -63,7 +64,7 @@ export function mapListing(c, seenAt) {
   };
 }
 
-export function makeMnstrListingsAdapter({ fetchImpl = fetch, throttleMs = 300 } = {}) {
+export function makeMnstrListingsAdapter({ fetchImpl = timedFetch, throttleMs = 300 } = {}) {
   return {
     name: 'mnstr',
     /** @param {{categories?:string[], seenAt?:string}} opts categories = IP labels to keep */

@@ -14,6 +14,7 @@
  * Modes: npm run phyg:dry | phyg:backfill; incremental rides ingest.
  */
 import { openDb } from './db.js';
+import { timedFetch } from './net.js';
 import { matchListing } from './match.js';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
 
@@ -55,7 +56,7 @@ export function decodePhygSale(tx) {
 
 // ---------- helius plumbing (mirrors indexer-solana; kept local for clarity) ----------
 
-function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, throttleMs = 250 } = {}) {
+function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = timedFetch, throttleMs = 250 } = {}) {
   if (!apiKey) throw new Error('HELIUS_API_KEY not set');
   let last = 0;
   const throttled = async (fn) => {

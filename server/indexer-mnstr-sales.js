@@ -19,6 +19,7 @@
  * a 6-hourly ingest never misses one).
  */
 import { openDb } from './db.js';
+import { timedFetch } from './net.js';
 import { matchListing } from './match.js';
 import { normalizeGrade, gradeFromTitle } from './adapters/collectorcrypt.js';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
@@ -66,7 +67,7 @@ export function mapSale(row, { card_id, price_usd }) {
 
 // ---------- main ----------
 
-export async function runMnstrSalesIndexer(db, { dry = false, fetchImpl = fetch, apiKey = process.env.ALCHEMY_API_KEY, verify = true } = {}) {
+export async function runMnstrSalesIndexer(db, { dry = false, fetchImpl = timedFetch, apiKey = process.env.ALCHEMY_API_KEY, verify = true } = {}) {
   const summary = { fetched: 0, matched: 0, verified: 0, inserted: 0, unmatched: 0, priceMiss: 0, examples: [] };
 
   let rows;

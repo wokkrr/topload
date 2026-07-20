@@ -18,6 +18,7 @@
  * one account pays out seller + fee — total single-payer outflow = price).
  */
 import { openDb } from './db.js';
+import { timedFetch } from './net.js';
 import { matchListing } from './match.js';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
 
@@ -100,7 +101,7 @@ export function decodeSale(tx) {
 
 // ---------- helius client ----------
 
-function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = fetch, throttleMs = 250 } = {}) {
+function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = timedFetch, throttleMs = 250 } = {}) {
   if (!apiKey) throw new Error('HELIUS_API_KEY not set');
   let last = 0;
   const throttled = async (fn) => {

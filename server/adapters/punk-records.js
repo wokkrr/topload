@@ -12,6 +12,8 @@
  * pass; codes + English names carry the matching today.
  */
 
+import { timedFetch } from '../net.js';
+
 const RAW = 'https://raw.githubusercontent.com/buhbbl/punk-records/main';
 
 /** Pure: one punk-records card + pack lookup → a Topload card record. */
@@ -36,7 +38,7 @@ export function mapCard(card, packsById, { language = 'English' } = {}) {
 }
 
 /** Fetch the English One Piece catalog (cards + packs) from the vendored source. */
-export async function fetchOnePieceCatalog({ lang = 'english', fetchImpl = fetch } = {}) {
+export async function fetchOnePieceCatalog({ lang = 'english', fetchImpl = timedFetch } = {}) {
   const [cards, packs] = await Promise.all([
     fetchImpl(`${RAW}/${lang}/index/cards_by_id.json`).then(r => { if (!r.ok) throw new Error(`cards ${r.status}`); return r.json(); }),
     fetchImpl(`${RAW}/${lang}/packs.json`).then(r => { if (!r.ok) throw new Error(`packs ${r.status}`); return r.json(); }),

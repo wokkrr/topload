@@ -15,6 +15,7 @@
  * Courtyard's own documented public endpoint, the same one their site uses.
  */
 import { normalizeGrade, gradeFromTitle } from './collectorcrypt.js';
+import { timedFetch } from '../net.js';
 
 const API = 'https://api.courtyard.io';
 
@@ -70,7 +71,7 @@ export function mapListing(a, seenAt) {
   };
 }
 
-export function makeCourtyardListingsAdapter({ fetchImpl = fetch, throttleMs = 300 } = {}) {
+export function makeCourtyardListingsAdapter({ fetchImpl = timedFetch, throttleMs = 300 } = {}) {
   let last = 0;
   const throttle = async () => { const w = last + throttleMs - Date.now(); if (w > 0) await new Promise(r => setTimeout(r, w)); last = Date.now(); };
 

@@ -10,9 +10,11 @@
  * program's buy transactions via an RPC/indexer for self-collected raw solds.
  */
 
+import { timedFetch } from '../net.js';
+
 export function makeCollectorCryptAdapter({
   baseUrl = 'https://api.collectorcrypt.com',
-  fetchImpl = fetch,
+  fetchImpl = timedFetch,
   throttleMs = 500,
 } = {}) {
   let lastCall = 0;

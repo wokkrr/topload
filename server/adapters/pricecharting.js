@@ -23,6 +23,8 @@
  * Prices arrive in pennies (integer cents) already.
  */
 
+import { timedFetch } from '../net.js';
+
 const FIELD_TO_GRADE = {
   'loose-price': 'raw',
   'graded-price': 'PSA9',
@@ -34,7 +36,7 @@ const FIELD_TO_GRADE = {
 export function makePriceChartingAdapter({
   apiKey = process.env.PRICECHARTING_API_KEY,
   baseUrl = 'https://www.pricecharting.com',
-  fetchImpl = fetch,
+  fetchImpl = timedFetch,
   throttleMs = Number(process.env.PC_THROTTLE_MS ?? 1100), // be a polite API citizen
 } = {}) {
   if (!apiKey) throw new Error('PRICECHARTING_API_KEY not set');
