@@ -28,6 +28,19 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
   // Grading company parsed off the normalized grade ('CGC10' → CGC / 10).
   const gm = /^([A-Z]+)([\d.]+)$/.exec(l.grade ?? '');
 
+  // Certification number — shown ONLY when confidently present: an explicit
+  // cert field from the adapter, or an explicit "Cert #12345678" in the title.
+  // Never guessed (a wrong cert link on someone's slab is worse than none).
+  const cert = l.cert ?? (/(?:cert(?:ification)?\.?\s*(?:number|no\.?|#)?\s*[:#]?\s*)(\d{6,10})/i.exec(l.item_name ?? '')?.[1] ?? null);
+  const certUrl = cert && gm ? ({
+    PSA: `https://www.psacard.com/cert/${cert}`,
+    CGC: `https://www.cgccards.com/certlookup/${cert}/`,
+    BGS: 'https://www.beckett.com/grading/card-lookup',      // no stable deep link — number shown alongside
+    BECKETT: 'https://www.beckett.com/grading/card-lookup',
+    TAG: 'https://my.taggrading.com/',
+    SGC: 'https://gosgc.com/cert-code-lookup',
+  })[gm[1]] ?? null : null;
+
   // Prev/next through the desk's listings without going back.
   const idx = (listings ?? []).findIndex(s => s.platform === l.platform && s.external_id === l.external_id);
   const prev = idx > 0 ? listings[idx - 1] : null;
@@ -159,10 +172,17 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
           </Accordion>
         )}
 
-        <Accordion title="More details" defaultOpen>
+        <Accordion title="Listing Details" defaultOpen>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '4px 40px', maxWidth: 760 }}>
             {gm && <Row k="Grading company" v={gm[1]} />}
             {gm && <Row k="Grade" v={gm[2]} />}
+            {cert && (
+              <Row k="Certification #" v={certUrl
+                ? <a href={certUrl} target="_blank" rel="noopener noreferrer"
+                     style={{ color: tokens.color.brass, textDecoration: 'underline' }}
+                     title="Verify this cert on the grader's site">{cert} ↗</a>
+                : cert} />
+            )}
             {!gm && <Row k="Condition" v="Raw / ungraded" />}
             <Row k="Category" v={l.category ?? '—'} />
             <Row k="Marketplace" v={platform} />

@@ -219,12 +219,29 @@ const GACHA_SORTS = [
   ['priceLow', 'Price ↑', (a, b) => a.price_cents - b.price_cents],
 ];
 
+// Franchise from a listing (matched rows carry ip; unmatched fall back to the
+// category string, accent-insensitively — mirrors server categoryToIp).
+function listingIp(l) {
+  if (l.ip) return l.ip;
+  const k = (l.category ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z]/g, '');
+  if (k.startsWith('pokemon')) return 'PKMN';
+  if (k.startsWith('onepiece')) return 'OP';
+  if (k.startsWith('yugioh')) return 'YGO';
+  return null;
+}
+
+const IP_FILTERS = [['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']];
+// BGS = Beckett Grading Services — one chip covers both spellings.
+const GRADER_FILTERS = [['', 'All'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['CGC', 'CGC'], ['TAG', 'TAG'], ['raw', 'Raw']];
+
 export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing }) {
   // Thumbnails are the default — the cards ARE the product; List is the opt-in.
   const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) ?? 'grid');
   const [hidden, setHidden] = useState(loadHidden);
   const [sort, setSort] = useState('recent');
   const [q, setQ] = useState('');
+  const [ipFilter, setIpFilter] = useState('');
+  const [graderFilter, setGraderFilter] = useState('');
   const pickView = (v) => { setView(v); localStorage.setItem(VIEW_KEY, v); };
   const togglePlatform = (id) => {
     setHidden(prev => {
@@ -251,11 +268,13 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
   const needle = q.trim().toLowerCase();
   const shown = listings
     .filter(l => !hidden.has(l.platform))
+    .filter(l => !ipFilter || listingIp(l) === ipFilter)
+    .filter(l => !graderFilter
+      || (graderFilter === 'raw' ? (l.grade ?? 'raw') === 'raw' : (l.grade ?? '').startsWith(graderFilter)))
     .filter(l => !needle
       || (l.item_name ?? '').toLowerCase().includes(needle)
       || (l.card_name ?? '').toLowerCase().includes(needle))
     .sort(GACHA_SORTS.find(([id]) => id === sort)[2]);
-  const matched = shown.filter(l => l.delta_pct != null);
   return (
     <div>
       <PlatformStrip platforms={platforms} hidden={hidden} onToggle={togglePlatform} />
@@ -279,14 +298,30 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
           ))}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          {['grid', 'table'].map(v => (
-            <Chip key={v} active={view === v} onClick={() => pickView(v)}>{v === 'grid' ? 'Thumbnails' : 'List'}</Chip>
+          <Chip active={view === 'grid'} onClick={() => pickView('grid')}>
+            <span title="Thumbnails" style={{ fontSize: 14, lineHeight: 1 }}>⊞</span>
+          </Chip>
+          <Chip active={view === 'table'} onClick={() => pickView('table')}>
+            <span title="List" style={{ fontSize: 14, lineHeight: 1 }}>☰</span>
+          </Chip>
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', gap: 4 }}>
+          {IP_FILTERS.map(([id, label]) => (
+            <Chip key={id || 'all-ip'} active={ipFilter === id} onClick={() => setIpFilter(id)}
+                  color={id ? tokens.series[id]?.data : undefined}>{label}</Chip>
+          ))}
+        </span>
+        <span style={{ width: 1, height: 18, background: tokens.color.border }} />
+        <span style={{ display: 'flex', gap: 4 }}>
+          {GRADER_FILTERS.map(([id, label]) => (
+            <Chip key={id || 'all-gr'} active={graderFilter === id} onClick={() => setGraderFilter(id)}>{label}</Chip>
           ))}
         </span>
       </div>
       <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
-        {shown.length} listings · sorted by {GACHA_SORTS.find(([id]) => id === sort)[1].toLowerCase().replace('↓', 'high→low').replace('↑', 'low→high')} ·
-        {' '}{matched.length} with grade-matched oracle comps · asking prices, never oracle input
+        {shown.length.toLocaleString()} card listings
       </div>
       {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect} onOpenListing={onOpenListing} />}
       {view === 'table' && <div>
