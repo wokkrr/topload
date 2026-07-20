@@ -72,8 +72,17 @@ function compileCard(card) {
   const nameRe = name && name.length < 5 ? new RegExp(`(^|\\s)${escRe(name)}(\\s|$)`) : null;
   const rawNum = norm(card.number ?? '');
   const numFull = stripZeros(rawNum);
+  // A STRUCTURED number ("4/102", "OP07-109", "SWSH001") is distinctive enough
+  // for a plain substring hit. A bare numeric ("4") is not — it hides inside
+  // years ("2024") and other numbers, which mis-comped a remnant Charizard #4
+  // over canonical 4/102 (live, 2026-07-20). Bare numerics only match via the
+  // boundary/# path below.
+  const numFullStrong = numFull && (numFull.includes('/') || /[a-z]/.test(numFull)) ? numFull : null;
   const numShort = stripZeros(numFull.split('/')[0] ?? '');
   const numShortRe = numShort ? new RegExp(`\\b${escRe(numShort)}\\b`) : null;
+  // PriceCharting-derived remnant ids ("pkmn-pc7309838") yield to canonical
+  // catalog cards on equal evidence — same physical card, one spine.
+  const remnant = /^[a-z]+-pc\d+$/.test(card.id ?? '');
   // One Piece-style split/concatenated forms ("Op07 … #109", "#OP02120").
   const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(rawNum);
   const opc = op ? {
@@ -92,7 +101,7 @@ function compileCard(card) {
       codeEvidence: yg[1].length >= 3,
     };
   }
-  c = { name, nameRe, numFull, numShort, numShortRe, op: opc, yg: ygc };
+  c = { name, nameRe, numFullStrong, numShort, numShortRe, op: opc, yg: ygc, remnant };
   COMPILED.set(card, c);
   return c;
 }
@@ -128,7 +137,7 @@ export function matchListing(itemName, cards) {
 
     // 2. Collector number, zero-insensitive.
     let numberHit =
-      (cc.numFull && titleZ.includes(cc.numFull)) ? 2 :
+      (cc.numFullStrong && titleZ.includes(cc.numFullStrong)) ? 2 :
       (cc.numShort && (titleZ.includes(`#${cc.numShort}`) || cc.numShortRe.test(titleZ))) ? 1 : 0;
 
     // One Piece / set-prefixed numbers ("OP07-109"): marketplaces write these
@@ -165,7 +174,7 @@ export function matchListing(itemName, cards) {
       if (setHits === 0 && !codeEvidence) continue;
     }
 
-    const score = numberHit + setHits * 2 + name.length / 100;
+    const score = numberHit + setHits * 2 + name.length / 100 - (cc.remnant ? 0.25 : 0);
     if (score > bestScore) { best = card.id; bestScore = score; }
   }
   return best;

@@ -204,3 +204,24 @@ describe('Yu-Gi-Oh set codes: regional infix tolerance (2026-07-20)', () => {
     expect(matchListing('Yu-Gi-Oh Dark Magician #006 PSA 8', ygo)).toBeNull();
   });
 });
+
+describe('canonical beats remnant; bare numerics are not substrings (live, 2026-07-20)', () => {
+  const universe = [
+    // Remnant (PriceCharting-derived, kept for sales FK) listed FIRST — order must not decide.
+    { id: 'pkmn-pc7309838', name: 'Charizard', number: '4', set_name: 'Pokemon Base Set' },
+    { id: 'pkmn-base1-4', name: 'Charizard', number: '4/102', set_name: 'Base' },
+  ];
+  it('the canonical card wins the same-card tie against its remnant', () => {
+    expect(matchListing('1999 Pokemon Base Set Charizard Holo #4/102 PSA 9', universe))
+      .toBe('pkmn-base1-4');
+  });
+  it('a bare numeric number does not hit inside a year ("2024" ⊅ number 4 at full strength)', () => {
+    // Before the fix: numFull '4' substring-matched inside '2024' → false level-2 hit.
+    expect(matchListing('2024 Pokemon Base Set Charizard Special Delivery #99 PSA 10', [universe[0]]))
+      .toBeNull();
+  });
+  it('a bare numeric still matches via # or word boundary (level-1 path intact)', () => {
+    expect(matchListing('1999 Pokemon Base Set Charizard Holo #4 PSA 9', [universe[0]]))
+      .toBe('pkmn-pc7309838');
+  });
+});
