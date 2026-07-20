@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS latest_marks (
   price_30d   INTEGER,
   PRIMARY KEY (card_id, grade)
 );
+-- Screener's default sort (price high→low, LIMIT 100) reads pre-sorted.
+CREATE INDEX IF NOT EXISTS idx_latest_price ON latest_marks(price_cents DESC);
 
 -- Rules-based basket membership, recorded per rebalance date.
 CREATE TABLE IF NOT EXISTS basket_members (
