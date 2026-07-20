@@ -208,12 +208,12 @@ async function runLive(db, today) {
     db.exec(`DELETE FROM gacha_listings WHERE platform = 'collectorcrypt'`); // snapshot refresh
     const insL = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
-       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, cert, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
       insL.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.image_back ?? null, l.nft_address, l.seen_at);
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.image_back ?? null, l.nft_address, l.cert ?? null, l.seen_at);
     }
     summary.gachaListings = listings.length;
     summary.gachaMatched = matches.size;

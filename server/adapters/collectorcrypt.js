@@ -47,10 +47,21 @@ export function makeCollectorCryptAdapter({
           if (c.type && c.type !== 'Card') continue;     // skip cases/boxes/sealed
           const priceNum = parseFloat(c.listing.price);
           if (!Number.isFinite(priceNum) || priceNum <= 0) continue;
-          // Structured grade fields are missing on some listings — fall back to
-          // parsing the title ('... PSA 10 ...') before giving up and calling it raw.
-          let grade = normalizeGrade(c.gradingCompany, c.gradeNum ?? c.grade);
+          // gradeNum is null on some listings while `grade` carries a TEXT
+          // descriptor + number ('PRISTINE 10', 'NM-MT 8') — extract the
+          // number before normalizing (live: a PSA 8 Dark Charizard and a CGC
+          // 10 Luffy showed as raw, 2026-07-20). Title parse stays the last
+          // resort before calling it raw.
+          let gradeVal = c.gradeNum;
+          if (gradeVal == null || gradeVal === '') {
+            const gnum = /([0-9]+(?:\.[0-9])?)\s*$/.exec(String(c.grade ?? '').trim());
+            gradeVal = gnum ? gnum[1] : null;
+          }
+          let grade = normalizeGrade(c.gradingCompany, gradeVal);
           if (grade === 'raw') grade = gradeFromTitle(c.itemName);
+          // gradingID IS the slab cert number (verified against a live PSA
+          // label). Digits-guarded — never link a malformed value.
+          const cert = /^\d{6,12}$/.test(String(c.gradingID ?? '').trim()) ? String(c.gradingID).trim() : null;
           out.push({
             platform: 'collectorcrypt',
             external_id: String(c.nftAddress ?? c.id),
@@ -63,6 +74,7 @@ export function makeCollectorCryptAdapter({
             image: c.images?.frontM ?? c.images?.front ?? null,
             image_back: c.images?.backM ?? c.images?.back ?? null,
             nft_address: c.nftAddress ?? null,
+            cert,
             seen_at: seenAt ?? new Date().toISOString().slice(0, 10),
           });
         }

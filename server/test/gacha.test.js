@@ -57,6 +57,29 @@ describe('collectorcrypt adapter (fixtures)', () => {
   });
 });
 
+describe('CC text-grades + gradingID cert (live raw-slab bug, 2026-07-20)', () => {
+  const base = {
+    nftAddress: 'So1abc', id: 9, itemName: '2000 #21 Dark Charizard 1st Edition', category: 'Pokemon',
+    type: 'Card', listing: { price: '465', currency: 'USDC', createdAt: '2026-07-19' },
+    images: {}, gradeNum: null, grade: 'NM-MT 8', gradingCompany: 'PSA', gradingID: '122217540',
+  };
+  const fetchOnce = (payload) => async () => ({ ok: true, json: async () => payload });
+  it('extracts the number from a text grade and captures the cert', async () => {
+    const cc = makeCollectorCryptAdapter({ fetchImpl: fetchOnce({ filterNFtCard: [base], totalPages: 1 }), throttleMs: 0 });
+    const [row] = await cc.fetchListings({ seenAt: '2026-07-20' });
+    expect(row.grade).toBe('PSA8');
+    expect(row.cert).toBe('122217540');
+  });
+  it('PRISTINE 10 + CGC → CGC10; malformed gradingID → null cert', async () => {
+    const cc = makeCollectorCryptAdapter({ fetchImpl: fetchOnce({ filterNFtCard: [
+      { ...base, grade: 'PRISTINE 10', gradingCompany: 'CGC', gradingID: 'not-a-cert' },
+    ], totalPages: 1 }), throttleMs: 0 });
+    const [row] = await cc.fetchListings({ seenAt: '2026-07-20' });
+    expect(row.grade).toBe('CGC10');
+    expect(row.cert).toBeNull();
+  });
+});
+
 describe('listing→card matcher', () => {
   const cards = [
     { id: 'pkmn-sv3pt5-charizard-ex-199', name: 'Charizard ex', number: '199/165', set_name: '151' },
