@@ -53,3 +53,41 @@ describe('seedOnePiece migration (FK-safe)', () => {
     expect(res.salesRepointed).toBe(1);
   });
 });
+
+import { buildJapaneseRows, JP_ONLY_NAMES } from '../adapters/punk-records.js';
+import { matchListing } from '../match.js';
+
+describe('Japanese pass: buildJapaneseRows (recon 2026-07-20)', () => {
+  const jpPacks = { '9': { title_parts: { label: 'P', title: 'Promotion Cards' } } };
+  const enCards = {
+    'EB01-006': { card_id: 'EB01-006', name: 'Nami', pack_id: 'x' },
+  };
+  it('emits JP-exclusive parallels with the inherited English name and base-code number', () => {
+    const jp = { 'EB01-006_p4': { card_id: 'EB01-006_p4', name: 'ナミ', pack_id: '9', img_url: 'https://x/p4.png' } };
+    const [r] = buildJapaneseRows(jp, jpPacks, enCards);
+    expect(r.id).toBe('op-eb01-006_p4');
+    expect(r.name).toBe('Nami');                 // inherited, never kanji
+    expect(r.number).toBe('EB01-006');           // base code = matchable
+    expect(r.variant).toBe('JP parallel p4');
+    expect(r.language).toBe('Japanese');
+  });
+  it('emits the 22 JP-only promos with romanized names; skips shared codes and unknowns', () => {
+    const jp = {
+      'P-080': { card_id: 'P-080', name: 'モンキー・D・ルフィ', pack_id: '9' },
+      'EB01-006': { card_id: 'EB01-006', name: 'ナミ', pack_id: '9' },       // shared → skipped
+      'P-999': { card_id: 'P-999', name: '謎のカード', pack_id: '9' },       // unknown → skipped, never guessed
+    };
+    const rows = buildJapaneseRows(jp, jpPacks, enCards);
+    expect(rows.length).toBe(1);
+    expect(rows[0].name).toBe('Monkey D. Luffy');
+    expect(rows[0].variant).toBe('JP promo');
+    expect(Object.keys(JP_ONLY_NAMES).length).toBe(20); // 22 cards, 20 distinct base codes
+  });
+  it('parallel rows yield to the base card on equal match evidence', () => {
+    const universe = [
+      { id: 'op-eb01-006_p4', name: 'Nami', number: 'EB01-006', set_name: 'One Piece Promotion Cards' },
+      { id: 'op-eb01-006', name: 'Nami', number: 'EB01-006', set_name: 'One Piece Promotion Cards' },
+    ];
+    expect(matchListing('One Piece Promotion Cards Nami EB01-006 PSA 10', universe)).toBe('op-eb01-006');
+  });
+});

@@ -83,6 +83,10 @@ function compileCard(card) {
   // PriceCharting-derived remnant ids ("pkmn-pc7309838") yield to canonical
   // catalog cards on equal evidence — same physical card, one spine.
   const remnant = /^[a-z]+-pc\d+$/.test(card.id ?? '');
+  // JP-exclusive parallel/reprint rows ("op-eb01-006_p4") share their base
+  // card's number — on equal evidence the BASE wins (listings that don't
+  // distinguish an alt-art attribute conservatively to the base printing).
+  const parallel = /_[pr]\d+$/.test(card.id ?? '');
   // One Piece-style split/concatenated forms ("Op07 … #109", "#OP02120"), and
   // no-separator promo codes ("SWSH285", "SVP077", "TG01") which titles write
   // as set words + a bare number ("Swsh Black Star Promo … #285").
@@ -105,7 +109,7 @@ function compileCard(card) {
       codeEvidence: yg[1].length >= 3,
     };
   }
-  c = { name, nameRe, numFullStrong, numShort, numShortRe, op: opc, yg: ygc, remnant };
+  c = { name, nameRe, numFullStrong, numShort, numShortRe, op: opc, yg: ygc, remnant, parallel };
   COMPILED.set(card, c);
   return c;
 }
@@ -178,7 +182,7 @@ export function matchListing(itemName, cards) {
       if (setHits === 0 && !codeEvidence) continue;
     }
 
-    const score = numberHit + setHits * 2 + name.length / 100 - (cc.remnant ? 0.25 : 0);
+    const score = numberHit + setHits * 2 + name.length / 100 - (cc.remnant ? 0.25 : 0) - (cc.parallel ? 0.1 : 0);
     if (score > bestScore) { best = card.id; bestScore = score; }
   }
   return best;

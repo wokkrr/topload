@@ -99,9 +99,37 @@ export function seedOnePiece(db, rows, { migrate = true } = {}) {
   return { seeded: n, purgedOldOp: Number(purged), salesRepointed: repointed, oldKeptStillHasSales: keptWithSales };
 }
 
+/**
+ * --japanese: the Japanese pass (claude/JAPANESE_PASS.md). Loads the JP
+ * catalog, emits ONLY what EN lacks (371 JP-exclusive parallels + 22 promos,
+ * English/romanized names, language='Japanese'), upsert-only — never migrates.
+ * Fetches live + refreshes the JA snapshot; --snapshot reads the committed one.
+ */
+async function loadJapaneseRows(useSnapshot) {
+  const { buildJapaneseRows } = await import('./adapters/punk-records.js');
+  const JA_SNAPSHOT = join(__dirname, '..', 'seed', 'onepiece-catalog-ja.json');
+  let jp;
+  if (useSnapshot) {
+    jp = JSON.parse(readFileSync(JA_SNAPSHOT, 'utf8'));
+  } else {
+    const RAW = 'https://raw.githubusercontent.com/buhbbl/punk-records/main/japanese';
+    const [cards, packs] = await Promise.all([
+      fetch(`${RAW}/index/cards_by_id.json`).then(r => r.json()),
+      fetch(`${RAW}/packs.json`).then(r => r.json()),
+    ]);
+    jp = { generated_at: Math.floor(Date.now() / 1000), source: 'punk-records/japanese', cards, packs };
+    writeFileSync(JA_SNAPSHOT, JSON.stringify(jp));
+  }
+  const en = JSON.parse(readFileSync(SNAPSHOT, 'utf8'));
+  return buildJapaneseRows(jp.cards, jp.packs, en.cards);
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const db = openDb();
-  const rows = await loadRows(process.argv.includes('--snapshot'));
-  const res = seedOnePiece(db, rows, { migrate: !process.argv.includes('--upsert-only') });
+  const japanese = process.argv.includes('--japanese');
+  const rows = japanese
+    ? await loadJapaneseRows(process.argv.includes('--snapshot'))
+    : await loadRows(process.argv.includes('--snapshot'));
+  const res = seedOnePiece(db, rows, { migrate: !japanese && !process.argv.includes('--upsert-only') });
   console.log('[seed:onepiece]', JSON.stringify({ ...res, sample: rows.slice(0, 2).map(r => ({ id: r.id, name: r.name, number: r.number, set: r.set_name })) }, null, 1));
 }
