@@ -80,12 +80,30 @@ export function matchListing(itemName, cards) {
     }
     if (nameIdx < 0 || nameIdx >= gradePos) continue;
 
-    // 2. Collector number, zero-insensitive: full form, '#N', or word-bounded N.
+    // 2. Collector number, zero-insensitive.
     const numFull = stripZeros(norm(card.number ?? ''));
     const numShort = stripZeros(numFull.split('/')[0] ?? '');
-    const numberHit =
+    let numberHit =
       (numFull && titleZ.includes(numFull)) ? 2 :
       (numShort && (titleZ.includes(`#${numShort}`) || new RegExp(`\\b${numShort}\\b`).test(titleZ))) ? 1 : 0;
+
+    // One Piece / set-prefixed numbers ("OP07-109", "ST01-012", "EB01-061"):
+    // marketplaces write these split ("Op07-500 Years… #109") or concatenated
+    // ("#OP02120"), so the contiguous "op07-109" never appears. Accept when the
+    // set prefix AND the card-number suffix both hit. Set evidence (rule 3)
+    // still guards against cross-set collisions.
+    if (!numberHit) {
+      // norm() turns the hyphen in "OP07-109" into a space → "op07 109".
+      const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(numFull);
+      if (op) {
+        const prefix = op[1];                            // "op07"
+        const suffix = stripZeros(op[2]);                // "109"
+        const concat = prefix + op[2];                   // "op07109"
+        const suffixHit = titleZ.includes(`#${suffix}`) || new RegExp(`\\b${suffix}\\b`).test(titleZ);
+        if (titleZ.includes(concat)) numberHit = 2;               // "#op02120" style
+        else if (title.includes(prefix) && suffixHit) numberHit = 2; // "op07 … #109" style
+      }
+    }
     if (!numberHit) continue;
 
     // 3. Set evidence — required whenever the card declares a set.

@@ -140,3 +140,27 @@ describe('set evidence is whole-word (2026-07-20 substring bug)', () => {
     expect(matchListing('One Piece Romance Dawn Shanks OP01-120 Alt Art PSA 10', op)).toBe('op-op01-shanks');
   });
 });
+
+describe('One Piece set-prefixed numbers (MNSTR formats, 2026-07-20)', () => {
+  const op = [
+    { id: 'op-op07-luffy-109', name: 'Monkey D. Luffy', number: 'OP07-109', set_name: 'One Piece Op07-500 Years in the Future' },
+    { id: 'op-op02-uta-120', name: 'Uta', number: 'OP02-120', set_name: 'One Piece Op02 Paramount War' },
+    { id: 'op-op06-uta-001', name: 'Uta', number: 'OP06-001', set_name: 'One Piece Op06 Wings of the Captain' },
+  ];
+  it('matches split format: "Op07-500 Years… #109"', () => {
+    expect(matchListing('2024 One Piece Op07-500 Years in the Future Monkey D. Luffy #109 PSA 10', op))
+      .toBe('op-op07-luffy-109');
+  });
+  it('matches concatenated format: "#OP02120"', () => {
+    expect(matchListing('2022 One Piece Card Game Paramount War Japanese Uta SEC #OP02120 BGS 10', op))
+      .toBe('op-op02-uta-120');
+  });
+  it('matches zero-padded suffix "#001" → OP06-001', () => {
+    expect(matchListing('2024 One Piece Op06 Wings of the Captain Uta Alternate Art #001 PSA 10', op))
+      .toBe('op-op06-uta-001');
+  });
+  it('does NOT cross-match a different set prefix (same name + suffix)', () => {
+    // Luffy #109 present, but set prefix is OP09 not OP07 → must not match OP07-109.
+    expect(matchListing('2024 One Piece Op09 Emperors Monkey D. Luffy #109 PSA 10', op)).toBeNull();
+  });
+});
