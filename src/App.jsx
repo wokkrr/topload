@@ -76,7 +76,9 @@ export default function App() {
         {!selectedCard && selectedListing && (
           <ListingDetail
             listing={selectedListing}
+            listings={gacha}
             onBack={() => setSelectedListing(null)}
+            onOpenListing={setSelectedListing}
             onSelectCard={(id) => { setSelectedListing(null); setSelectedCard(id); }}
           />
         )}

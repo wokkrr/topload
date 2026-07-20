@@ -6,19 +6,27 @@ import { CardResearch } from './CardDetail.jsx';
 
 /**
  * In-app listing page — the user stays on Topload for everything except the
- * final buy click. Renders entirely from the /api/gacha row we already hold
- * client-side: photos (front/back when the marketplace provides them), ask
- * vs oracle comp, and the bridge to the matched card's research page.
- * Native in-app buying (wallet-connect) is the pinned execution-layer phase;
- * until then the buy button is the one outbound step.
+ * final buy click. Hero (photos + ask vs comp + buy), then marketplace-style
+ * accordion sections (Kaleb, modeled on Collector Crypt's listing page):
+ * Price history & comps (the embedded research module), More details, and
+ * Similar listings. Native in-app buying is the pinned execution-layer phase.
  */
-export function ListingDetail({ listing: l, onBack, onSelectCard }) {
+export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
   const [side, setSide] = useState('front');
-  const [showResearch, setShowResearch] = useState(false);
   const url = listingUrl(l);
   const img = side === 'back' && l.image_back ? l.image_back : l.image;
   const hasComp = l.comp_cents && !l.comp_suspect;
   const platform = PLATFORM_LABELS[l.platform] ?? l.platform;
+
+  // Similar: same tracked card first, then same grade within the franchise.
+  const similar = (listings ?? [])
+    .filter(s => !(s.platform === l.platform && s.external_id === l.external_id))
+    .filter(s => (l.card_id && s.card_id === l.card_id) || (s.category === l.category && s.grade === l.grade))
+    .sort((a, b) => (l.card_id && (b.card_id === l.card_id) - (a.card_id === l.card_id)) || a.price_cents - b.price_cents)
+    .slice(0, 6);
+
+  // Grading company parsed off the normalized grade ('CGC10' → CGC / 10).
+  const gm = /^([A-Z]+)([\d.]+)$/.exec(l.grade ?? '');
 
   return (
     <section>
@@ -75,18 +83,18 @@ export function ListingDetail({ listing: l, onBack, onSelectCard }) {
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.body}`, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Asking</div>
+              <div style={labelStyle}>Asking</div>
               <div style={{ font: `30px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</div>
             </div>
             {hasComp && (
               <div>
-                <div style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.body}`, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Oracle comp ({l.grade})</div>
+                <div style={labelStyle}>Oracle comp ({l.grade})</div>
                 <div style={{ font: `20px ${tokens.font.mono}`, color: tokens.color.inkSecondary }}>{fmtUsd(l.comp_cents)}</div>
               </div>
             )}
             {l.delta_pct != null && (
               <div>
-                <div style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.body}`, textTransform: 'uppercase', letterSpacing: '0.08em' }}>vs comp</div>
+                <div style={labelStyle}>vs comp</div>
                 <div style={{ font: `20px ${tokens.font.mono}`, color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down }}>{fmtPct(l.delta_pct)}</div>
               </div>
             )}
@@ -110,13 +118,6 @@ export function ListingDetail({ listing: l, onBack, onSelectCard }) {
                 borderRadius: 6, padding: '10px 22px', font: `600 13px ${tokens.font.body}`,
               }}>Buy on {platform} ↗</a>
             )}
-            {l.card_id && (
-              <button onClick={() => setShowResearch(s => !s)} style={{
-                background: showResearch ? tokens.color.surfaceRaised : 'none',
-                border: `1px solid ${tokens.color.inkMuted}`, color: tokens.color.ink,
-                borderRadius: 6, padding: '10px 18px', font: `13px ${tokens.font.body}`, cursor: 'pointer',
-              }}>{showResearch ? '▾' : '▸'} Price history & comps</button>
-            )}
           </div>
           {url && (
             <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 8 }}>
@@ -126,15 +127,89 @@ export function ListingDetail({ listing: l, onBack, onSelectCard }) {
         </div>
       </div>
 
-      {/* ── Research, folded into the same page (Kaleb: no separate page hop) ── */}
-      {l.card_id && showResearch && (
-        <div style={{
-          marginTop: 28, paddingTop: 8,
-          borderTop: `1px solid ${tokens.color.border}`,
-        }}>
-          <CardResearch cardId={l.card_id} initialGrade={l.grade} embedded />
-        </div>
-      )}
+      {/* ── Accordion sections, marketplace-style ── */}
+      <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {l.card_id && (
+          <Accordion title="Price history & comps" defaultOpen={false}>
+            <CardResearch cardId={l.card_id} initialGrade={l.grade} embedded />
+          </Accordion>
+        )}
+
+        <Accordion title="More details" defaultOpen>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '4px 40px', maxWidth: 760 }}>
+            {gm && <Row k="Grading company" v={gm[1]} />}
+            {gm && <Row k="Grade" v={gm[2]} />}
+            {!gm && <Row k="Condition" v="Raw / ungraded" />}
+            <Row k="Category" v={l.category ?? '—'} />
+            <Row k="Marketplace" v={platform} />
+            <Row k="Listed" v={l.listed_at ? String(l.listed_at).slice(0, 10) : '—'} />
+            <Row k="Currency" v={l.currency ?? '—'} />
+            {l.card_id
+              ? <Row k="Tracked card" v={l.card_name ?? l.card_id} />
+              : <Row k="Tracked card" v="not matched yet" />}
+            <Row k="Photo" v={l.image_kind === 'art' ? 'reference art (not the item)' : l.image ? 'actual item' : '—'} />
+            {l.nft_address && <Row k="Vault token" v={`${l.nft_address.slice(0, 6)}…${l.nft_address.slice(-4)}`} />}
+          </div>
+        </Accordion>
+
+        {similar.length > 0 && (
+          <Accordion title="Similar listings" defaultOpen>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {similar.map(s => (
+                <div key={`${s.platform}|${s.external_id}`}
+                     onClick={() => onOpenListing?.(s)}
+                     style={{
+                       display: 'flex', alignItems: 'center', gap: 12, padding: '7px 4px',
+                       borderBottom: `1px solid ${tokens.color.surface}`, cursor: 'pointer',
+                     }}>
+                  {s.image
+                    ? <img src={s.image} alt="" loading="lazy" style={{ height: 40, width: 30, objectFit: 'contain', borderRadius: 3, background: tokens.color.surfaceRaised, flexShrink: 0 }} />
+                    : <span style={{ height: 40, width: 30, borderRadius: 3, background: tokens.color.surfaceRaised, flexShrink: 0 }} />}
+                  <span style={{ font: `12px ${tokens.font.body}`, color: tokens.color.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {s.item_name}
+                  </span>
+                  <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, flexShrink: 0 }}>{s.grade}</span>
+                  <span style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.ink, flexShrink: 0 }}>{fmtUsd(s.price_cents)}</span>
+                  {s.delta_pct != null && (
+                    <span style={{ font: `11px ${tokens.font.mono}`, color: s.delta_pct <= 0 ? tokens.color.up : tokens.color.down, flexShrink: 0, minWidth: 56, textAlign: 'right' }}>
+                      {fmtPct(s.delta_pct)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Accordion>
+        )}
+      </div>
     </section>
   );
 }
+
+/** Full-width expandable section — the marketplace listing-page pattern. */
+function Accordion({ title, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 10, background: tokens.color.surface, overflow: 'hidden' }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+        background: 'none', border: 'none', cursor: 'pointer', padding: '14px 18px',
+        color: tokens.color.ink, font: `14px ${tokens.font.display}`, textAlign: 'left',
+      }}>
+        {title}
+        <span style={{ color: tokens.color.inkSecondary, fontSize: 11, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▼</span>
+      </button>
+      {open && <div style={{ padding: '2px 18px 16px' }}>{children}</div>}
+    </div>
+  );
+}
+
+function Row({ k, v }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '4px 0', font: `12px ${tokens.font.body}`, borderBottom: `1px solid ${tokens.color.surface}` }}>
+      <span style={{ color: tokens.color.inkMuted }}>{k}</span>
+      <span style={{ color: tokens.color.ink, font: `12px ${tokens.font.mono}`, textAlign: 'right' }}>{v}</span>
+    </div>
+  );
+}
+
+const labelStyle = { color: tokens.color.inkMuted, font: `10px ${tokens.font.body}`, textTransform: 'uppercase', letterSpacing: '0.08em' };
