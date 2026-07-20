@@ -42,6 +42,15 @@ export const api = {
   recentSales: () => get('/api/sales/recent'),
 };
 
+/** Marketplace display names — no chain/crypto jargon on user surfaces. */
+export const PLATFORM_LABELS = {
+  collectorcrypt: 'Collector Crypt',
+  beezie: 'Beezie',
+  phygitals: 'Phygitals',
+  courtyard: 'Courtyard',
+  mnstr: 'MNSTR',
+};
+
 export const fmtUsd = (cents) =>
   cents == null ? '—' : (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 

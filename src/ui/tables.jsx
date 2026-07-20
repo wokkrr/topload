@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { tokens } from '../tokens.js';
-import { fmtUsd, fmtPct } from '../data/client.js';
+import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 
 const th = { textAlign: 'right', padding: '6px 12px', borderBottom: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary, fontWeight: 400, font: `11px ${tokens.font.body}`, whiteSpace: 'nowrap' };
 const thL = { ...th, textAlign: 'left' };
@@ -322,17 +322,26 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
   );
 }
 
-/** Thumbnail grid — slabs as visual merchandise. */
+/** Thumbnail grid — slabs as visual merchandise. Hover lift via injected CSS
+ *  (inline styles can't express :hover); colors ride the theme CSS vars. */
+const GRID_CSS = `
+.tl-gacha-card { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+.tl-gacha-card:hover { transform: translateY(-2px); border-color: ${tokens.color.inkMuted}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+`;
+
 function GachaGrid({ listings, onSelect }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
+      <style>{GRID_CSS}</style>
       {listings.map(l => (
         <div key={`${l.platform}|${l.external_id}`}
+             className="tl-gacha-card"
              onClick={l.card_id ? () => onSelect?.(l.card_id) : undefined}
              title={l.item_name}
              style={{
                border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
                background: tokens.color.surface, cursor: l.card_id ? 'pointer' : 'default',
+               display: 'flex', flexDirection: 'column',
              }}>
           <div style={{ position: 'relative', aspectRatio: '3/4', background: tokens.color.surfaceRaised }}>
             {l.image
@@ -350,22 +359,23 @@ function GachaGrid({ listings, onSelect }) {
               color: tokens.color.ink, background: tokens.color.overlay,
               borderRadius: 3, padding: '2px 6px',
             }}>{l.grade}</span>
-            {l.delta_pct != null && (
-              <span style={{
-                position: 'absolute', top: 6, right: 6, font: `10px ${tokens.font.mono}`,
-                color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down,
-                background: tokens.color.overlay, borderRadius: 3, padding: '2px 6px',
-              }}>{fmtPct(l.delta_pct)}</span>
-            )}
           </div>
-          <div style={{ padding: '8px 10px' }}>
-            <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</div>
+          <div style={{ padding: '8px 10px 9px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
+              <span style={{ font: `13px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</span>
+              {l.delta_pct != null && (
+                <span style={{ font: `10px ${tokens.font.mono}`, color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down }}>
+                  {fmtPct(l.delta_pct)}
+                </span>
+              )}
+            </div>
             <div style={{
-              font: `10px ${tokens.font.body}`, color: tokens.color.inkSecondary, marginTop: 2,
+              font: `10px ${tokens.font.body}`, color: tokens.color.inkSecondary,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>{l.card_name ?? l.item_name}</div>
-            <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 1 }}>
-              {l.comp_cents && !l.comp_suspect ? `comp ${fmtUsd(l.comp_cents)}` : l.comp_suspect ? 'comp suspect' : 'no comp'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 'auto' }}>
+              <span>{l.comp_cents && !l.comp_suspect ? `comp ${fmtUsd(l.comp_cents)}` : l.comp_suspect ? 'comp suspect' : 'no comp'}</span>
+              <span style={{ whiteSpace: 'nowrap' }}>{PLATFORM_LABELS[l.platform] ?? l.platform}</span>
             </div>
           </div>
         </div>

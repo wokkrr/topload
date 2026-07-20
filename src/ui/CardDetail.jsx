@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '../tokens.js';
-import { api, fmtUsd, fmtPct } from '../data/client.js';
+import { api, fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 
 const W = 860, H = 280, PAD = { t: 16, r: 24, b: 28, l: 56 };
 
-/** Marketplace display names — no chain/crypto jargon on user surfaces. */
-const SOURCE_LABELS = {
-  collectorcrypt: 'Collector Crypt',
-  beezie: 'Beezie',
-  phygitals: 'Phygitals',
-  courtyard: 'Courtyard',
-};
+const DETAIL_CSS = `
+.tl-buy-link { transition: border-color .12s ease, background .12s ease; }
+.tl-buy-link:hover { border-color: ${tokens.color.inkMuted}; }
+.tl-back:hover { color: ${tokens.color.ink}; }
+`;
 
 /**
  * Card research view: per-grade oracle chart with provenance-aware rendering
@@ -55,7 +53,8 @@ export function CardDetail({ cardId, onBack }) {
 
   return (
     <section>
-      <button onClick={onBack} style={backStyle}>← back</button>
+      <style>{DETAIL_CSS}</style>
+      <button onClick={onBack} className="tl-back" style={backStyle}>← back</button>
 
       {/* ── Hero: card art + identity + big price + delta chips ── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24, margin: '14px 0 4px', flexWrap: 'wrap' }}>
@@ -63,7 +62,7 @@ export function CardDetail({ cardId, onBack }) {
           <span style={{ position: 'relative', alignSelf: 'flex-start', lineHeight: 0 }}
                 title={card.image_kind === 'listing' ? 'Sample slab photo from a marketplace listing — not a specific item for sale' : undefined}>
             <img src={card.image} alt={card.name} style={{
-              height: 130, borderRadius: 6, border: `1px solid ${tokens.color.border}`,
+              height: 168, borderRadius: 8, border: `1px solid ${tokens.color.border}`,
               background: tokens.color.surfaceRaised,
             }} />
             {card.image_kind === 'listing' && (
@@ -163,12 +162,15 @@ export function CardDetail({ cardId, onBack }) {
                      title={s.is_outlier ? 'Flagged as outlier — excluded from oracle marks' : undefined}>
                   <span style={{ color: tokens.color.inkMuted, minWidth: 62 }}>{s.sold_at?.slice(0, 10)}</span>
                   <span style={{ color: tokens.color.inkSecondary, minWidth: 46 }}>{s.grade}</span>
+                  <span style={{ color: tokens.color.inkMuted, font: `9px ${tokens.font.body}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {PLATFORM_LABELS[s.source] ?? s.source}
+                  </span>
                   <span style={{ color: tokens.color.ink, marginLeft: 'auto' }}>{fmtUsd(s.price_cents)}</span>
                   {s.is_outlier ? <span style={{ color: tokens.color.down, fontSize: 9 }}>⚑</span> : null}
                 </div>
               ))}
               <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 6 }}>
-                first-hand solds · {[...new Set(sales.map(s => SOURCE_LABELS[s.source] ?? s.source))].join(', ')}
+                first-hand solds, straight from the marketplaces
               </div>
             </div>
           )}
@@ -184,7 +186,7 @@ export function CardDetail({ cardId, onBack }) {
         <Panel title="Where to buy">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {marketLinks(card).map(l => (
-              <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" style={{
+              <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" className="tl-buy-link" style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 border: `1px solid ${tokens.color.border}`, borderRadius: 6, padding: '8px 12px',
                 color: tokens.color.ink, textDecoration: 'none', font: `12px ${tokens.font.body}`,
@@ -312,6 +314,19 @@ function MarkChart({ series, color }) {
         <text key={i} x={x(i)} y={H - 8} textAnchor={i === 0 ? 'start' : i === series.length - 1 ? 'end' : 'middle'}
               fill={tokens.color.inkMuted} style={{ font: `10px ${tokens.font.mono}` }}>{series[i].as_of.slice(5)}</text>
       ))}
+
+      {/* Area fill under the whole series — the token-chart read. Kept very
+          light so the provenance-dashed line stays the protagonist. */}
+      <defs>
+        <linearGradient id="tl-mark-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.16" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
+        </linearGradient>
+      </defs>
+      <path d={
+        series.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.price_cents).toFixed(1)}`).join('')
+        + `L${x(series.length - 1).toFixed(1)},${H - PAD.b}L${x(0).toFixed(1)},${H - PAD.b}Z`
+      } fill="url(#tl-mark-fill)" stroke="none" />
 
       {segs.map((s, k) => (
         <path key={k}
