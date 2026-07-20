@@ -143,3 +143,29 @@ describe('exact P-code = set evidence (promo pack names never appear in titles)'
     expect(matchListing('2024 #006 Monkey D. Luffy PSA 10 One Piece Promos', universe)).toBeNull();
   });
 });
+
+import { tagLanguages } from '../seed-language-tags.js';
+
+describe('language-tag migration (JP Pokémon/YGO via PC satellites)', () => {
+  it('tags Japanese/Chinese satellites by set name, leaves English alone, idempotent', () => {
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, external_ids) VALUES ('pkmn-pc1','PKMN','Aroma Lady','86','Pokemon Japanese Eevee Heroes','{}')`).run();
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, external_ids) VALUES ('pkmn-pc2','PKMN','Ponyta','1','Pokemon Chinese Gem Pack','{}')`).run();
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, external_ids) VALUES ('pkmn-base1-4','PKMN','Charizard','4/102','Base','{}')`).run();
+    const r1 = tagLanguages(db);
+    expect(r1.Japanese).toBe(1);
+    expect(r1.Chinese).toBe(1);
+    expect(db.prepare(`SELECT language FROM cards WHERE id='pkmn-pc1'`).get().language).toBe('Japanese');
+    expect(db.prepare(`SELECT language FROM cards WHERE id='pkmn-base1-4'`).get().language).toBe('English');
+    const r2 = tagLanguages(db);
+    expect(r2.Japanese).toBe(0);    // idempotent
+  });
+
+  it('after tagging, language routing steers JP Pokémon listings to the satellite (with its comps)', () => {
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, external_ids) VALUES ('pkmn-pc1','PKMN','Aroma Lady','86','Pokemon Japanese Eevee Heroes','{}')`).run();
+    tagLanguages(db);
+    const uni = db.prepare(`SELECT id, name, number, set_name, language FROM cards`).all();
+    expect(matchListing('2021 Pokemon Japanese Eevee Heroes #086 Aroma Lady PSA 10', uni)).toBe('pkmn-pc1');
+  });
+});
