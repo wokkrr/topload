@@ -296,7 +296,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
           <th style={th}>Oracle comp</th><th style={th}>Δ vs comp</th><th style={th}>Comp conf</th>
         </tr></thead>
         <tbody>
-          {shown.map(l => (
+          {shown.slice(0, 250).map(l => (
             <tr key={`${l.platform}|${l.external_id}`}
                 onClick={onOpenListing ? () => onOpenListing(l)
                   : l.card_id ? () => onSelect?.(l.card_id)
@@ -322,6 +322,11 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
           ))}
         </tbody>
       </table>
+      {shown.length > 250 && (
+        <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, padding: '10px 12px' }}>
+          showing first 250 of {shown.length.toLocaleString()} — search or filter to narrow
+        </div>
+      )}
       </div>}
     </div>
   );
@@ -349,11 +354,18 @@ const GRID_CSS = `
 .tl-gacha-card:hover { transform: translateY(-2px); border-color: ${tokens.color.inkMuted}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
 `;
 
+const GRID_PAGE = 120;
+
 function GachaGrid({ listings, onSelect, onOpenListing }) {
+  // Render in pages — 1,800+ cards at once makes every refresh feel slow
+  // regardless of API speed. Count resets when the filtered list changes.
+  const [shown, setShown] = useState(GRID_PAGE);
+  const visible = listings.slice(0, shown);
   return (
+    <div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
       <style>{GRID_CSS}</style>
-      {listings.map(l => {
+      {visible.map(l => {
         const url = listingUrl(l);
         return (
         <div key={`${l.platform}|${l.external_id}`}
@@ -414,6 +426,16 @@ function GachaGrid({ listings, onSelect, onOpenListing }) {
         </div>
         );
       })}
+    </div>
+    {listings.length > shown && (
+      <div style={{ textAlign: 'center', marginTop: 18 }}>
+        <button onClick={() => setShown(s => s + GRID_PAGE)} style={{
+          background: tokens.color.surfaceRaised, border: `1px solid ${tokens.color.inkMuted}`,
+          color: tokens.color.ink, borderRadius: 4, padding: '9px 26px',
+          font: `12px ${tokens.font.body}`, cursor: 'pointer',
+        }}>Show more · {Math.min(GRID_PAGE, listings.length - shown)} of {(listings.length - shown).toLocaleString()} remaining</button>
+      </div>
+    )}
     </div>
   );
 }
