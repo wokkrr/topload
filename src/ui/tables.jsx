@@ -234,7 +234,11 @@ function listingIp(l) {
 
 const IP_FILTERS = [['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']];
 // BGS = Beckett Grading Services — one chip covers both spellings.
-const GRADER_FILTERS = [['', 'All'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['CGC', 'CGC'], ['TAG', 'TAG'], ['raw', 'Raw'], ['sealed', 'Sealed']];
+// 'Raw' chip removed for now (Kaleb, 2026-07-20): every marketplace listing is
+// a slab or sealed — raw returns when user/eBay/TCGplayer listings arrive.
+// Re-add by inserting ['raw', 'Raw'] here; the filter logic below still
+// handles it.
+const GRADER_FILTERS = [['', 'All'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['CGC', 'CGC'], ['TAG', 'TAG'], ['sealed', 'Sealed']];
 
 // Sealed product (packs/boxes) is its own category, not "raw" — Kaleb wants a
 // dedicated section eventually; for now the chip separates it and Raw stays
