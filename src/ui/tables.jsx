@@ -234,7 +234,14 @@ function listingIp(l) {
 
 const IP_FILTERS = [['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']];
 // BGS = Beckett Grading Services — one chip covers both spellings.
-const GRADER_FILTERS = [['', 'All'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['CGC', 'CGC'], ['TAG', 'TAG'], ['raw', 'Raw']];
+const GRADER_FILTERS = [['', 'All'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['CGC', 'CGC'], ['TAG', 'TAG'], ['raw', 'Raw'], ['sealed', 'Sealed']];
+
+// Sealed product (packs/boxes) is its own category, not "raw" — Kaleb wants a
+// dedicated section eventually; for now the chip separates it and Raw stays
+// honest. Title heuristic until adapters carry a product-type flag.
+export function isSealed(l) {
+  return /\b(booster|packs?|box|etb|elite trainer|display|bundle|blister|tins?|case)\b/i.test(l.item_name ?? '');
+}
 
 export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing }) {
   // Thumbnails are the default — the cards ARE the product; List is the opt-in.
@@ -272,7 +279,9 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
     .filter(l => !hidden.has(l.platform))
     .filter(l => !ipFilter || listingIp(l) === ipFilter)
     .filter(l => !graderFilter
-      || (graderFilter === 'raw' ? (l.grade ?? 'raw') === 'raw' : (l.grade ?? '').startsWith(graderFilter)))
+      || (graderFilter === 'sealed' ? isSealed(l)
+        : graderFilter === 'raw' ? (l.grade ?? 'raw') === 'raw' && !isSealed(l)
+        : (l.grade ?? '').startsWith(graderFilter)))
     .filter(l => !needle
       || (l.item_name ?? '').toLowerCase().includes(needle)
       || (l.card_name ?? '').toLowerCase().includes(needle))
@@ -434,7 +443,7 @@ function GachaGrid({ listings, onSelect, onOpenListing }) {
               position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`,
               color: tokens.color.ink, background: tokens.color.overlay,
               borderRadius: 3, padding: '2px 6px',
-            }}>{l.grade}</span>
+            }}>{(l.grade ?? 'raw') === 'raw' && isSealed(l) ? 'sealed' : l.grade}</span>
           </div>
           <div style={{ padding: '8px 10px 9px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
