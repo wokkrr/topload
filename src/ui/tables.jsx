@@ -336,6 +336,9 @@ export function listingUrl(l) {
   if (l.platform === 'collectorcrypt' && l.nft_address) {
     return `https://collectorcrypt.com/assets/solana/${l.nft_address}`;
   }
+  if (l.platform === 'courtyard' && l.proof) {
+    return `https://courtyard.io/asset/${l.proof}`;
+  }
   return null;
 }
 

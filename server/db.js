@@ -30,6 +30,7 @@ function migrate(db) {
   ensureColumn(db, 'oracle_prices', 'source', 'TEXT');
   ensureColumn(db, 'cards', 'image', 'TEXT');
   ensureColumn(db, 'gacha_listings', 'image_back', 'TEXT');
+  ensureColumn(db, 'gacha_listings', 'proof', 'TEXT'); // courtyard asset-page hash
 }
 
 function ensureColumn(db, table, column, ddl) {

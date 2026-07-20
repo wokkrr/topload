@@ -215,19 +215,34 @@ async function runLive(db, today) {
       if (!subset.length || !universeByIp[ip]) continue;
       for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
     }
-    db.exec(`DELETE FROM gacha_listings WHERE platform = 'courtyard'`); // snapshot refresh
+    // ACCUMULATE, don't snapshot: the recently-listed feed is a rolling window,
+    // so each ingest adds the new flow on top of everything already seen.
     const insY = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
-       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
     );
     for (const l of listings) {
       insY.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.nft_address, l.seen_at);
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.nft_address, l.proof ?? null, l.seen_at);
     }
+    // Prune SOLD: our own Courtyard sales indexer sees every fill — a sale of
+    // the same token on/after the listing date means this ask is gone. (Sales
+    // store external_id as '<hash>:<tokenId first 18 chars>'.)
+    const sold = db.prepare(
+      `DELETE FROM gacha_listings WHERE platform = 'courtyard' AND EXISTS (
+         SELECT 1 FROM sales s WHERE s.source = 'courtyard'
+           AND s.external_id LIKE '%:' || substr(gacha_listings.nft_address, 1, 18)
+           AND (gacha_listings.listed_at IS NULL OR date(s.sold_at) >= gacha_listings.listed_at))`
+    ).run();
+    // Prune STALE: orders expire / get repriced off-feed — cap shelf life.
+    const stale = db.prepare(
+      `DELETE FROM gacha_listings WHERE platform = 'courtyard' AND seen_at < date('now', '-45 days')`
+    ).run();
+    const live = db.prepare(`SELECT COUNT(*) n FROM gacha_listings WHERE platform = 'courtyard'`).get().n;
     summary.yardListings = listings.length;
     summary.yardMatched = matches.size;
-    console.log(`[ingest] courtyard listings: ${listings.length} (${matches.size} matched to tracked cards)`);
+    console.log(`[ingest] courtyard listings: +${listings.length} new (${matches.size} matched) · ${live} accumulated · pruned ${Number(sold.changes)} sold, ${Number(stale.changes)} stale`);
   } catch (e) {
     console.warn(`[ingest] courtyard listings fetch failed: ${e.message}`);
   }

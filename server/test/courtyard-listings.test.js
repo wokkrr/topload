@@ -73,3 +73,12 @@ describe('Courtyard listing mapper', () => {
     expect(rows[0].ip).toBe('PKMN');
   });
 });
+
+describe('proof passthrough (buy-link)', () => {
+  it('carries proof_of_integrity for the courtyard.io/asset/<proof> page', () => {
+    const r = mapListing({ ...({}), title: 'X CGC 10', token_id: '9', proof_of_integrity: 'abc123',
+      attributes: [{ name: 'Category', value: 'Pokémon' }, { name: 'Grader', value: 'CGC' }, { name: 'Grade', value: '10' }],
+      listing_data: [{ price: { amount: { usd: 10 } }, side: 'sell' }] });
+    expect(r.proof).toBe('abc123');
+  });
+});

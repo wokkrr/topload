@@ -64,6 +64,7 @@ export function mapListing(a, seenAt) {
     listed_at: (order?.listedAt ?? order?.createdAt ?? '').slice(0, 10) || (seenAt ?? null),
     image: a.image ?? a.cropped_image ?? null,
     nft_address: tokenId,              // Polygon tokenId — opaque, matches sales registry key style
+    proof: a.proof_of_integrity ?? null, // courtyard.io/asset/<proof> = the listing page
     fmv_usd: Number.isFinite(a.fmv_estimate_usd) ? a.fmv_estimate_usd : null,
     seen_at: seenAt ?? new Date().toISOString().slice(0, 10),
   };
