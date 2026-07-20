@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
 import { tokens, applyTheme, initialTheme } from './tokens.js';
 import { api } from './data/client.js';
-import { IndexChart } from './ui/IndexChart.jsx';
 import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
 import { ListingDetail } from './ui/ListingDetail.jsx';
-import { MoversTable, BasketTable, GachaDesk } from './ui/tables.jsx';
-import { Screener } from './ui/Screener.jsx';
+import { GachaDesk } from './ui/tables.jsx';
+import { Terminal } from './ui/Terminal.jsx';
 
-// 'Indexes' removed from nav for now (Kaleb, 2026-07-19) — computation still
-// runs nightly and the ticker still shows levels; re-add here to revisit.
-const TABS = ['Cards', 'Movers', 'Basket', 'Gacha Desk'];
-const RANGES = [7, 30, 90];
+// Cards / Movers / Basket merged into the single 'Terminal' dashboard
+// (Kaleb, 2026-07-20: "combine them into one singular tab… keep things
+// simple"). Their tables live on inside Terminal.jsx sections.
+const TABS = ['Terminal', 'Gacha Desk'];
 
 export default function App() {
-  const [tab, setTab] = useState('Cards');
+  const [tab, setTab] = useState('Terminal');
   const [days, setDays] = useState(90);
   const [basketIp, setBasketIp] = useState('PKMN');
   const [indexes, setIndexes] = useState(null);
@@ -83,46 +82,12 @@ export default function App() {
           />
         )}
 
-        {!selectedCard && tab === 'Indexes' && (
-          <section>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-              {RANGES.map(r => (
-                <button key={r} onClick={() => setDays(r)} style={{
-                  background: days === r ? tokens.color.surfaceRaised : 'none',
-                  border: `1px solid ${days === r ? tokens.color.inkMuted : tokens.color.border}`,
-                  color: days === r ? tokens.color.ink : tokens.color.inkSecondary,
-                  borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
-                }}>{r}D</button>
-              ))}
-              <span style={{ marginLeft: 12, alignSelf: 'center', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}` }}>
-                liquidity-weighted, rules-based baskets, base 100
-              </span>
-            </div>
-            <IndexChart data={indexes} />
-          </section>
-        )}
-
-        {!selectedCard && tab === 'Cards' && <Screener onSelect={setSelectedCard} />}
-
-        {!selectedCard && tab === 'Movers' && <MoversTable movers={movers} onSelect={setSelectedCard} />}
-
-        {!selectedCard && tab === 'Basket' && (
-          <section>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-              {Object.entries(tokens.series).map(([id, s]) => (
-                <button key={id} onClick={() => setBasketIp(id)} style={{
-                  background: basketIp === id ? tokens.color.surfaceRaised : 'none',
-                  border: `1px solid ${basketIp === id ? s.data : tokens.color.border}`,
-                  color: basketIp === id ? tokens.color.ink : tokens.color.inkSecondary,
-                  borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
-                }}>{s.label}</button>
-              ))}
-              <span style={{ marginLeft: 12, alignSelf: 'center', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}` }}>
-                top-N by 90D volume · conf ≥ 30 · monthly rebalance
-              </span>
-            </div>
-            <BasketTable basket={basket} onSelect={setSelectedCard} />
-          </section>
+        {!selectedCard && !selectedListing && tab === 'Terminal' && (
+          <Terminal
+            indexes={indexes} days={days} setDays={setDays}
+            movers={movers} basket={basket} basketIp={basketIp} setBasketIp={setBasketIp}
+            onSelect={setSelectedCard}
+          />
         )}
 
         {!selectedCard && !selectedListing && tab === 'Gacha Desk' && (
