@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { tokens } from '../tokens.js';
 import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 import { listingUrl } from './tables.jsx';
+import { CardResearch } from './CardDetail.jsx';
 
 /**
  * In-app listing page — the user stays on Topload for everything except the
@@ -13,6 +14,7 @@ import { listingUrl } from './tables.jsx';
  */
 export function ListingDetail({ listing: l, onBack, onSelectCard }) {
   const [side, setSide] = useState('front');
+  const [showResearch, setShowResearch] = useState(false);
   const url = listingUrl(l);
   const img = side === 'back' && l.image_back ? l.image_back : l.image;
   const hasComp = l.comp_cents && !l.comp_suspect;
@@ -109,10 +111,11 @@ export function ListingDetail({ listing: l, onBack, onSelectCard }) {
               }}>Buy on {platform} ↗</a>
             )}
             {l.card_id && (
-              <button onClick={() => onSelectCard?.(l.card_id)} style={{
-                background: 'none', border: `1px solid ${tokens.color.inkMuted}`, color: tokens.color.ink,
+              <button onClick={() => setShowResearch(s => !s)} style={{
+                background: showResearch ? tokens.color.surfaceRaised : 'none',
+                border: `1px solid ${tokens.color.inkMuted}`, color: tokens.color.ink,
                 borderRadius: 6, padding: '10px 18px', font: `13px ${tokens.font.body}`, cursor: 'pointer',
-              }}>Price history & comps →</button>
+              }}>{showResearch ? '▾' : '▸'} Price history & comps</button>
             )}
           </div>
           {url && (
@@ -122,6 +125,16 @@ export function ListingDetail({ listing: l, onBack, onSelectCard }) {
           )}
         </div>
       </div>
+
+      {/* ── Research, folded into the same page (Kaleb: no separate page hop) ── */}
+      {l.card_id && showResearch && (
+        <div style={{
+          marginTop: 28, paddingTop: 8,
+          borderTop: `1px solid ${tokens.color.border}`,
+        }}>
+          <CardResearch cardId={l.card_id} initialGrade={l.grade} embedded />
+        </div>
+      )}
     </section>
   );
 }

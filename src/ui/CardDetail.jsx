@@ -11,11 +11,28 @@ const DETAIL_CSS = `
 `;
 
 /**
- * Card research view: per-grade oracle chart with provenance-aware rendering
- * (solid = solds-based marks, dashed + open markers = external bootstrap),
- * stat row, and a per-grade table. Single series → no legend (title names it).
+ * Card research page (Cards/Movers/Basket route in): thin wrapper around
+ * CardResearch, which is also embedded inline by ListingDetail — one research
+ * module, two homes.
  */
 export function CardDetail({ cardId, onBack }) {
+  return (
+    <section>
+      <style>{DETAIL_CSS}</style>
+      <button onClick={onBack} className="tl-back" style={backStyle}>← back</button>
+      <CardResearch cardId={cardId} />
+    </section>
+  );
+}
+
+/**
+ * Card research module: per-grade oracle chart with provenance-aware rendering
+ * (solid = solds-based marks, dashed + open markers = external bootstrap),
+ * stat row, per-grade table, and panels. `embedded` drops the image + title
+ * (the host page already shows them); `initialGrade` preselects the listing's
+ * grade so ask-vs-mark lines up.
+ */
+export function CardResearch({ cardId, initialGrade = null, embedded = false }) {
   const [card, setCard] = useState(null);
   const [grade, setGrade] = useState(null);
   const [days, setDays] = useState(90);
@@ -28,9 +45,13 @@ export function CardDetail({ cardId, onBack }) {
   useEffect(() => {
     api.card(cardId).then(c => {
       setCard(c);
-      setGrade(g => g && c.grades.some(x => x.grade === g) ? g : (c.grades[0]?.grade ?? 'raw'));
+      setGrade(g => {
+        if (g && c.grades.some(x => x.grade === g)) return g;
+        if (initialGrade && c.grades.some(x => x.grade === initialGrade)) return initialGrade;
+        return c.grades[0]?.grade ?? 'raw';
+      });
     }).catch(e => setErr(String(e)));
-  }, [cardId]);
+  }, [cardId, initialGrade]);
 
   useEffect(() => {
     if (!grade) return;
@@ -52,13 +73,10 @@ export function CardDetail({ cardId, onBack }) {
   } : null;
 
   return (
-    <section>
-      <style>{DETAIL_CSS}</style>
-      <button onClick={onBack} className="tl-back" style={backStyle}>← back</button>
-
+    <div>
       {/* ── Hero: card art + identity + big price + delta chips ── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24, margin: '14px 0 4px', flexWrap: 'wrap' }}>
-        {card.image && (
+        {!embedded && card.image && (
           <span style={{ position: 'relative', alignSelf: 'flex-start', lineHeight: 0 }}
                 title={card.image_kind === 'listing' ? 'Sample slab photo from a marketplace listing — not a specific item for sale' : undefined}>
             <img src={card.image} alt={card.name} style={{
@@ -76,12 +94,19 @@ export function CardDetail({ cardId, onBack }) {
           </span>
         )}
         <div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-            <h2 style={{ font: `24px ${tokens.font.display}`, margin: 0 }}>{card.name}</h2>
-            <span style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}` }}>
-              {card.set_name} {card.number} · {tokens.series[card.ip]?.label ?? card.ip}
-            </span>
-          </div>
+          {!embedded && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+              <h2 style={{ font: `24px ${tokens.font.display}`, margin: 0 }}>{card.name}</h2>
+              <span style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}` }}>
+                {card.set_name} {card.number} · {tokens.series[card.ip]?.label ?? card.ip}
+              </span>
+            </div>
+          )}
+          {embedded && (
+            <div style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}` }}>
+              Tracked as <span style={{ color: tokens.color.ink }}>{card.name}</span> · {card.set_name} {card.number} — oracle mark by grade:
+            </div>
+          )}
           {cur && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 8 }}>
               <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(cur.price_cents)}</span>
@@ -210,7 +235,7 @@ export function CardDetail({ cardId, onBack }) {
           </div>
         </Panel>
       </div>
-    </section>
+    </div>
   );
 }
 
