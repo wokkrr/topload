@@ -38,6 +38,11 @@ describe('MNSTR listing mapper', () => {
     expect(mapListing(card({ grading: 'GEM MINT 10', gradingCompany: 'PSA' })).grade).toBe('PSA10');
   });
 
+  it("maps grader-with-no-number to an Authentic slab, not raw ('CGC AUTH')", () => {
+    expect(mapListing(card({ grading: 'CGC', gradingCompany: 'cgc' })).grade).toBe('CGCAuth');
+    expect(mapListing(card({ grading: '', gradingCompany: '', title: 'Some Raw Card #1' })).grade).toBe('raw');
+  });
+
   it('carries the vault serial as the slab cert number', () => {
     expect(mapListing(card()).cert).toBe('129648888');
     expect(mapListing(card({ serialNumber: 'not-a-cert', remoteId: 'x' })).cert).toBeNull();

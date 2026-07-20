@@ -25,8 +25,9 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
     .sort((a, b) => (l.card_id && (b.card_id === l.card_id) - (a.card_id === l.card_id)) || a.price_cents - b.price_cents)
     .slice(0, 6);
 
-  // Grading company parsed off the normalized grade ('CGC10' → CGC / 10).
-  const gm = /^([A-Z]+)([\d.]+)$/.exec(l.grade ?? '');
+  // Grading company parsed off the normalized grade ('CGC10' → CGC / 10;
+  // 'CGCAuth' → CGC / Authentic — an authenticated-but-ungraded slab).
+  const gm = /^([A-Z]+)(?:([\d.]+)|Auth)$/.exec(l.grade ?? '');
 
   // Certification number — shown ONLY when confidently present: the adapter's
   // cert field (Courtyard 'Serial' attr, MNSTR serialNumber), MNSTR's vault
@@ -179,7 +180,7 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
         <Accordion title="Listing Details" defaultOpen>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '4px 40px', maxWidth: 760 }}>
             {gm && <Row k="Grading company" v={gm[1]} />}
-            {gm && <Row k="Grade" v={gm[2]} />}
+            {gm && <Row k="Grade" v={gm[2] ?? 'Authentic (ungraded)'} />}
             {cert && (
               <Row k="Certification #" v={certUrl
                 ? <a href={certUrl} target="_blank" rel="noopener noreferrer"

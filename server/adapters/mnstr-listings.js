@@ -51,6 +51,14 @@ export function mapListing(c, seenAt) {
     if (n >= 20 && Number.isInteger(n)) n = n / 10;    // 'BECKETT 95' → 9.5
     grade = normalizeGrade(gm[1], n);
   }
+  // Grader with NO number ('CGC' + 'CGC AUTH' titles) = an Authentic slab —
+  // authenticated, deliberately ungraded. Not raw, not a numeric grade.
+  if (grade === 'raw') {
+    const co = (c.gradingCompany ?? c.grading ?? '').trim().toUpperCase();
+    if (/^(PSA|CGC|BGS|BECKETT|SGC|TAG)$/.test(co) && !/[0-9]/.test(c.grading ?? '')) {
+      grade = `${co === 'BECKETT' ? 'BGS' : co}Auth`;
+    }
+  }
   if (grade === 'raw') grade = gradeFromTitle(c.title);
 
   const serial = String(c.serialNumber ?? c.remoteId ?? '');
