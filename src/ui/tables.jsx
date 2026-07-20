@@ -233,6 +233,14 @@ function listingIp(l) {
 }
 
 const IP_FILTERS = [['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']];
+
+// Listing language: the matched card's language when attributed (language-
+// variant rows), else a title heuristic — same signal the matcher routes on.
+export function listingLanguage(l) {
+  if (l.card_language) return l.card_language;
+  return /\b(japanese|jpn|jp)\b/i.test(l.item_name ?? '') ? 'Japanese' : 'English';
+}
+const LANG_FILTERS = [['', 'All'], ['English', 'English'], ['Japanese', 'Japanese']];
 // BGS = Beckett Grading Services — one chip covers both spellings.
 // 'Raw' chip removed for now (Kaleb, 2026-07-20): every marketplace listing is
 // a slab or sealed — raw returns when user/eBay/TCGplayer listings arrive.
@@ -263,6 +271,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
   const [q, setQ] = useState('');
   const [ipFilter, setIpFilter] = useState('');
   const [graderFilter, setGraderFilter] = useState('');
+  const [langFilter, setLangFilter] = useState('');
   const pickView = (v) => { setView(v); localStorage.setItem(VIEW_KEY, v); };
   const togglePlatform = (id) => {
     setHidden(prev => {
@@ -290,6 +299,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
   const shown = listings
     .filter(l => !hidden.has(l.platform))
     .filter(l => !ipFilter || listingIp(l) === ipFilter)
+    .filter(l => !langFilter || listingLanguage(l) === langFilter)
     .filter(l => !graderFilter
       || (graderFilter === 'sealed' ? isSealed(l)
         : graderFilter === 'raw' ? (l.grade ?? 'raw') === 'raw' && !isSealed(l)
@@ -340,6 +350,12 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
         <span style={{ display: 'flex', gap: 4 }}>
           {GRADER_FILTERS.map(([id, label]) => (
             <Chip key={id || 'all-gr'} active={graderFilter === id} onClick={() => setGraderFilter(id)}>{label}</Chip>
+          ))}
+        </span>
+        <span style={{ width: 1, height: 18, background: tokens.color.border }} />
+        <span style={{ display: 'flex', gap: 4 }}>
+          {LANG_FILTERS.map(([id, label]) => (
+            <Chip key={id || 'all-lang'} active={langFilter === id} onClick={() => setLangFilter(id)}>{label}</Chip>
           ))}
         </span>
       </div>
@@ -459,7 +475,7 @@ function GachaGrid({ listings, onSelect, onOpenListing }) {
               position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`,
               color: tokens.color.ink, background: tokens.color.overlay,
               borderRadius: 3, padding: '2px 6px',
-            }}>{(l.grade ?? 'raw') === 'raw' && isSealed(l) ? 'sealed' : l.grade}</span>
+            }}>{((l.grade ?? 'raw') === 'raw' && isSealed(l) ? 'sealed' : l.grade) + (listingLanguage(l) === 'Japanese' ? ' · JP' : '')}</span>
           </div>
           <div style={{ padding: '8px 10px 9px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>

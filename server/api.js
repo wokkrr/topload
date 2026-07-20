@@ -193,7 +193,7 @@ app.get('/api/gacha', (req, res) => {
            g.price_cents, g.currency, g.listed_at, g.nft_address, g.image_back, g.proof, g.cert,
            COALESCE(g.image, c.image) AS image,
            CASE WHEN g.image IS NOT NULL THEN 'actual' WHEN c.image IS NOT NULL THEN 'art' END AS image_kind,
-           c.name AS card_name, c.ip,
+           c.name AS card_name, c.ip, c.language AS card_language,
            lm.price_cents AS comp_cents, lm.confidence AS comp_confidence, lm.basis AS comp_basis, lm.source AS comp_source
     FROM gacha_listings g
     LEFT JOIN cards c ON c.id = g.card_id

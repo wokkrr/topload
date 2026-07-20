@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { tokens } from '../tokens.js';
 import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
-import { listingUrl } from './tables.jsx';
+import { listingUrl, listingLanguage } from './tables.jsx';
 import { CardResearch, headingStyle } from './CardDetail.jsx';
 
 /**
@@ -119,7 +119,7 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
         <div style={{ flex: 1, minWidth: 280 }}>
           <h2 style={{ font: `20px ${tokens.font.display}`, margin: '0 0 4px', lineHeight: 1.3 }}>{l.item_name}</h2>
           <div style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}`, marginBottom: 16 }}>
-            {l.grade !== 'raw' ? `${l.grade} · ` : ''}{l.category ?? ''} · listed on {platform}
+            {l.grade !== 'raw' ? `${l.grade} · ` : ''}{l.category ?? ''}{listingLanguage(l) === 'Japanese' ? ' · Japanese' : ''} · listed on {platform}
             {l.listed_at ? ` · ${String(l.listed_at).slice(0, 10)}` : ''}
           </div>
 
@@ -190,6 +190,7 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
             )}
             {!gm && <Row k="Condition" v="Raw / ungraded" />}
             <Row k="Category" v={l.category ?? '—'} />
+            <Row k="Language" v={listingLanguage(l)} />
             <Row k="Marketplace" v={platform} />
             <Row k="Listed" v={l.listed_at ? String(l.listed_at).slice(0, 10) : '—'} />
             <Row k="Currency" v={l.currency ?? '—'} />
