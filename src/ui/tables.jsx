@@ -347,8 +347,12 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
         {shown.length.toLocaleString()} card listings
       </div>
       {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect} onOpenListing={onOpenListing} />}
-      {view === 'table' && <div>
-      <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
+      {view === 'table' && <div style={{ overflowX: 'auto' }}>
+      <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%', tableLayout: 'fixed' }}>
+        <colgroup>
+          <col /><col style={{ width: 76 }} /><col style={{ width: 86 }} />
+          <col style={{ width: 100 }} /><col style={{ width: 96 }} /><col style={{ width: 86 }} />
+        </colgroup>
         <thead><tr>
           <th style={thL}>Listing</th><th style={thL}>Grade</th><th style={th}>Ask</th>
           <th style={th}>Oracle comp</th><th style={th}>Δ vs comp</th><th style={th}>Comp conf</th>
@@ -360,9 +364,9 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
                   : l.card_id ? () => onSelect?.(l.card_id)
                   : listingUrl(l) ? () => window.open(listingUrl(l), '_blank', 'noopener') : undefined}
                 style={{ cursor: 'pointer' }}>
-              <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}>
+              <td style={{ ...tdL, display: 'flex', alignItems: 'center', minWidth: 0 }} title={l.item_name}>
                 <Thumb src={l.image} size={42} badge={l.image_kind === 'art' ? 'NOT ITEM' : null} />
-                <span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {l.ip && <IpDot ip={l.ip} />}{l.item_name}
                   {l.card_name && <span style={{ color: tokens.color.inkMuted }}> → {l.card_name}</span>}
                 </span>
