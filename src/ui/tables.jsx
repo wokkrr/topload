@@ -216,7 +216,7 @@ const GACHA_SORTS = [
   ['priceLow', 'Price ↑', (a, b) => a.price_cents - b.price_cents],
 ];
 
-export function GachaDesk({ listings, platforms, sales, onSelect }) {
+export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing }) {
   // Thumbnails are the default — the cards ARE the product; List is the opt-in.
   const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) ?? 'grid');
   const [hidden, setHidden] = useState(loadHidden);
@@ -285,7 +285,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
         {shown.length} listings · sorted by {GACHA_SORTS.find(([id]) => id === sort)[1].toLowerCase().replace('↓', 'high→low').replace('↑', 'low→high')} ·
         {' '}{matched.length} with grade-matched oracle comps · asking prices, never oracle input
       </div>
-      {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect} />}
+      {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect} onOpenListing={onOpenListing} />}
       {view === 'table' && <div>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
         <thead><tr>
@@ -295,9 +295,10 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
         <tbody>
           {shown.map(l => (
             <tr key={`${l.platform}|${l.external_id}`}
-                onClick={l.card_id ? () => onSelect?.(l.card_id)
+                onClick={onOpenListing ? () => onOpenListing(l)
+                  : l.card_id ? () => onSelect?.(l.card_id)
                   : listingUrl(l) ? () => window.open(listingUrl(l), '_blank', 'noopener') : undefined}
-                style={{ cursor: l.card_id || listingUrl(l) ? 'pointer' : 'default' }}>
+                style={{ cursor: 'pointer' }}>
               <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}>
                 <Thumb src={l.image} size={42} badge={l.image_kind === 'art' ? 'NOT ITEM' : null} />
                 <span>
@@ -342,7 +343,7 @@ const GRID_CSS = `
 .tl-gacha-card:hover { transform: translateY(-2px); border-color: ${tokens.color.inkMuted}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
 `;
 
-function GachaGrid({ listings, onSelect }) {
+function GachaGrid({ listings, onSelect, onOpenListing }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
       <style>{GRID_CSS}</style>
@@ -351,11 +352,13 @@ function GachaGrid({ listings, onSelect }) {
         return (
         <div key={`${l.platform}|${l.external_id}`}
              className="tl-gacha-card"
-             onClick={l.card_id ? () => onSelect?.(l.card_id) : url ? () => window.open(url, '_blank', 'noopener') : undefined}
-             title={l.card_id ? l.item_name : url ? `${l.item_name} — no research page yet, opens the marketplace listing` : l.item_name}
+             onClick={onOpenListing ? () => onOpenListing(l)
+               : l.card_id ? () => onSelect?.(l.card_id)
+               : url ? () => window.open(url, '_blank', 'noopener') : undefined}
+             title={l.item_name}
              style={{
                border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
-               background: tokens.color.surface, cursor: l.card_id || url ? 'pointer' : 'default',
+               background: tokens.color.surface, cursor: onOpenListing || l.card_id || url ? 'pointer' : 'default',
                display: 'flex', flexDirection: 'column',
              }}>
           <div style={{ position: 'relative', aspectRatio: '3/4', background: tokens.color.surfaceRaised }}>

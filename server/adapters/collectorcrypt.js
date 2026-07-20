@@ -59,6 +59,7 @@ export function makeCollectorCryptAdapter({
             currency: c.listing.currency ?? 'USDC',
             listed_at: c.listing.createdAt ?? null,
             image: c.images?.frontM ?? c.images?.front ?? null,
+            image_back: c.images?.backM ?? c.images?.back ?? null,
             nft_address: c.nftAddress ?? null,
             seen_at: seenAt ?? new Date().toISOString().slice(0, 10),
           });

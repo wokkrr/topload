@@ -192,7 +192,7 @@ app.get('/api/gacha', (req, res) => {
   const rows = db.prepare(`
     WITH latest AS (SELECT MAX(as_of) d FROM oracle_prices)
     SELECT g.platform, g.external_id, g.card_id, g.item_name, g.category, g.grade,
-           g.price_cents, g.currency, g.listed_at, g.nft_address,
+           g.price_cents, g.currency, g.listed_at, g.nft_address, g.image_back,
            COALESCE(g.image, c.image) AS image,
            CASE WHEN g.image IS NOT NULL THEN 'actual' WHEN c.image IS NOT NULL THEN 'art' END AS image_kind,
            c.name AS card_name, c.ip,

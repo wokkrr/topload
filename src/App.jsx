@@ -4,6 +4,7 @@ import { api } from './data/client.js';
 import { IndexChart } from './ui/IndexChart.jsx';
 import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
+import { ListingDetail } from './ui/ListingDetail.jsx';
 import { MoversTable, BasketTable, GachaDesk } from './ui/tables.jsx';
 import { Screener } from './ui/Screener.jsx';
 
@@ -23,6 +24,7 @@ export default function App() {
   const [platforms, setPlatforms] = useState(null);
   const [recentSales, setRecentSales] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
+  const [selectedListing, setSelectedListing] = useState(null);
   const [theme, setTheme] = useState(initialTheme());
   const [err, setErr] = useState(null);
 
@@ -47,7 +49,7 @@ export default function App() {
         </h1>
         <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto', alignItems: 'center' }}>
           {TABS.map(t => (
-            <button key={t} onClick={() => { setTab(t); setSelectedCard(null); }} style={{
+            <button key={t} onClick={() => { setTab(t); setSelectedCard(null); setSelectedListing(null); }} style={{
               background: tab === t ? tokens.color.surfaceRaised : 'none',
               border: 'none', borderBottom: tab === t ? `2px solid ${tokens.color.brass}` : '2px solid transparent',
               color: tab === t ? tokens.color.ink : tokens.color.inkSecondary,
@@ -69,6 +71,14 @@ export default function App() {
 
         {selectedCard && (
           <CardDetail cardId={selectedCard} onBack={() => setSelectedCard(null)} />
+        )}
+
+        {!selectedCard && selectedListing && (
+          <ListingDetail
+            listing={selectedListing}
+            onBack={() => setSelectedListing(null)}
+            onSelectCard={(id) => { setSelectedListing(null); setSelectedCard(id); }}
+          />
         )}
 
         {!selectedCard && tab === 'Indexes' && (
@@ -113,7 +123,10 @@ export default function App() {
           </section>
         )}
 
-        {!selectedCard && tab === 'Gacha Desk' && <GachaDesk listings={gacha} platforms={platforms} sales={recentSales} onSelect={setSelectedCard} />}
+        {!selectedCard && !selectedListing && tab === 'Gacha Desk' && (
+          <GachaDesk listings={gacha} platforms={platforms} sales={recentSales}
+                     onSelect={setSelectedCard} onOpenListing={setSelectedListing} />
+        )}
       </main>
     </div>
   );

@@ -29,6 +29,7 @@ function migrate(db) {
   ensureColumn(db, 'external_marks', 'sales_volume', 'INTEGER');
   ensureColumn(db, 'oracle_prices', 'source', 'TEXT');
   ensureColumn(db, 'cards', 'image', 'TEXT');
+  ensureColumn(db, 'gacha_listings', 'image_back', 'TEXT');
 }
 
 function ensureColumn(db, table, column, ddl) {
