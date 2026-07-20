@@ -29,6 +29,7 @@
     "coverage": "node --env-file-if-exists=.env server/coverage.js",
     "mnstr:sales": "node --env-file-if-exists=.env server/indexer-mnstr-sales.js",
     "seed:onepiece": "node --env-file-if-exists=.env server/seed-onepiece.js",
+    "seed:pokemon": "node --env-file-if-exists=.env server/seed-pokemon.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
   },
