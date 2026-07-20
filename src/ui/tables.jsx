@@ -7,6 +7,18 @@ const thL = { ...th, textAlign: 'left' };
 const td = { textAlign: 'right', padding: '5px 12px', borderBottom: `1px solid ${tokens.color.surface}`, font: `12px ${tokens.font.mono}`, whiteSpace: 'nowrap' };
 const tdL = { ...td, textAlign: 'left', font: `12px ${tokens.font.body}` };
 
+export function Chip({ active, onClick, color, children }) {
+  return (
+    <button onClick={onClick} style={{
+      background: active ? tokens.color.surfaceRaised : 'none',
+      border: `1px solid ${active ? (color ?? tokens.color.inkMuted) : tokens.color.border}`,
+      color: active ? tokens.color.ink : tokens.color.inkSecondary,
+      borderRadius: 4, padding: '4px 11px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    }}>{children}</button>
+  );
+}
+
 const Delta = ({ pct }) => (
   <span style={{ color: pct == null ? tokens.color.inkMuted : pct >= 0 ? tokens.color.up : tokens.color.down }}>{fmtPct(pct)}</span>
 );
@@ -151,7 +163,7 @@ export function PlatformStrip({ platforms, hidden, onToggle }) {
                     opacity: off ? 0.55 : 1, cursor: interactive ? 'pointer' : 'default',
                   }}>
             {p.name.toUpperCase()}
-            {off ? ' · HIDDEN' : p.status === 'live' ? ' ● LIVE' : ' · SOON'}
+            {off ? ' · HIDDEN' : p.status === 'live' ? '' : ' · SOON'}
           </button>
         );
       })}
@@ -197,10 +209,19 @@ const loadHidden = () => {
   catch { return new Set(); }
 };
 
+const GACHA_SORTS = [
+  ['recent', 'Recent', (a, b) => (b.listed_at ?? '').localeCompare(a.listed_at ?? '') || b.price_cents - a.price_cents],
+  ['oldest', 'Oldest', (a, b) => (a.listed_at ?? '').localeCompare(b.listed_at ?? '') || b.price_cents - a.price_cents],
+  ['priceHigh', 'Price ↓', (a, b) => b.price_cents - a.price_cents],
+  ['priceLow', 'Price ↑', (a, b) => a.price_cents - b.price_cents],
+];
+
 export function GachaDesk({ listings, platforms, sales, onSelect }) {
   // Thumbnails are the default — the cards ARE the product; List is the opt-in.
   const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) ?? 'grid');
   const [hidden, setHidden] = useState(loadHidden);
+  const [sort, setSort] = useState('recent');
+  const [q, setQ] = useState('');
   const pickView = (v) => { setView(v); localStorage.setItem(VIEW_KEY, v); };
   const togglePlatform = (id) => {
     setHidden(prev => {
@@ -224,27 +245,45 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
       </div>
     );
   }
-  const shown = listings.filter(l => !hidden.has(l.platform));
+  const needle = q.trim().toLowerCase();
+  const shown = listings
+    .filter(l => !hidden.has(l.platform))
+    .filter(l => !needle
+      || (l.item_name ?? '').toLowerCase().includes(needle)
+      || (l.card_name ?? '').toLowerCase().includes(needle))
+    .sort(GACHA_SORTS.find(([id]) => id === sort)[2]);
   const matched = shown.filter(l => l.delta_pct != null);
   return (
     <div>
       <PlatformStrip platforms={platforms} hidden={hidden} onToggle={togglePlatform} />
       <SalesTape sales={shownSales} onSelect={onSelect} />
-      <div style={{ display: 'flex', alignItems: 'center', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
-        <span>
-          {shown.length} live listings · {matched.length} with grade-matched oracle comps ·
-          asking prices, never oracle input
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search listings…"
+          style={{
+            background: tokens.color.surface, border: `1px solid ${tokens.color.border}`,
+            color: tokens.color.ink, borderRadius: 6, padding: '6px 12px', width: 230,
+            font: `12px ${tokens.font.body}`, outline: 'none',
+          }}
+          onFocus={e => e.target.style.borderColor = tokens.color.inkMuted}
+          onBlur={e => e.target.style.borderColor = tokens.color.border}
+        />
+        <span style={{ display: 'flex', gap: 4 }}>
+          {GACHA_SORTS.map(([id, label]) => (
+            <Chip key={id} active={sort === id} onClick={() => setSort(id)}>{label}</Chip>
+          ))}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           {['grid', 'table'].map(v => (
-            <button key={v} onClick={() => pickView(v)} style={{
-              background: view === v ? tokens.color.surfaceRaised : 'none',
-              border: `1px solid ${view === v ? tokens.color.inkMuted : tokens.color.border}`,
-              color: view === v ? tokens.color.ink : tokens.color.inkSecondary,
-              borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
-            }}>{v === 'grid' ? 'Thumbnails' : 'List'}</button>
+            <Chip key={v} active={view === v} onClick={() => pickView(v)}>{v === 'grid' ? 'Thumbnails' : 'List'}</Chip>
           ))}
         </span>
+      </div>
+      <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
+        {shown.length} listings · sorted by {GACHA_SORTS.find(([id]) => id === sort)[1].toLowerCase().replace('↓', 'high→low').replace('↑', 'low→high')} ·
+        {' '}{matched.length} with grade-matched oracle comps · asking prices, never oracle input
       </div>
       {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect} />}
       {view === 'table' && <div>
@@ -267,10 +306,12 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
               </td>
               <td style={tdL}>{l.grade}</td>
               <td style={td}>{fmtUsd(l.price_cents)}</td>
-              <td style={td}>{l.comp_cents ? fmtUsd(l.comp_cents) : '—'}</td>
+              <td style={td}>{l.comp_cents && !l.comp_suspect ? fmtUsd(l.comp_cents) : '—'}</td>
               <td style={td}>{l.delta_pct != null
                 ? <span style={{ color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down }}>{fmtPct(l.delta_pct)}</span>
-                : <span style={{ color: tokens.color.inkMuted }}>no comp</span>}</td>
+                : l.comp_suspect
+                  ? <span style={{ color: tokens.color.inkMuted }} title="Comp exists but is wildly out of line with the ask — not shown until we trust it">comp suspect</span>
+                  : <span style={{ color: tokens.color.inkMuted }}>no comp</span>}</td>
               <td style={td}>{l.comp_confidence != null ? <Conf c={l.comp_confidence} /> : '—'}</td>
             </tr>
           ))}
@@ -324,7 +365,7 @@ function GachaGrid({ listings, onSelect }) {
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>{l.card_name ?? l.item_name}</div>
             <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 1 }}>
-              {l.comp_cents ? `comp ${fmtUsd(l.comp_cents)}` : 'no comp'}
+              {l.comp_cents && !l.comp_suspect ? `comp ${fmtUsd(l.comp_cents)}` : l.comp_suspect ? 'comp suspect' : 'no comp'}
             </div>
           </div>
         </div>

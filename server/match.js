@@ -26,15 +26,31 @@ const GRADE_RE = /\b(psa|cgc|bgs|sgc|beckett|ace)\s*[0-9]/;
 
 const stripZeros = (s) => s.replace(/\b0+(\d)/g, '$1');
 
-/** Distinctive set tokens + collapsed variant ('op-01' → 'op01'). */
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Distinctive set evidence, compiled once per set name. Tokens must match as
+ * WHOLE WORDS in the title — substring matching let 'poke' (Poke Card
+ * Creator) hide inside 'pokemon' and 'on' (Town on No Map) inside anything,
+ * which comped $35 promo Pikachus against a $10k Poke Card Creator Pikachu
+ * (live counterexamples, 2026-07-20). The collapsed form ('op 01' → 'op01')
+ * stays a substring test on the squashed title so hyphen/space variants hit.
+ */
+const EVIDENCE_CACHE = new Map();
 function setEvidence(setName) {
-  const n = norm(setName ?? '');
-  if (!n) return [];
+  const key = setName ?? '';
+  let ev = EVIDENCE_CACHE.get(key);
+  if (ev) return ev;
+  const n = norm(key);
+  if (!n) { ev = { res: [], collapsed: null }; EVIDENCE_CACHE.set(key, ev); return ev; }
   const tokens = n.split(' ').filter(t => t.length >= 2 && !SET_STOPWORDS.has(t));
   const collapsed = n.replace(/[\s]/g, '');
-  const out = [...tokens];
-  if (collapsed.length >= 4 && tokens.length !== 1) out.push(collapsed);
-  return out;
+  ev = {
+    res: tokens.map(t => new RegExp(`\\b${escRe(t)}\\b`)),
+    collapsed: collapsed.length >= 4 && tokens.length !== 1 ? collapsed : null,
+  };
+  EVIDENCE_CACHE.set(key, ev);
+  return ev;
 }
 
 /**
@@ -75,8 +91,9 @@ export function matchListing(itemName, cards) {
     // 3. Set evidence — required whenever the card declares a set.
     const evidence = setEvidence(card.set_name);
     let setHits = 0;
-    if (evidence.length) {
-      setHits = evidence.filter(t => title.includes(t)).length;
+    if (evidence.res.length || evidence.collapsed) {
+      setHits = evidence.res.filter(re => re.test(title)).length
+        + (evidence.collapsed && title.replace(/\s/g, '').includes(evidence.collapsed) ? 1 : 0);
       if (setHits === 0) continue;
     }
 

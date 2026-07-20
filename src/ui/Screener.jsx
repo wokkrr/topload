@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { tokens } from '../tokens.js';
 import { api } from '../data/client.js';
-import { CardsTable } from './tables.jsx';
+import { CardsTable, Chip } from './tables.jsx';
 
 const IPS = [['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']];
 const GRADES = ['', 'raw', 'PSA9', 'PSA10', 'BGS10', 'CGC10'];
@@ -68,17 +68,5 @@ export function Screener({ onSelect }) {
       )}
       <CardsTable cards={cards} onSelect={onSelect} />
     </section>
-  );
-}
-
-function Chip({ active, onClick, color, children }) {
-  return (
-    <button onClick={onClick} style={{
-      background: active ? tokens.color.surfaceRaised : 'none',
-      border: `1px solid ${active ? (color ?? tokens.color.inkMuted) : tokens.color.border}`,
-      color: active ? tokens.color.ink : tokens.color.inkSecondary,
-      borderRadius: 4, padding: '4px 11px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
-      whiteSpace: 'nowrap',
-    }}>{children}</button>
   );
 }

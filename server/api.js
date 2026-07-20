@@ -201,11 +201,19 @@ app.get('/api/gacha', (req, res) => {
     LEFT JOIN cards c ON c.id = g.card_id
     LEFT JOIN latest
     LEFT JOIN oracle_prices o ON o.card_id = g.card_id AND o.grade = g.grade AND o.as_of = latest.d
-    ORDER BY (o.price_cents IS NULL), CAST(g.price_cents AS REAL) / NULLIF(o.price_cents, 0) ASC, g.price_cents DESC`).all();
-  res.json(rows.map(r => ({
-    ...r,
-    delta_pct: r.comp_cents ? +((r.price_cents / r.comp_cents - 1) * 100).toFixed(2) : null,
-  })));
+    ORDER BY g.listed_at DESC, g.price_cents DESC`).all();
+  res.json(rows.map(r => {
+    // A comp wildly out of line with the ask (ask < 20% of comp, or > 5x) is
+    // almost always bad data (penny/auction-start listings, residual mis-
+    // attribution) — not free money. Surface it as suspect, never as a delta.
+    const ratio = r.comp_cents ? r.price_cents / r.comp_cents : null;
+    const suspect = ratio != null && (ratio < 0.2 || ratio > 5);
+    return {
+      ...r,
+      delta_pct: ratio != null && !suspect ? +((ratio - 1) * 100).toFixed(2) : null,
+      comp_suspect: suspect || undefined,
+    };
+  }));
 });
 
 // Production: serve the built UI from the same process (VPS mode) — /api/*

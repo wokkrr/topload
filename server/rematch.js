@@ -42,12 +42,14 @@ for (const r of db.prepare(`SELECT mint, item_name, category, card_id FROM nft_r
   else if (r.card_id) regCleared++;
 }
 
-// 3. On-chain sales: attributions predate the strict matcher — purge and reset
-//    cursors so backfill re-walks the same history with clean attribution.
-const purged = db.prepare(`SELECT COUNT(*) n FROM sales WHERE source = 'collectorcrypt'`).get().n;
-db.exec(`DELETE FROM sales WHERE source = 'collectorcrypt'`);
+// 3. On-chain sales: attributions were made under the previous matcher — purge
+//    ALL sources and reset ALL cursors so backfills re-walk the same history
+//    with clean attribution. Registry keeps item_names, so re-attribution is
+//    instant (no metadata refetches); the nightly crons regrow the totals.
+const purged = db.prepare(`SELECT COUNT(*) n FROM sales`).get().n;
+db.exec(`DELETE FROM sales`);
 db.exec(`DELETE FROM oracle_prices WHERE basis = 'solds'`);
-db.exec(`DELETE FROM indexer_state WHERE key IN ('cc_newest_sig', 'cc_backfill_before', 'cc_backfill_done')`);
+db.exec(`DELETE FROM indexer_state`);
 
 db.exec('COMMIT');
 
@@ -55,5 +57,5 @@ console.log('[rematch]', JSON.stringify({
   listings: { matched: listingsMatched, cleared: listingsCleared },
   registry: { matched: regMatched, cleared: regCleared },
   onchainSalesPurged: purged,
-  next: 'run `npm run solana:backfill` to re-ingest sales with clean attribution',
+  next: 'backfills (manual or nightly cron) re-ingest sales with clean attribution',
 }, null, 1));

@@ -120,3 +120,23 @@ describe('listing→card matcher', () => {
     expect(matchListing('Pokemon Noble Victories N #100/101 Trainer PSA 10', withN)).toBe('pkmn-trainer-n');
   });
 });
+
+describe('set evidence is whole-word (2026-07-20 substring bug)', () => {
+  it("'poke' inside 'pokemon' is not evidence for Poke Card Creator", () => {
+    const traps = [{ id: 'pkmn-pcc-pikachu', name: 'Pikachu', number: 'SV-P', set_name: 'Pokemon 2004 Poke Card Creator' }];
+    // A $35 SV-P promo Pikachu must not comp against the $10k Poke Card Creator card.
+    expect(matchListing('2025 #SV-P Pikachu EX PSA 9 Japanese SV-P Promo Pokemon', traps)).toBeNull();
+  });
+
+  it("'on'/'no' hiding inside words is not evidence for Town on No Map", () => {
+    const traps = [{ id: 'pkmn-town-psyduck', name: 'Psyduck', number: '10', set_name: 'Pokemon Japanese The Town on No Map' }];
+    expect(matchListing('2019 Pokemon Japanese Playing Cards Old Maid Psyduck #10 CGC 10 GEM MINT', traps)).toBeNull();
+  });
+
+  it('genuine whole-word set evidence still matches', () => {
+    const real = [{ id: 'pkmn-town-psyduck', name: 'Psyduck', number: '10', set_name: 'Pokemon Japanese The Town on No Map' }];
+    expect(matchListing('Pokemon Japanese The Town on No Map Psyduck #10 CGC 8', real)).toBe('pkmn-town-psyduck');
+    const op = [{ id: 'op-op01-shanks', name: 'Shanks', number: 'OP01-120', set_name: 'OP-01 Romance Dawn' }];
+    expect(matchListing('One Piece Romance Dawn Shanks OP01-120 Alt Art PSA 10', op)).toBe('op-op01-shanks');
+  });
+});
