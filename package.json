@@ -30,7 +30,9 @@
     "mnstr:sales": "node --env-file-if-exists=.env server/indexer-mnstr-sales.js",
     "seed:onepiece": "node --env-file-if-exists=.env server/seed-onepiece.js",
     "seed:pokemon": "node --env-file-if-exists=.env server/seed-pokemon.js",
-    "catalog:refresh": "npm run seed:onepiece -- --upsert-only && npm run seed:pokemon -- --upsert-only && npm run rematch -- --listings-only",
+    "seed:yugioh": "node --max-old-space-size=1536 --env-file-if-exists=.env server/seed-yugioh.js",
+    "catalog:refresh": "npm run seed:onepiece -- --upsert-only && npm run seed:pokemon -- --upsert-only && npm run seed:yugioh -- --upsert-only && npm run rematch -- --listings-only",
+    "catalog:verify": "node --env-file-if-exists=.env server/catalog-verify.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
   },

@@ -172,3 +172,35 @@ describe('name punctuation: dotted vs spaced (MNSTR One Piece)', () => {
       .toBe('op-op07-dragon-015');
   });
 });
+
+describe('Yu-Gi-Oh set codes: regional infix tolerance (2026-07-20)', () => {
+  const ygo = [
+    { id: 'ygo-lob-en001', name: 'Blue-Eyes White Dragon', number: 'LOB-EN001', set_name: 'Legend of Blue Eyes White Dragon' },
+    { id: 'ygo-mrd-060', name: 'Summoned Skull', number: 'MRD-060', set_name: 'Metal Raiders' },
+    { id: 'ygo-sdy-006', name: 'Dark Magician', number: 'SDY-006', set_name: 'Starter Deck: Yugi' },
+    { id: 'ygo-lob-en005', name: 'Exodia the Forbidden One', number: 'LOB-EN005', set_name: 'Legend of Blue Eyes White Dragon' },
+  ];
+  it('matches vintage regionless title "LOB-001" to canonical "LOB-EN001"', () => {
+    expect(matchListing('2002 Yu-Gi-Oh Legend of Blue Eyes LOB-001 Blue-Eyes White Dragon 1st Edition PSA 9', ygo))
+      .toBe('ygo-lob-en001');
+  });
+  it('matches euro infix "LOB-E005" to canonical "LOB-EN005"', () => {
+    expect(matchListing('Yu-Gi-Oh Legend of Blue Eyes Exodia the Forbidden One LOB-E005 PSA 8', ygo))
+      .toBe('ygo-lob-en005');
+  });
+  it('full set code stands as set evidence when the set name is absent from the title', () => {
+    expect(matchListing('2002 Yu-Gi-Oh Dark Magician SDY-006 1st Edition PSA 8', ygo))
+      .toBe('ygo-sdy-006');
+  });
+  it('matches exact regionless code "MRD-060"', () => {
+    expect(matchListing('Yu-Gi-Oh Metal Raiders Summoned Skull MRD-060 PSA 10', ygo))
+      .toBe('ygo-mrd-060');
+  });
+  it('does NOT match when the code prefix differs (same name + digits)', () => {
+    // Summoned Skull also printed in other sets; a SYE-numbered listing must not hit MRD-060.
+    expect(matchListing('Yu-Gi-Oh Starter Deck Summoned Skull SYE-002 PSA 10', ygo)).toBeNull();
+  });
+  it('bare number without the code prefix does not match (needs the code or set name)', () => {
+    expect(matchListing('Yu-Gi-Oh Dark Magician #006 PSA 8', ygo)).toBeNull();
+  });
+});

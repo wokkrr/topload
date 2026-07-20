@@ -12,7 +12,7 @@
  * ours even if the upstream repo disappears — the ownership model.
  */
 import { openDb } from './db.js';
-import { fetchOnePieceCatalog, mapCard } from './adapters/punk-records.js';
+import { mapCard } from './adapters/punk-records.js';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

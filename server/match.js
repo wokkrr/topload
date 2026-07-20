@@ -112,6 +112,24 @@ export function matchListing(itemName, cards) {
         else if (title.includes(prefix) && splitHit) numberHit = 2;    // "op07 … #109"
       }
     }
+    // Set-prefixed codes ("LOB-EN001", "MRD-060", "SDY-006", "OP07-109"): the
+    // regional infix is written inconsistently across eras — LOB-001 ≡
+    // LOB-E001 ≡ LOB-EN001 are the same printing. Accept prefix + digits with
+    // ANY (or no) 1–2 letter infix, zero-insensitive. Because a full set code
+    // is globally unique, a ≥3-char prefix found adjacent to the digits in the
+    // title also stands as SET EVIDENCE (graded YGO titles often carry the
+    // code but not the set name). Runs regardless of which path matched the
+    // number, so the evidence applies even when the plain number check hit.
+    let codeEvidence = false;
+    {
+      const yg = /^([a-z]{2,5}\d{0,2})\s([a-z]{1,2})?(\d{2,4})$/.exec(norm(card.number ?? ''));
+      if (yg) {
+        const prefix = yg[1];                               // "lob"
+        const core = yg[3].replace(/^0+/, '') || yg[3];     // "001" → "1"
+        const re = new RegExp(`\\b${escRe(prefix)}[\\s-]?(?:[a-z]{1,2})?0*${core}\\b`);
+        if (re.test(title)) { if (!numberHit) numberHit = 2; codeEvidence = prefix.length >= 3; }
+      }
+    }
     if (!numberHit) continue;
 
     // 3. Set evidence — required whenever the card declares a set.
@@ -120,7 +138,7 @@ export function matchListing(itemName, cards) {
     if (evidence.res.length || evidence.collapsed) {
       setHits = evidence.res.filter(re => re.test(title)).length
         + (evidence.collapsed && title.replace(/\s/g, '').includes(evidence.collapsed) ? 1 : 0);
-      if (setHits === 0) continue;
+      if (setHits === 0 && !codeEvidence) continue;
     }
 
     const score = numberHit + setHits * 2 + name.length / 100;
