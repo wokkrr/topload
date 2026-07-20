@@ -53,13 +53,12 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
   const prev = idx > 0 ? nav[idx - 1] : null;
   const next = idx >= 0 && idx < nav.length - 1 ? nav[idx + 1] : null;
 
-  // Square boxes, glyph dead-center (Kaleb, 2026-07-20).
+  // Styled to match the header's theme toggle (Kaleb, 2026-07-20).
   const navBtn = (enabled) => ({
-    background: 'none', border: `1px solid ${enabled ? tokens.color.inkMuted : tokens.color.border}`,
-    color: enabled ? tokens.color.ink : tokens.color.inkMuted, cursor: enabled ? 'pointer' : 'default',
-    width: 28, height: 28, padding: 0, borderRadius: 0,
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    font: `15px ${tokens.font.mono}`, lineHeight: 1,
+    background: 'none', border: `1px solid ${tokens.color.border}`,
+    color: enabled ? tokens.color.inkSecondary : tokens.color.inkMuted,
+    cursor: enabled ? 'pointer' : 'default',
+    borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, lineHeight: 1,
   });
 
   return (
@@ -76,9 +75,9 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             </span>
           )}
           <button onClick={prev ? () => onOpenListing?.(prev) : undefined} title={prev ? prev.item_name : undefined}
-                  style={navBtn(!!prev)}>‹</button>
+                  style={navBtn(!!prev)}>←</button>
           <button onClick={next ? () => onOpenListing?.(next) : undefined} title={next ? next.item_name : undefined}
-                  style={navBtn(!!next)}>›</button>
+                  style={navBtn(!!next)}>→</button>
         </span>
       </div>
 
