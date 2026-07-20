@@ -238,8 +238,16 @@ const GRADER_FILTERS = [['', 'All'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['C
 
 // Sealed product (packs/boxes) is its own category, not "raw" — Kaleb wants a
 // dedicated section eventually; for now the chip separates it and Raw stays
-// honest. Title heuristic until adapters carry a product-type flag.
+// honest. Rules (v2 — a title heuristic alone swept 287 graded slabs into
+// Sealed, because promo cards are NAMED AFTER sealed products: "Mega Charizard
+// Tin", "Prismatic Evolutions ETB"):
+//   1. A graded slab is never sealed, full stop.
+//   2. MNSTR sells exactly two things — slabs and packs — so ungraded MNSTR
+//      IS a pack (catches keyword-less titles like "Ascended Heroes").
+//   3. Otherwise, sealed keywords on an ungraded item.
 export function isSealed(l) {
+  if ((l.grade ?? 'raw') !== 'raw') return false;
+  if (l.platform === 'mnstr') return true;
   return /\b(booster|packs?|box|etb|elite trainer|display|bundle|blister|tins?|case)\b/i.test(l.item_name ?? '');
 }
 
