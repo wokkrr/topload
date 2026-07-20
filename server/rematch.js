@@ -29,24 +29,32 @@ db.exec('BEGIN');
 // 1. Gacha listings: re-match every row, franchise-scoped.
 let listingsMatched = 0, listingsCleared = 0;
 const updListing = db.prepare(`UPDATE gacha_listings SET card_id = ? WHERE platform = ? AND external_id = ?`);
-for (const l of db.prepare(`SELECT platform, external_id, item_name, category, card_id FROM gacha_listings`).all()) {
+const listings = db.prepare(`SELECT platform, external_id, item_name, category, card_id FROM gacha_listings`).all();
+console.log(`[rematch] listings: ${listings.length} rows…`);
+let i = 0;
+for (const l of listings) {
   const ip = CATEGORY_TO_IP[l.category];
   const hit = ip ? matchListing(l.item_name, universeByIp[ip] ?? []) : null;
   updListing.run(hit, l.platform, l.external_id);
   if (hit) listingsMatched++;
   else if (l.card_id) listingsCleared++;
+  if (++i % 1000 === 0) console.log(`[rematch] listings ${i}/${listings.length} (${listingsMatched} matched)`);
 }
 
 // 2. NFT registry: re-match from stored item_name (overwrites old attributions,
 //    including clearing ones the strict matcher no longer stands behind).
 let regMatched = 0, regCleared = 0;
 const updReg = db.prepare(`UPDATE nft_registry SET card_id = ? WHERE mint = ?`);
-for (const r of db.prepare(`SELECT mint, item_name, category, card_id FROM nft_registry`).all()) {
+const regRows = db.prepare(`SELECT mint, item_name, category, card_id FROM nft_registry`).all();
+console.log(`[rematch] registry: ${regRows.length} rows…`);
+i = 0;
+for (const r of regRows) {
   const ip = CATEGORY_TO_IP[r.category];
   const hit = ip && r.item_name ? matchListing(r.item_name, universeByIp[ip] ?? []) : null;
   updReg.run(hit, r.mint);
   if (hit) regMatched++;
   else if (r.card_id) regCleared++;
+  if (++i % 2000 === 0) console.log(`[rematch] registry ${i}/${regRows.length} (${regMatched} matched)`);
 }
 
 // 3. On-chain sales: attributions were made under the previous matcher — purge

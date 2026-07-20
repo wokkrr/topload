@@ -1,6 +1,6 @@
 /**
- * Catalog integrity gate — the "rock solid" check for the Topload Card
- * Database. Run after seeding/refreshing all three franchises:
+ * Catalog integrity check for the Topload Card Database — a pass/fail health
+ * report. Run after seeding/refreshing all three franchises:
  *
  *   npm run catalog:verify
  *
@@ -25,7 +25,7 @@ const CANON = {
 // Sanity floors — a fetch/seed that silently truncated should trip these.
 const MIN_CANONICAL = { PKMN: 15000, OP: 4000, YGO: 25000 };
 
-console.log('\n=== Topload Card Database — integrity gate ===\n');
+console.log('\n=== Topload Card Database — integrity check ===\n');
 
 for (const [ip, canonSql] of Object.entries(CANON)) {
   console.log(`${ip}:`);
@@ -74,6 +74,6 @@ for (const [ip, title, expected] of SMOKE) {
 }
 
 console.log(failures === 0
-  ? '\n=== ALL CHECKS PASSED — the spine is solid ===\n'
+  ? '\n=== ALL CHECKS PASSED — catalog verified ===\n'
   : `\n=== ${failures} FAILURE(S) — fix before building on top ===\n`);
 process.exit(failures === 0 ? 0 : 1);

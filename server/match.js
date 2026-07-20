@@ -56,6 +56,48 @@ function setEvidence(setName) {
 }
 
 /**
+ * Per-card compiled matching data, cached for the card object's lifetime.
+ * A rematch/ingest runs the SAME universe rows against thousands of titles;
+ * before this cache, every (listing × card) pair re-normalized strings and
+ * constructed up to four RegExps — at 20k+ canonical cards per franchise that
+ * ballooned into billions of regex compilations and pinned the droplet's CPU
+ * long enough to drop SSH sessions (live incident, 2026-07-20). WeakMap keyed
+ * on the row object: reused across calls, GC'd with the universe.
+ */
+const COMPILED = new WeakMap();
+function compileCard(card) {
+  let c = COMPILED.get(card);
+  if (c) return c;
+  const name = norm(stripParen(card.name ?? ''));
+  const nameRe = name && name.length < 5 ? new RegExp(`(^|\\s)${escRe(name)}(\\s|$)`) : null;
+  const rawNum = norm(card.number ?? '');
+  const numFull = stripZeros(rawNum);
+  const numShort = stripZeros(numFull.split('/')[0] ?? '');
+  const numShortRe = numShort ? new RegExp(`\\b${escRe(numShort)}\\b`) : null;
+  // One Piece-style split/concatenated forms ("Op07 … #109", "#OP02120").
+  const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(rawNum);
+  const opc = op ? {
+    prefix: op[1],                                   // "op07"
+    suffixRaw: op[2],                                // "015" (padded)
+    suffixNoZero: stripZeros(op[2]),                 // "15"
+    suffixRe: new RegExp(`\\b${escRe(stripZeros(op[2]))}\\b`),
+  } : null;
+  // Regional-infix set codes (LOB-001 ≡ LOB-E001 ≡ LOB-EN001).
+  const yg = /^([a-z]{2,5}\d{0,2})\s([a-z]{1,2})?(\d{2,4})$/.exec(rawNum);
+  let ygc = null;
+  if (yg) {
+    const core = yg[3].replace(/^0+/, '') || yg[3];  // "001" → "1"
+    ygc = {
+      re: new RegExp(`\\b${escRe(yg[1])}[\\s-]?(?:[a-z]{1,2})?0*${core}\\b`),
+      codeEvidence: yg[1].length >= 3,
+    };
+  }
+  c = { name, nameRe, numFull, numShort, numShortRe, op: opc, yg: ygc };
+  COMPILED.set(card, c);
+  return c;
+}
+
+/**
  * @param {string} itemName listing title
  * @param {{id:string, name:string, number:string|null, set_name:string|null}[]} cards tracked universe
  * @returns {string|null} card_id or null
@@ -64,18 +106,20 @@ export function matchListing(itemName, cards) {
   const title = norm(itemName);
   if (!title) return null;
   const titleZ = stripZeros(title);
+  const titleSquashed = title.replace(/\s/g, '');
   const gradeMatch = GRADE_RE.exec(title);
   const gradePos = gradeMatch ? gradeMatch.index : Infinity;
 
   let best = null, bestScore = 0;
   for (const card of cards) {
-    const name = norm(stripParen(card.name ?? ''));
+    const cc = compileCard(card);
+    const name = cc.name;
     if (!name) continue;
 
     // 1. Name present — whole-word for short names — and BEFORE the grade.
     let nameIdx = -1;
-    if (name.length < 5) {
-      const m = new RegExp(`(^|\\s)${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).exec(title);
+    if (cc.nameRe) {
+      const m = cc.nameRe.exec(title);
       nameIdx = m ? m.index + (m[1] ? 1 : 0) : -1;
     } else {
       nameIdx = title.indexOf(name);
@@ -83,52 +127,32 @@ export function matchListing(itemName, cards) {
     if (nameIdx < 0 || nameIdx >= gradePos) continue;
 
     // 2. Collector number, zero-insensitive.
-    const numFull = stripZeros(norm(card.number ?? ''));
-    const numShort = stripZeros(numFull.split('/')[0] ?? '');
     let numberHit =
-      (numFull && titleZ.includes(numFull)) ? 2 :
-      (numShort && (titleZ.includes(`#${numShort}`) || new RegExp(`\\b${numShort}\\b`).test(titleZ))) ? 1 : 0;
+      (cc.numFull && titleZ.includes(cc.numFull)) ? 2 :
+      (cc.numShort && (titleZ.includes(`#${cc.numShort}`) || cc.numShortRe.test(titleZ))) ? 1 : 0;
 
-    // One Piece / set-prefixed numbers ("OP07-109", "ST01-012", "EB01-061"):
-    // marketplaces write these split ("Op07-500 Years… #109") or concatenated
-    // ("#OP02120"), so the contiguous "op07-109" never appears. Accept when the
-    // set prefix AND the card-number suffix both hit. Set evidence (rule 3)
-    // still guards against cross-set collisions.
-    if (!numberHit) {
-      // Set-prefixed numbers ("OP07-109", "OP07-015", "EB02-098"). Parse from
-      // the UN-zero-stripped form (norm turns the hyphen into a space) so the
-      // padded suffix survives — MNSTR writes both "#OP07015" (concatenated,
-      // padded) and "Op07 … #109" (split). op[2] is the raw suffix.
-      const rawNum = norm(card.number ?? '');
-      const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(rawNum);
-      if (op) {
-        const prefix = op[1];                              // "op07"
-        const suffixRaw = op[2];                            // "015" (padded)
-        const suffixNoZero = stripZeros(suffixRaw);         // "15"
-        const splitHit = title.includes(`#${suffixRaw}`)
-          || titleZ.includes(`#${suffixNoZero}`)
-          || new RegExp(`\\b${suffixNoZero}\\b`).test(titleZ);
-        if (title.includes(prefix + suffixRaw)) numberHit = 2;         // "#op07015"
-        else if (title.includes(prefix) && splitHit) numberHit = 2;    // "op07 … #109"
-      }
+    // One Piece / set-prefixed numbers ("OP07-109"): marketplaces write these
+    // split ("Op07-500 Years… #109") or concatenated ("#OP02120"), so the
+    // contiguous "op07-109" never appears. Accept when the set prefix AND the
+    // card-number suffix both hit. Set evidence (rule 3) still guards
+    // against cross-set collisions.
+    if (!numberHit && cc.op) {
+      const { prefix, suffixRaw, suffixNoZero, suffixRe } = cc.op;
+      const splitHit = title.includes(`#${suffixRaw}`)
+        || titleZ.includes(`#${suffixNoZero}`)
+        || suffixRe.test(titleZ);
+      if (title.includes(prefix + suffixRaw)) numberHit = 2;         // "#op07015"
+      else if (title.includes(prefix) && splitHit) numberHit = 2;    // "op07 … #109"
     }
-    // Set-prefixed codes ("LOB-EN001", "MRD-060", "SDY-006", "OP07-109"): the
-    // regional infix is written inconsistently across eras — LOB-001 ≡
-    // LOB-E001 ≡ LOB-EN001 are the same printing. Accept prefix + digits with
-    // ANY (or no) 1–2 letter infix, zero-insensitive. Because a full set code
-    // is globally unique, a ≥3-char prefix found adjacent to the digits in the
-    // title also stands as SET EVIDENCE (graded YGO titles often carry the
-    // code but not the set name). Runs regardless of which path matched the
-    // number, so the evidence applies even when the plain number check hit.
+    // Regional-infix set codes (LOB-001 ≡ LOB-E001 ≡ LOB-EN001): accept prefix
+    // + digits with ANY (or no) 1–2 letter infix, zero-insensitive. A globally
+    // unique ≥3-char code found in the title also stands as SET EVIDENCE
+    // (graded YGO titles often carry the code but not the set name). Runs
+    // regardless of which path matched the number.
     let codeEvidence = false;
-    {
-      const yg = /^([a-z]{2,5}\d{0,2})\s([a-z]{1,2})?(\d{2,4})$/.exec(norm(card.number ?? ''));
-      if (yg) {
-        const prefix = yg[1];                               // "lob"
-        const core = yg[3].replace(/^0+/, '') || yg[3];     // "001" → "1"
-        const re = new RegExp(`\\b${escRe(prefix)}[\\s-]?(?:[a-z]{1,2})?0*${core}\\b`);
-        if (re.test(title)) { if (!numberHit) numberHit = 2; codeEvidence = prefix.length >= 3; }
-      }
+    if (cc.yg && cc.yg.re.test(title)) {
+      if (!numberHit) numberHit = 2;
+      codeEvidence = cc.yg.codeEvidence;
     }
     if (!numberHit) continue;
 
@@ -137,7 +161,7 @@ export function matchListing(itemName, cards) {
     let setHits = 0;
     if (evidence.res.length || evidence.collapsed) {
       setHits = evidence.res.filter(re => re.test(title)).length
-        + (evidence.collapsed && title.replace(/\s/g, '').includes(evidence.collapsed) ? 1 : 0);
+        + (evidence.collapsed && titleSquashed.includes(evidence.collapsed) ? 1 : 0);
       if (setHits === 0 && !codeEvidence) continue;
     }
 
