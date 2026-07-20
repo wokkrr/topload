@@ -83,10 +83,14 @@ function compileCard(card) {
   // PriceCharting-derived remnant ids ("pkmn-pc7309838") yield to canonical
   // catalog cards on equal evidence — same physical card, one spine.
   const remnant = /^[a-z]+-pc\d+$/.test(card.id ?? '');
-  // One Piece-style split/concatenated forms ("Op07 … #109", "#OP02120").
-  const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(rawNum);
+  // One Piece-style split/concatenated forms ("Op07 … #109", "#OP02120"), and
+  // no-separator promo codes ("SWSH285", "SVP077", "TG01") which titles write
+  // as set words + a bare number ("Swsh Black Star Promo … #285").
+  const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(rawNum)
+    ?? /^([a-z]{2,5})(\d{2,4})$/.exec(rawNum);
   const opc = op ? {
-    prefix: op[1],                                   // "op07"
+    prefix: op[1],                                   // "op07" / "swsh"
+    prefixRe: new RegExp(`\\b${escRe(op[1])}`),      // word-start guard for the split form
     suffixRaw: op[2],                                // "015" (padded)
     suffixNoZero: stripZeros(op[2]),                 // "15"
     suffixRe: new RegExp(`\\b${escRe(stripZeros(op[2]))}\\b`),
@@ -146,12 +150,12 @@ export function matchListing(itemName, cards) {
     // card-number suffix both hit. Set evidence (rule 3) still guards
     // against cross-set collisions.
     if (!numberHit && cc.op) {
-      const { prefix, suffixRaw, suffixNoZero, suffixRe } = cc.op;
+      const { prefix, prefixRe, suffixRaw, suffixNoZero, suffixRe } = cc.op;
       const splitHit = title.includes(`#${suffixRaw}`)
         || titleZ.includes(`#${suffixNoZero}`)
         || suffixRe.test(titleZ);
-      if (title.includes(prefix + suffixRaw)) numberHit = 2;         // "#op07015"
-      else if (title.includes(prefix) && splitHit) numberHit = 2;    // "op07 … #109"
+      if (title.includes(prefix + suffixRaw)) numberHit = 2;         // "#op07015" / "swsh285"
+      else if (prefixRe.test(title) && splitHit) numberHit = 2;      // "op07 … #109" / "swsh … #285"
     }
     // Regional-infix set codes (LOB-001 ≡ LOB-E001 ≡ LOB-EN001): accept prefix
     // + digits with ANY (or no) 1–2 letter infix, zero-insensitive. A globally
@@ -183,6 +187,22 @@ export function matchListing(itemName, cards) {
 /** 'Umbreon VMAX (Alt Art)' → 'Umbreon VMAX' — parentheticals rarely appear in titles. */
 function stripParen(name) {
   return name.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Marketplace category string → franchise code, accent/punctuation-insensitive.
+ * 'Pokémon' ≡ 'Pokemon'; 'Yu-Gi-Oh!' ≡ 'YuGiOh'; 'one_piece_english' ≡ 'One
+ * Piece'. Seven hand-rolled maps drifted apart across indexers — rematch.js
+ * lacked the accented spellings Courtyard emits, so its franchise-scoping
+ * skipped (and thus NULLED) every Courtyard row on every run: the live 2%
+ * Courtyard match-rate bug (2026-07-20). One shared mapper, no dialects.
+ */
+export function categoryToIp(category) {
+  const k = (category ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z]/g, '');
+  if (k.startsWith('pokemon')) return 'PKMN';
+  if (k.startsWith('onepiece')) return 'OP';
+  if (k.startsWith('yugioh')) return 'YGO';
+  return null;
 }
 
 /** Match a batch of listings; returns Map external_id → card_id. */

@@ -13,9 +13,7 @@
  *   the safe path — it never destroys on-chain sales or forces a full backfill.
  */
 import { openDb } from './db.js';
-import { matchListing } from './match.js';
-
-const CATEGORY_TO_IP = { 'Pokemon': 'PKMN', 'One Piece': 'OP', 'YuGiOh': 'YGO', 'Yu-Gi-Oh': 'YGO' };
+import { matchListing, categoryToIp } from './match.js';
 
 const listingsOnly = process.argv.includes('--listings-only');
 const db = openDb();
@@ -33,7 +31,7 @@ const listings = db.prepare(`SELECT platform, external_id, item_name, category, 
 console.log(`[rematch] listings: ${listings.length} rows…`);
 let i = 0;
 for (const l of listings) {
-  const ip = CATEGORY_TO_IP[l.category];
+  const ip = categoryToIp(l.category);
   const hit = ip ? matchListing(l.item_name, universeByIp[ip] ?? []) : null;
   updListing.run(hit, l.platform, l.external_id);
   if (hit) listingsMatched++;
@@ -49,7 +47,7 @@ const regRows = db.prepare(`SELECT mint, item_name, category, card_id FROM nft_r
 console.log(`[rematch] registry: ${regRows.length} rows…`);
 i = 0;
 for (const r of regRows) {
-  const ip = CATEGORY_TO_IP[r.category];
+  const ip = categoryToIp(r.category);
   const hit = ip && r.item_name ? matchListing(r.item_name, universeByIp[ip] ?? []) : null;
   updReg.run(hit, r.mint);
   if (hit) regMatched++;

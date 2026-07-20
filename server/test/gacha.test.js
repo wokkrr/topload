@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeCollectorCryptAdapter, normalizeGrade, gradeFromTitle } from '../adapters/collectorcrypt.js';
-import { matchListing } from '../match.js';
+import { matchListing, categoryToIp } from '../match.js';
 
 const jsonRes = (body) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
 
@@ -223,5 +223,30 @@ describe('canonical beats remnant; bare numerics are not substrings (live, 2026-
   it('a bare numeric still matches via # or word boundary (level-1 path intact)', () => {
     expect(matchListing('1999 Pokemon Base Set Charizard Holo #4 PSA 9', [universe[0]]))
       .toBe('pkmn-pc7309838');
+  });
+});
+
+describe('no-separator promo codes + category dialects (Courtyard 2% bug, 2026-07-20)', () => {
+  const promo = [{ id: 'pkmn-swshp-SWSH285', name: 'Pikachu V', number: 'SWSH285', set_name: 'SWSH Black Star Promos' }];
+  it('SWSH285 matches "Swsh Black Star Promo … #285" (split form)', () => {
+    expect(matchListing('2023 Pokémon Swsh Black Star Promo #285 Pikachu V - Holo (PSA 9 MINT)', promo))
+      .toBe('pkmn-swshp-SWSH285');
+  });
+  it('SWSH285 matches the concatenated form too', () => {
+    expect(matchListing('Pokemon Black Star Promo Pikachu V SWSH285 PSA 10', promo))
+      .toBe('pkmn-swshp-SWSH285');
+  });
+  it('does not match a different promo number', () => {
+    expect(matchListing('2023 Pokémon Swsh Black Star Promo #144 Pikachu V PSA 9', promo)).toBeNull();
+  });
+  it('categoryToIp is accent/punctuation-insensitive across marketplace dialects', () => {
+    expect(categoryToIp('Pokémon')).toBe('PKMN');
+    expect(categoryToIp('Pokemon')).toBe('PKMN');
+    expect(categoryToIp('Yu-Gi-Oh!')).toBe('YGO');
+    expect(categoryToIp('YuGiOh')).toBe('YGO');
+    expect(categoryToIp('one_piece_english')).toBe('OP');
+    expect(categoryToIp('One Piece')).toBe('OP');
+    expect(categoryToIp('Magic: The Gathering')).toBeNull();
+    expect(categoryToIp(null)).toBeNull();
   });
 });
