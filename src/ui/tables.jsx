@@ -35,7 +35,7 @@ export const Thumb = ({ src, size = 34, badge = null }) => {
     <span style={{ position: 'relative', display: 'inline-block', marginRight: 10, flexShrink: 0, lineHeight: 0 }}
           title={badge ? 'Reference image — not a photo of the actual item' : undefined}>
       <img src={src} alt="" loading="lazy" style={{
-        height: size, width: w, objectFit: 'cover', borderRadius: 3,
+        height: size, width: w, objectFit: 'contain', borderRadius: 3,
         background: tokens.color.surfaceRaised, border: `1px solid ${tokens.color.border}`,
       }} />
       {badge && (
@@ -127,32 +127,45 @@ export function CardsTable({ cards, onSelect }) {
   );
 }
 
-export function PlatformStrip({ platforms }) {
+/**
+ * Marketplace chips. When `hidden`/`onToggle` are provided the chips are
+ * filters: every marketplace is shown by default, click one to exclude it.
+ * No chain/crypto jargon on the surface — users are buying cards, not tokens.
+ */
+export function PlatformStrip({ platforms, hidden, onToggle }) {
   if (!platforms?.length) return null;
+  const interactive = typeof onToggle === 'function';
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-      {platforms.map(p => (
-        <span key={p.id} title={`${p.chain} — ${p.access}`} style={{
-          font: `10px ${tokens.font.mono}`, padding: '3px 9px', borderRadius: 3,
-          border: `1px solid ${p.status === 'live' ? tokens.color.brass : tokens.color.border}`,
-          color: p.status === 'live' ? tokens.color.ink : tokens.color.inkMuted,
-          background: p.status === 'live' ? tokens.color.surfaceRaised : 'none',
-        }}>
-          {p.name.toUpperCase()} <span style={{ opacity: 0.7 }}>· {p.chain.split(' ')[0]}</span>
-          {p.status === 'live' ? ' ● LIVE' : p.status === 'next' ? ' · NEXT' : ' · RECON'}
-        </span>
-      ))}
+      {platforms.map(p => {
+        const off = hidden?.has(p.id);
+        return (
+          <button key={p.id}
+                  onClick={interactive ? () => onToggle(p.id) : undefined}
+                  title={interactive ? (off ? `Show ${p.name} listings & sales` : `Hide ${p.name} listings & sales`) : undefined}
+                  style={{
+                    font: `10px ${tokens.font.mono}`, padding: '3px 9px', borderRadius: 3,
+                    border: off ? `1px dashed ${tokens.color.border}` : `1px solid ${p.status === 'live' ? tokens.color.brass : tokens.color.border}`,
+                    color: off ? tokens.color.inkMuted : p.status === 'live' ? tokens.color.ink : tokens.color.inkMuted,
+                    background: !off && p.status === 'live' ? tokens.color.surfaceRaised : 'none',
+                    opacity: off ? 0.55 : 1, cursor: interactive ? 'pointer' : 'default',
+                  }}>
+            {p.name.toUpperCase()}
+            {off ? ' · HIDDEN' : p.status === 'live' ? ' ● LIVE' : ' · SOON'}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-/** Live on-chain sales tape — what actually traded, first-hand from the chain. */
+/** Live sales tape — what actually traded, recorded first-hand (chain-verified under the hood). */
 export function SalesTape({ sales, onSelect }) {
   if (!sales?.length) return null;
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-        On-chain sales · first-hand from Solana
+        Live sales · recorded first-hand from the marketplaces
       </div>
       <div style={{ display: 'flex', gap: 20, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 4, scrollbarWidth: 'thin' }}>
         {sales.filter(s => !s.is_outlier).slice(0, 15).map((s, i) => (
@@ -177,43 +190,63 @@ function timeAgo(iso) {
   return `${Math.round(mins / 1440)}d ago`;
 }
 
+const VIEW_KEY = 'topload-gacha-view';
+const HIDDEN_KEY = 'topload-hidden-platforms';
+const loadHidden = () => {
+  try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '[]')); }
+  catch { return new Set(); }
+};
+
 export function GachaDesk({ listings, platforms, sales, onSelect }) {
-  const [view, setView] = useState('table');
+  // Thumbnails are the default — the cards ARE the product; List is the opt-in.
+  const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) ?? 'grid');
+  const [hidden, setHidden] = useState(loadHidden);
+  const pickView = (v) => { setView(v); localStorage.setItem(VIEW_KEY, v); };
+  const togglePlatform = (id) => {
+    setHidden(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
   if (!listings) return <Empty label="gacha" />;
+  const shownSales = sales?.filter(s => !hidden.has(s.source));
   if (!listings.length) {
     return (
       <div>
-        <PlatformStrip platforms={platforms} />
-        <SalesTape sales={sales} onSelect={onSelect} />
+        <PlatformStrip platforms={platforms} hidden={hidden} onToggle={togglePlatform} />
+        <SalesTape sales={shownSales} onSelect={onSelect} />
         <div style={{ padding: '32px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>
-          <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>No gacha listings yet</div>
-          Run `npm run ingest` — live mode pulls current Collector Crypt listings (Pokémon + One Piece slabs).
+          <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>No listings yet</div>
+          Listings refresh automatically with the next scheduled data pull.
         </div>
       </div>
     );
   }
-  const matched = listings.filter(l => l.delta_pct != null);
+  const shown = listings.filter(l => !hidden.has(l.platform));
+  const matched = shown.filter(l => l.delta_pct != null);
   return (
     <div>
-      <PlatformStrip platforms={platforms} />
-      <SalesTape sales={sales} onSelect={onSelect} />
+      <PlatformStrip platforms={platforms} hidden={hidden} onToggle={togglePlatform} />
+      <SalesTape sales={shownSales} onSelect={onSelect} />
       <div style={{ display: 'flex', alignItems: 'center', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
         <span>
-          {listings.length} live listings · {matched.length} with grade-matched oracle comps ·
+          {shown.length} live listings · {matched.length} with grade-matched oracle comps ·
           asking prices, never oracle input
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          {['table', 'grid'].map(v => (
-            <button key={v} onClick={() => setView(v)} style={{
+          {['grid', 'table'].map(v => (
+            <button key={v} onClick={() => pickView(v)} style={{
               background: view === v ? tokens.color.surfaceRaised : 'none',
               border: `1px solid ${view === v ? tokens.color.inkMuted : tokens.color.border}`,
               color: view === v ? tokens.color.ink : tokens.color.inkSecondary,
               borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
-            }}>{v === 'table' ? 'Table' : 'Thumbnails'}</button>
+            }}>{v === 'grid' ? 'Thumbnails' : 'List'}</button>
           ))}
         </span>
       </div>
-      {view === 'grid' && <GachaGrid listings={listings} onSelect={onSelect} />}
+      {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect} />}
       {view === 'table' && <div>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
         <thead><tr>
@@ -221,7 +254,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
           <th style={th}>Oracle comp</th><th style={th}>Δ vs comp</th><th style={th}>Comp conf</th>
         </tr></thead>
         <tbody>
-          {listings.map(l => (
+          {shown.map(l => (
             <tr key={`${l.platform}|${l.external_id}`}
                 onClick={l.card_id ? () => onSelect?.(l.card_id) : undefined}
                 style={{ cursor: l.card_id ? 'pointer' : 'default' }}>
@@ -262,7 +295,7 @@ function GachaGrid({ listings, onSelect }) {
              }}>
           <div style={{ position: 'relative', aspectRatio: '3/4', background: tokens.color.surfaceRaised }}>
             {l.image
-              ? <img src={l.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              ? <img src={l.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
               : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `10px ${tokens.font.body}` }}>no photo</div>}
             {l.image && l.image_kind === 'art' && (
               <span style={{

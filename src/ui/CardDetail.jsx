@@ -4,6 +4,14 @@ import { api, fmtUsd, fmtPct } from '../data/client.js';
 
 const W = 860, H = 280, PAD = { t: 16, r: 24, b: 28, l: 56 };
 
+/** Marketplace display names — no chain/crypto jargon on user surfaces. */
+const SOURCE_LABELS = {
+  collectorcrypt: 'Collector Crypt',
+  beezie: 'Beezie',
+  phygitals: 'Phygitals',
+  courtyard: 'Courtyard',
+};
+
 /**
  * Card research view: per-grade oracle chart with provenance-aware rendering
  * (solid = solds-based marks, dashed + open markers = external bootstrap),
@@ -145,8 +153,8 @@ export function CardDetail({ cardId, onBack }) {
         <Panel title="Recent sales">
           {!sales?.length ? (
             <div style={placeholderStyle}>
-              No recorded sales for this card yet — on-chain sales land here
-              first-hand as the Solana indexer walks Collector Crypt's history.
+              No recorded sales for this card yet — sales land here first-hand
+              as our indexers walk the marketplaces' history.
             </div>
           ) : (
             <div>
@@ -160,7 +168,7 @@ export function CardDetail({ cardId, onBack }) {
                 </div>
               ))}
               <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 6 }}>
-                first-hand solds · {sales[0]?.source === 'collectorcrypt' ? 'Collector Crypt (Solana)' : sales[0]?.source}
+                first-hand solds · {[...new Set(sales.map(s => SOURCE_LABELS[s.source] ?? s.source))].join(', ')}
               </div>
             </div>
           )}
