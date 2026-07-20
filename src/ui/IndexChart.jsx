@@ -12,17 +12,23 @@ export function IndexChart({ data }) {
   const [showTable, setShowTable] = useState(false);
   const svgRef = useRef(null);
 
+  // Defensive: the API can return an index with a missing or empty series
+  // (no points in the window). One malformed entry must degrade, never blank
+  // the page (live crash, 2026-07-20). Uneven series lengths are also real —
+  // hover indexes are guarded below.
+  const rows = useMemo(() => (data ?? []).filter(d => Array.isArray(d?.series) && d.series.length > 0), [data]);
   const model = useMemo(() => {
-    if (!data?.length) return null;
-    const dates = data[0].series.map(p => p.as_of);
-    const all = data.flatMap(d => d.series.map(p => p.value));
+    if (!rows.length) return null;
+    const longest = rows.reduce((a, b) => (b.series.length > a.series.length ? b : a));
+    const dates = longest.series.map(p => p.as_of);
+    const all = rows.flatMap(d => d.series.map(p => p.value));
     const lo = Math.min(...all), hi = Math.max(...all);
     const pad = (hi - lo) * 0.08 || 1;
     const y = (v) => PAD.t + (H - PAD.t - PAD.b) * (1 - (v - (lo - pad)) / ((hi + pad) - (lo - pad)));
     const x = (i) => PAD.l + (W - PAD.l - PAD.r) * (dates.length < 2 ? 0 : i / (dates.length - 1));
     const gridVals = [lo, (lo + hi) / 2, hi].map(v => +v.toFixed(1));
     return { dates, x, y, gridVals };
-  }, [data]);
+  }, [rows]);
 
   if (!model) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>No index data — run `npm run ingest`.</div>;
   const { dates, x, y, gridVals } = model;
@@ -38,7 +44,7 @@ export function IndexChart({ data }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-        {data.map(d => {
+        {rows.map(d => {
           const s = tokens.series[d.index_id] ?? { label: d.index_id, data: tokens.color.ink };
           return (
             <span key={d.index_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: `12px ${tokens.font.body}`, color: tokens.color.inkSecondary }}>
@@ -50,7 +56,7 @@ export function IndexChart({ data }) {
         <button onClick={() => setShowTable(t => !t)} style={btnStyle}>{showTable ? 'Chart' : 'Table'}</button>
       </div>
 
-      {showTable ? <IndexTable data={data} dates={dates} /> : (
+      {showTable ? <IndexTable data={rows} dates={dates} /> : (
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}
              onMouseMove={onMove} onMouseLeave={() => setHover(null)} role="img" aria-label="Index performance, base 100">
           {gridVals.map(v => (
@@ -67,7 +73,7 @@ export function IndexChart({ data }) {
                   style={{ font: `10px ${tokens.font.mono}` }}>{d.slice(5)}</text>
           ))}
 
-          {data.map(d => {
+          {rows.map(d => {
             const s = tokens.series[d.index_id] ?? { data: tokens.color.ink };
             const path = d.series.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join('');
             const last = d.series[d.series.length - 1];
@@ -84,11 +90,11 @@ export function IndexChart({ data }) {
           {hover && (
             <g pointerEvents="none">
               <line x1={hover.x} x2={hover.x} y1={PAD.t} y2={H - PAD.b} stroke={tokens.color.inkSecondary} strokeWidth="1" strokeDasharray="3 3" />
-              {data.map(d => (
+              {rows.filter(d => d.series[hover.i] != null).map(d => (
                 <circle key={d.index_id} cx={hover.x} cy={y(d.series[hover.i].value)} r="4"
                         fill={(tokens.series[d.index_id] ?? {}).data} stroke={tokens.color.bg} strokeWidth="2" />
               ))}
-              <Tooltip x={hover.x} date={dates[hover.i]} rows={data.map(d => ({
+              <Tooltip x={hover.x} date={dates[hover.i]} rows={rows.filter(d => d.series[hover.i] != null).map(d => ({
                 label: tokens.series[d.index_id]?.label ?? d.index_id,
                 color: (tokens.series[d.index_id] ?? {}).data,
                 value: d.series[hover.i].value.toFixed(2),
