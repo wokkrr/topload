@@ -150,9 +150,14 @@ async function runLive(db, today) {
     }
   }
 
-  // 2b. PriceCharting per-card API — only used when no CSV URLs are configured
-  //     (the CSV route supersedes card-by-card resolution).
-  if (process.env.PRICECHARTING_API_KEY && csvSources.length === 0) {
+  // 2b. PriceCharting per-card API — ONLY for setups with no CSV subscription
+  //     at all. Gate on whether CSV URLs are CONFIGURED, not on this run's
+  //     csvSources (freshSkip empties that list, which wrongly re-enabled this
+  //     path on --if-stale runs — live 2026-07-20: it started crawling 9,916
+  //     canonical cards via loose search-based resolution, an accuracy risk
+  //     AND an hours-long delay ahead of the oracle refresh).
+  const csvConfigured = Boolean(process.env.PC_CSV_URL_PKMN || process.env.PC_CSV_URL_YGO || process.env.PC_CSV_URL_OP);
+  if (process.env.PRICECHARTING_API_KEY && !csvConfigured) {
     const pc = makePriceChartingAdapter();
     const resolveLimit = Number(process.env.PC_RESOLVE_LIMIT ?? 150);
     const unresolvedAll = db.prepare(
