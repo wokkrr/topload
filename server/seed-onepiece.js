@@ -65,7 +65,8 @@ export function seedOnePiece(db, rows, { migrate = true } = {}) {
 
   // Canonical = has a punkrecords external_id. Old = any other OP card
   // (op-pc* from PriceCharting + the legacy manual ones).
-  const isCanonical = `json_extract(external_ids, '$.punkrecords') IS NOT NULL`;
+  const isCanonical = `(json_extract(external_ids, '$.punkrecords') IS NOT NULL
+                        OR json_extract(external_ids, '$.punkrecords_ja') IS NOT NULL)`;
   const canonicalByNumber = new Map();
   for (const c of db.prepare(`SELECT id, number FROM cards WHERE ip='OP' AND ${isCanonical} AND number IS NOT NULL`).all())
     canonicalByNumber.set(c.number.toUpperCase(), c.id);
@@ -121,7 +122,7 @@ async function loadJapaneseRows(useSnapshot) {
     writeFileSync(JA_SNAPSHOT, JSON.stringify(jp));
   }
   const en = JSON.parse(readFileSync(SNAPSHOT, 'utf8'));
-  return buildJapaneseRows(jp.cards, jp.packs, en.cards);
+  return buildJapaneseRows(jp.cards, jp.packs, en.cards, en.packs);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

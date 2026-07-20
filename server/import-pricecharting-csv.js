@@ -74,7 +74,7 @@ export function splitProductName(productName) {
 export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 200 }) {
   const rows = parseCsv(text);
   const existing = db.prepare(
-    `SELECT id, name, number, set_name FROM cards
+    `SELECT id, name, number, set_name, language FROM cards
      WHERE ip = ? AND json_extract(external_ids, '$.pricecharting') IS NULL`
   ).all(ip);
   const insCard = db.prepare(

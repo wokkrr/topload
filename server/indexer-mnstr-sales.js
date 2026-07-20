@@ -80,7 +80,7 @@ export async function runMnstrSalesIndexer(db, { dry = false, fetchImpl = timedF
 
   // Universe for title-matching (OP + PKMN — MNSTR's two categories).
   const universeByIp = {};
-  for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards WHERE ip IN ('PKMN','OP')`).all())
+  for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards WHERE ip IN ('PKMN','OP')`).all())
     (universeByIp[c.ip] ??= []).push(c);
 
   const rpc = async (method, params) => {

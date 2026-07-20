@@ -196,7 +196,7 @@ async function runLive(db, today) {
     // Franchise-scoped matching: a One Piece listing may only match OP cards.
     const CATEGORY_TO_IP = { 'Pokemon': 'PKMN', 'One Piece': 'OP', 'YuGiOh': 'YGO', 'Yu-Gi-Oh': 'YGO' };
     const universeByIp = {};
-    for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) {
       (universeByIp[c.ip] ??= []).push(c);
     }
     const matches = new Map();
@@ -229,7 +229,7 @@ async function runLive(db, today) {
     const yard = makeCourtyardListingsAdapter();
     const listings = await yard.fetchListings({ seenAt: today, maxPages: Number(process.env.YARD_LISTINGS_MAX_PAGES ?? 20) });
     const universeByIp = {};
-    for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) {
       (universeByIp[c.ip] ??= []).push(c);
     }
     // Each listing already carries its franchise (ip); match within that universe.
@@ -279,7 +279,7 @@ async function runLive(db, today) {
     const mnstr = makeMnstrListingsAdapter();
     const listings = await mnstr.fetchListings({ seenAt: today });
     const universeByIp = {};
-    for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) {
       (universeByIp[c.ip] ??= []).push(c);
     }
     const matches = new Map();

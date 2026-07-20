@@ -57,37 +57,58 @@ describe('seedOnePiece migration (FK-safe)', () => {
 import { buildJapaneseRows, JP_ONLY_NAMES } from '../adapters/punk-records.js';
 import { matchListing } from '../match.js';
 
-describe('Japanese pass: buildJapaneseRows (recon 2026-07-20)', () => {
-  const jpPacks = { '9': { title_parts: { label: 'P', title: 'Promotion Cards' } } };
-  const enCards = {
-    'EB01-006': { card_id: 'EB01-006', name: 'Nami', pack_id: 'x' },
-  };
-  it('emits JP-exclusive parallels with the inherited English name and base-code number', () => {
-    const jp = { 'EB01-006_p4': { card_id: 'EB01-006_p4', name: 'ナミ', pack_id: '9', img_url: 'https://x/p4.png' } };
-    const [r] = buildJapaneseRows(jp, jpPacks, enCards);
-    expect(r.id).toBe('op-eb01-006_p4');
-    expect(r.name).toBe('Nami');                 // inherited, never kanji
-    expect(r.number).toBe('EB01-006');           // base code = matchable
-    expect(r.variant).toBe('JP parallel p4');
-    expect(r.language).toBe('Japanese');
-  });
-  it('emits the 22 JP-only promos with romanized names; skips shared codes and unknowns', () => {
+describe('Japanese pass: language-variant rows (Kaleb, 2026-07-20)', () => {
+  const jpPacks = { '9': { title_parts: { label: 'EB-01', title: 'メモリアルコレクション' } } };
+  const enPacks = { '8': { title_parts: { label: 'EB-01', title: 'MEMORIAL COLLECTION' } } };
+  const enCards = { 'EB01-006': { card_id: 'EB01-006', name: 'Nami', pack_id: '8' } };
+
+  it('every JP printing gets a -ja sibling row: shared code, parallel, promo', () => {
     const jp = {
+      'EB01-006': { card_id: 'EB01-006', name: 'ナミ', pack_id: '9', img_url: 'https://x/a.png' },
+      'EB01-006_p4': { card_id: 'EB01-006_p4', name: 'ナミ', pack_id: '9', img_url: 'https://x/p4.png' },
       'P-080': { card_id: 'P-080', name: 'モンキー・D・ルフィ', pack_id: '9' },
-      'EB01-006': { card_id: 'EB01-006', name: 'ナミ', pack_id: '9' },       // shared → skipped
-      'P-999': { card_id: 'P-999', name: '謎のカード', pack_id: '9' },       // unknown → skipped, never guessed
+      'P-999': { card_id: 'P-999', name: '謎のカード', pack_id: '9' },     // unknown → skipped, never guessed
     };
-    const rows = buildJapaneseRows(jp, jpPacks, enCards);
-    expect(rows.length).toBe(1);
-    expect(rows[0].name).toBe('Monkey D. Luffy');
-    expect(rows[0].variant).toBe('JP promo');
-    expect(Object.keys(JP_ONLY_NAMES).length).toBe(20); // 22 cards, 20 distinct base codes
+    const rows = buildJapaneseRows(jp, jpPacks, enCards, enPacks);
+    expect(rows.length).toBe(3);
+    const shared = rows.find(r => r.id === 'op-eb01-006-ja');
+    expect(shared.name).toBe('Nami');                    // inherited, never kanji
+    expect(shared.number).toBe('EB01-006');
+    expect(shared.set_name).toBe('One Piece MEMORIAL COLLECTION'); // EN pack title via label
+    expect(shared.language).toBe('Japanese');
+    const par = rows.find(r => r.id === 'op-eb01-006_p4-ja');
+    expect(par.variant).toBe('JP parallel p4');
+    expect(par.number).toBe('EB01-006');
+    const promo = rows.find(r => r.id === 'op-p-080-ja');
+    expect(promo.name).toBe('Monkey D. Luffy');
+    expect(Object.keys(JP_ONLY_NAMES).length).toBe(20);  // 22 cards, 20 distinct base codes
   });
-  it('parallel rows yield to the base card on equal match evidence', () => {
+
+  it('language routing: a Japanese-titled listing matches the -ja sibling; plain matches EN', () => {
     const universe = [
-      { id: 'op-eb01-006_p4', name: 'Nami', number: 'EB01-006', set_name: 'One Piece Promotion Cards' },
-      { id: 'op-eb01-006', name: 'Nami', number: 'EB01-006', set_name: 'One Piece Promotion Cards' },
+      { id: 'op-eb01-006', name: 'Nami', number: 'EB01-006', set_name: 'One Piece MEMORIAL COLLECTION', language: 'English' },
+      { id: 'op-eb01-006-ja', name: 'Nami', number: 'EB01-006', set_name: 'One Piece MEMORIAL COLLECTION', language: 'Japanese' },
     ];
-    expect(matchListing('One Piece Promotion Cards Nami EB01-006 PSA 10', universe)).toBe('op-eb01-006');
+    expect(matchListing('2024 One Piece Japanese Memorial Collection Nami EB01-006 PSA 10', universe))
+      .toBe('op-eb01-006-ja');
+    expect(matchListing('2024 One Piece Memorial Collection Nami EB01-006 PSA 10', universe))
+      .toBe('op-eb01-006');
+  });
+
+  it('a JP-titled listing still matches an EN row when no -ja sibling exists (pre-pass status quo)', () => {
+    const universe = [
+      { id: 'op-eb01-006', name: 'Nami', number: 'EB01-006', set_name: 'One Piece MEMORIAL COLLECTION', language: 'English' },
+    ];
+    expect(matchListing('One Piece Japanese Memorial Collection Nami EB01-006 PSA 10', universe))
+      .toBe('op-eb01-006');
+  });
+
+  it('parallel -ja rows yield to the plain -ja sibling on equal evidence', () => {
+    const universe = [
+      { id: 'op-eb01-006_p4-ja', name: 'Nami', number: 'EB01-006', set_name: 'One Piece MEMORIAL COLLECTION', language: 'Japanese' },
+      { id: 'op-eb01-006-ja', name: 'Nami', number: 'EB01-006', set_name: 'One Piece MEMORIAL COLLECTION', language: 'Japanese' },
+    ];
+    expect(matchListing('One Piece Japanese Memorial Collection Nami EB01-006 PSA 10', universe))
+      .toBe('op-eb01-006-ja');
   });
 });

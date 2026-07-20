@@ -55,37 +55,65 @@ export const JP_ONLY_NAMES = {
 };
 
 /**
- * Japanese pass: from the JP catalog, emit ONLY the rows the EN catalog lacks
- * — JP-exclusive parallels (`_p`/`_r` suffixed codes whose base exists in EN;
- * English name inherited from the base) and the 22 JP-only promos (names from
- * JP_ONLY_NAMES). Shared codes are the SAME card and get no duplicate row
- * (Kaleb's display model: one canonical card; "· Japanese" is a listing-level
- * tag). `number` is the BASE code so the matcher can hit it; parallels yield
- * to the base card on score ties (match.js parallel penalty) so listings that
- * don't distinguish an alt-art attribute conservatively to the base.
+ * Japanese pass — LANGUAGE-VARIANT ROWS (Kaleb, 2026-07-20): the same code in
+ * English and Japanese is one card IDENTITY but two MARKETS — EN and JA
+ * printings price differently (PriceCharting/Card Ladder model them as
+ * separate products). Every JP printing therefore gets its own row:
+ *
+ *   id      op-<code>-ja           (sibling of the EN row; uniform -ja suffix)
+ *   name    English, always — inherited by exact code, then base code, then
+ *           JP_ONLY_NAMES. Unknown JP-only codes are SKIPPED, never guessed.
+ *   number  base code (matchable; listings never write _p/_r suffixes)
+ *   set     the EN pack title looked up by pack label (JP pack titles are
+ *           kanji; display must read English)
+ *   language 'Japanese' — drives matcher routing, filters, and the UI tag.
+ *
+ * Comps need no schema change: -ja rows accrue their own marks (JP
+ * PriceCharting products merge into them via language routing) → own
+ * latest_marks → correct JP comps.
  */
-export function buildJapaneseRows(jpCards, jpPacks, enCards) {
-  const enCodes = new Set(Object.values(enCards).map(c => c.card_id));
+export function buildJapaneseRows(jpCards, jpPacks, enCards, enPacks) {
+  const enNameByCode = new Map(Object.values(enCards).map(c => [c.card_id, c.name]));
   const enNameByBase = new Map();
   for (const c of Object.values(enCards)) {
-    const base = c.card_id.split('_')[0];
-    if (!enNameByBase.has(base)) enNameByBase.set(base, c.name);
+    const b = c.card_id.split('_')[0];
+    if (!enNameByBase.has(b)) enNameByBase.set(b, c.name);
+  }
+  // EN set titles keyed by NORMALIZED label ('OP-07' → 'OP07') — resolved from
+  // the CARD CODE's set prefix, because JP pack metadata often lacks labels
+  // (first dry run left -ja rows with bare set names, so EN siblings out-scored
+  // them on set evidence and language routing lost the tie it should win).
+  const enTitleByLabel = new Map();
+  const normLabel = (l) => String(l ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  for (const p of Object.values(enPacks ?? {})) {
+    const key = normLabel(p?.title_parts?.label);
+    const title = p?.title_parts?.title ?? null;
+    if (key && title && !enTitleByLabel.has(key)) enTitleByLabel.set(key, title);
   }
   const rows = [];
   for (const c of Object.values(jpCards)) {
     const code = c.card_id;
-    if (!code || enCodes.has(code)) continue;            // shared identity — no duplicate row
+    if (!code) continue;
     const base = code.split('_')[0];
-    const name = enNameByBase.get(base) ?? JP_ONLY_NAMES[base] ?? null;
-    if (!name) continue;                                 // unknown JP-only card — surface via recon, never guess
+    const name = enNameByCode.get(code) ?? enNameByBase.get(base) ?? JP_ONLY_NAMES[base] ?? null;
+    if (!name) continue;                                 // unknown JP-only — surface via recon, never guess
+    const setPrefix = base.split('-')[0];               // 'OP07' | 'EB01' | 'ST01' | 'P'
+    const enTitle = enTitleByLabel.get(setPrefix) ?? null;
+    // Promos (P-xxx) stay bare 'One Piece': no set-evidence requirement, so
+    // name+code carry the match — promo listings phrase the set a dozen ways.
+    const set_name = enTitle ? `One Piece ${enTitle}` : 'One Piece';
     const suffix = code.slice(base.length);              // '_p4' | '_r2' | ''
-    const mapped = mapCard({ ...c, name }, jpPacks, { language: 'Japanese' });
-    if (!mapped) continue;
-    mapped.number = base;                                // matchable; full code stays in external_ids
-    mapped.variant = suffix
-      ? `JP ${suffix.startsWith('_r') ? 'reprint' : 'parallel'} ${suffix.slice(1)}`
-      : (mapped.variant || 'JP promo');
-    rows.push(mapped);
+    rows.push({
+      id: `op-${code.toLowerCase()}-ja`,
+      ip: 'OP',
+      name,
+      set_name,
+      number: base,
+      variant: suffix ? `JP ${suffix.startsWith('_r') ? 'reprint' : 'parallel'} ${suffix.slice(1)}` : '',
+      image: c.img_url ?? null,
+      language: 'Japanese',
+      external_ids: { punkrecords_ja: code, pack_id: c.pack_id ?? null },
+    });
   }
   return rows;
 }

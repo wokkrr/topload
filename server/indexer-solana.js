@@ -157,7 +157,7 @@ function makeHelius({ apiKey = process.env.HELIUS_API_KEY, fetchImpl = timedFetc
 
 function universeByIp(db) {
   const by = {};
-  for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+  for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) {
     (by[c.ip] ??= []).push(c);
   }
   return by;

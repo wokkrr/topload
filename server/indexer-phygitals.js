@@ -103,7 +103,7 @@ export async function runPhygitalsIndexer(db, { dry = false, backfill = false, m
   const { gradeFromTitle } = await import('./adapters/collectorcrypt.js');
   const h = helius ?? makeHelius();
   const universeByIp = {};
-  for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) (universeByIp[c.ip] ??= []).push(c);
+  for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) (universeByIp[c.ip] ??= []).push(c);
   const getState = (k) => db.prepare(`SELECT value FROM indexer_state WHERE key = ?`).get(k)?.value ?? null;
   const setState = (k, v) => db.prepare(`INSERT INTO indexer_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(k, v);
   const insSale = db.prepare(

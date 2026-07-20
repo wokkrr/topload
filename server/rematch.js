@@ -18,7 +18,7 @@ import { matchListing, categoryToIp } from './match.js';
 const listingsOnly = process.argv.includes('--listings-only');
 const db = openDb();
 const universeByIp = {};
-for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) {
   (universeByIp[c.ip] ??= []).push(c);
 }
 

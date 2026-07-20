@@ -19,7 +19,7 @@ const ok = (msg) => console.log(`  ✓ ${msg}`);
 
 const CANON = {
   PKMN: `json_extract(external_ids, '$.ptcgdata') IS NOT NULL`,
-  OP: `json_extract(external_ids, '$.punkrecords') IS NOT NULL`,
+  OP: `(json_extract(external_ids, '$.punkrecords') IS NOT NULL OR json_extract(external_ids, '$.punkrecords_ja') IS NOT NULL)`,
   YGO: `json_extract(external_ids, '$.ygoprodeck') IS NOT NULL`,
 };
 // Sanity floors — a fetch/seed that silently truncated should trip these.
@@ -67,7 +67,7 @@ const SMOKE = [
   ['YGO', '2002 Yu-Gi-Oh Legend of Blue Eyes LOB-001 Blue-Eyes White Dragon 1st Edition PSA 9', 'ygo-lob-'],
 ];
 for (const [ip, title, expected] of SMOKE) {
-  const universe = db.prepare(`SELECT id, name, number, set_name FROM cards WHERE ip=?`).all(ip);
+  const universe = db.prepare(`SELECT id, name, number, set_name, language FROM cards WHERE ip=?`).all(ip);
   const hit = matchListing(title, universe);
   if (hit && hit.startsWith(expected)) ok(`${ip}: "${title.slice(0, 55)}…" → ${hit}`);
   else fail(`${ip}: "${title.slice(0, 55)}…" → ${hit ?? 'NO MATCH'} (expected ${expected}*)`);
