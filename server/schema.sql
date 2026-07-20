@@ -96,6 +96,11 @@ CREATE TABLE IF NOT EXISTS external_marks (
   PRIMARY KEY (source, card_id, grade, as_of)
 );
 CREATE INDEX IF NOT EXISTS idx_external_marks_card ON external_marks(card_id, grade, as_of);
+-- Latest-mark lookups (movers/screener/gacha 'WHERE as_of = MAX(as_of)') scan
+-- by date; the PK leads with card_id so date-first queries need this index.
+-- oracle_prices grows ~260k rows per marked day — without it, every screener
+-- load is a full-table scan (observed as site-wide slowdown, 2026-07-20).
+CREATE INDEX IF NOT EXISTS idx_oracle_asof ON oracle_prices(as_of, card_id, grade);
 
 -- Rules-based basket membership, recorded per rebalance date.
 CREATE TABLE IF NOT EXISTS basket_members (
