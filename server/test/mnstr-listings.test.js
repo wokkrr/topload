@@ -33,6 +33,16 @@ describe('MNSTR listing mapper', () => {
     expect(r.grade).toBe('BGS9.5');
   });
 
+  it('falls back to gradingCompany when grading lacks the grader (live raw bug, 2026-07-20)', () => {
+    expect(mapListing(card({ grading: '10', gradingCompany: 'psa' })).grade).toBe('PSA10');
+    expect(mapListing(card({ grading: 'GEM MINT 10', gradingCompany: 'PSA' })).grade).toBe('PSA10');
+  });
+
+  it('carries the vault serial as the slab cert number', () => {
+    expect(mapListing(card()).cert).toBe('129648888');
+    expect(mapListing(card({ serialNumber: 'not-a-cert', remoteId: 'x' })).cert).toBeNull();
+  });
+
   it('normalizes BECKETT 95 → 9.5 and BGS 10 Black → BGS10', () => {
     expect(mapListing(card({ grading: 'BECKETT 95' })).grade).toBe('BGS9.5');
     expect(mapListing(card({ grading: 'BGS 10 Black' })).grade).toBe('BGS10');

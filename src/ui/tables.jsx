@@ -145,16 +145,18 @@ export function CardsTable({ cards, onSelect }) {
  * No chain/crypto jargon on the surface — users are buying cards, not tokens.
  */
 export function PlatformStrip({ platforms, hidden, onToggle }) {
-  if (!platforms?.length) return null;
+  // Only marketplaces we actually pull LISTINGS from belong on the desk's
+  // toggle strip (Kaleb, 2026-07-20) — sales-only sources (Beezie, Phygitals)
+  // feed the tape + oracle silently and return here when their listings land.
+  const shown = (platforms ?? []).filter(p => p.listings);
+  if (!shown.length) return null;
   const interactive = typeof onToggle === 'function';
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-      {platforms.map(p => {
+      {shown.map(p => {
         const off = hidden?.has(p.id);
         const live = p.listings || p.sales; // any real data flowing
-        // Honest coverage labels: bare = listings + sales; SALES = solds only
-        // (feeds the tape + oracle, listings ingestion TBD); SOON = neither.
-        const suffix = off ? ' · HIDDEN' : p.listings ? '' : p.sales ? ' · SALES' : ' · SOON';
+        const suffix = off ? ' · HIDDEN' : '';
         return (
           <button key={p.id}
                   onClick={interactive ? () => onToggle(p.id) : undefined}

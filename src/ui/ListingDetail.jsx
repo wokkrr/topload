@@ -28,10 +28,14 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
   // Grading company parsed off the normalized grade ('CGC10' → CGC / 10).
   const gm = /^([A-Z]+)([\d.]+)$/.exec(l.grade ?? '');
 
-  // Certification number — shown ONLY when confidently present: an explicit
-  // cert field from the adapter, or an explicit "Cert #12345678" in the title.
-  // Never guessed (a wrong cert link on someone's slab is worse than none).
-  const cert = l.cert ?? (/(?:cert(?:ification)?\.?\s*(?:number|no\.?|#)?\s*[:#]?\s*)(\d{6,10})/i.exec(l.item_name ?? '')?.[1] ?? null);
+  // Certification number — shown ONLY when confidently present: the adapter's
+  // cert field (Courtyard 'Serial' attr, MNSTR serialNumber), MNSTR's vault
+  // serial (which IS the slab cert — covers rows ingested before the cert
+  // column existed), or an explicit "Cert #12345678" in the title. Never
+  // guessed (a wrong cert link on someone's slab is worse than none).
+  const cert = l.cert
+    ?? (l.platform === 'mnstr' && /^\d{6,12}$/.test(l.nft_address ?? '') ? l.nft_address : null)
+    ?? (/(?:cert(?:ification)?\.?\s*(?:number|no\.?|#)?\s*[:#]?\s*)(\d{6,10})/i.exec(l.item_name ?? '')?.[1] ?? null);
   const certUrl = cert && gm ? ({
     PSA: `https://www.psacard.com/cert/${cert}`,
     CGC: `https://www.cgccards.com/certlookup/${cert}/`,

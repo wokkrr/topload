@@ -24,6 +24,14 @@ const asset = (over = {}) => ({
 });
 
 describe('Courtyard listing mapper', () => {
+  it("captures the 'Serial' attribute as the slab cert number, digits-guarded", () => {
+    expect(mapListing(asset()).cert).toBe('6119147138');
+    expect(mapListing(asset({ attributes: [
+      { name: 'Grader', value: 'CGC' }, { name: 'Serial', value: 'ABC-123' },
+      { name: 'Grade', value: '10' }, { name: 'Category', value: 'Pokémon' },
+    ] })).cert).toBeNull();
+  });
+
   it('maps a graded Pokémon listing with price, grade, ip', () => {
     const r = mapListing(asset(), '2026-07-20');
     expect(r.platform).toBe('courtyard');

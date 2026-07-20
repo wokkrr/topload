@@ -35,6 +35,9 @@ function migrate(db) {
   ensureColumn(db, 'cards', 'language', "TEXT NOT NULL DEFAULT 'English'");
   ensureColumn(db, 'gacha_listings', 'image_back', 'TEXT');
   ensureColumn(db, 'gacha_listings', 'proof', 'TEXT'); // courtyard asset-page hash
+  // Grading-slab certification number (verifiable on the grader's site).
+  // Sources: Courtyard 'Serial' attribute; MNSTR serialNumber. Never guessed.
+  ensureColumn(db, 'gacha_listings', 'cert', 'TEXT');
 }
 
 function ensureColumn(db, table, column, ddl) {

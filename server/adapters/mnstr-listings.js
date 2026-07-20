@@ -37,7 +37,15 @@ export function mapListing(c, seenAt) {
   // grading '(PSA|BGS|BECKETT|CGC|SGC) <n>' → normalized; 'BECKETT 95' → 9.5;
   // 'BGS 10 Black' → BGS10. Fall back to title parse, else raw.
   let grade = 'raw';
-  const gm = /^([A-Za-z]+)\s*([0-9]+(?:\.[0-9])?)/.exec(c.grading ?? '');
+  let gm = /^([A-Za-z]+)\s*([0-9]+(?:\.[0-9])?)/.exec(c.grading ?? '');
+  // MNSTR splits grader and grade across two fields — when `grading` doesn't
+  // lead with letters (bare '10', 'GEM MINT 10'), fall back to gradingCompany
+  // + the first number. (Every MNSTR item is a slab; 'raw' here meant a parse
+  // failure, not an ungraded card — live bug, 2026-07-20.)
+  if (!gm && c.gradingCompany) {
+    const n = /([0-9]+(?:\.[0-9])?)/.exec(c.grading ?? '');
+    if (n) gm = [null, c.gradingCompany, n[1]];
+  }
   if (gm) {
     let n = parseFloat(gm[2]);
     if (n >= 20 && Number.isInteger(n)) n = n / 10;    // 'BECKETT 95' → 9.5
@@ -58,6 +66,7 @@ export function mapListing(c, seenAt) {
     listed_at: seenAt ?? new Date().toISOString().slice(0, 10),
     image: c.image ?? c.images?.[0]?.url ?? null,
     nft_address: serial,                                // vault serial — opaque id
+    cert: /^\d{6,12}$/.test(serial) ? serial : null,   // ...which IS the slab cert number
     slug: c.slug ?? null,                               // → mnstr.xyz/cards/<slug>
     fmv_usd: Number.isFinite(Number(c.fmv)) ? Number(c.fmv) : null,
     seen_at: seenAt ?? new Date().toISOString().slice(0, 10),

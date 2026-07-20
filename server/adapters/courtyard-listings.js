@@ -47,6 +47,11 @@ export function mapListing(a, seenAt) {
   // Grade: Grader ('PSA') + numeric lead of Grade ('10 GEM MINT' → 10). Fall
   // back to parsing the title; else raw. (Booster packs / raw cards → 'raw'.)
   const grader = attr(a.attributes, 'Grader');
+  // Slab certification number — Courtyard publishes it as the 'Serial'
+  // attribute (verified in the live feed). Digits-only guard: never link a
+  // malformed value to a grader's cert page.
+  const serialAttr = attr(a.attributes, 'Serial');
+  const cert = serialAttr && /^\d{6,12}$/.test(String(serialAttr).trim()) ? String(serialAttr).trim() : null;
   const gradeRaw = attr(a.attributes, 'Grade');
   const gradeNum = gradeRaw ? parseFloat(String(gradeRaw).match(/[0-9]+(?:\.5)?/)?.[0] ?? '') : NaN;
   let grade = grader && Number.isFinite(gradeNum) ? normalizeGrade(grader, gradeNum) : 'raw';
@@ -66,6 +71,7 @@ export function mapListing(a, seenAt) {
     image: a.image ?? a.cropped_image ?? null,
     nft_address: tokenId,              // Polygon tokenId — opaque, matches sales registry key style
     proof: a.proof_of_integrity ?? null, // courtyard.io/asset/<proof> = the listing page
+    cert,                              // slab certification number (Serial attr)
     fmv_usd: Number.isFinite(a.fmv_estimate_usd) ? a.fmv_estimate_usd : null,
     seen_at: seenAt ?? new Date().toISOString().slice(0, 10),
   };
