@@ -69,7 +69,7 @@ describe('pokemontcg adapter (fixtures)', () => {
     const cards = await ptcg.listCards();
     expect(cards).toHaveLength(1);
     expect(cards[0]).toMatchObject({
-      id: 'pkmn-sv3pt5-charizard-ex-199', ip: 'PKMN', number: '199/165',
+      id: 'pkmn-sv3pt5-199', ip: 'PKMN', number: '199/165', // canonical scheme: pkmn-<ptcgio id>
     });
     expect(cards[0].external_ids.pcQuery).toContain('Charizard ex');
   });
@@ -79,10 +79,10 @@ describe('pokemontcg adapter (fixtures)', () => {
       fetchImpl: () => jsonRes(page),
       sets: [{ ptcgioId: 'sv3pt5', label: '151' }],
     });
-    const marks = await ptcg.fetchExternalMarks([{ id: 'pkmn-sv3pt5-charizard-ex-199' }], '2026-07-19');
+    const marks = await ptcg.fetchExternalMarks([{ id: 'pkmn-sv3pt5-199' }], '2026-07-19');
     expect(marks).toHaveLength(1); // untracked Energy card skipped
     expect(marks[0]).toEqual({
-      source: 'tcgplayer', card_id: 'pkmn-sv3pt5-charizard-ex-199',
+      source: 'tcgplayer', card_id: 'pkmn-sv3pt5-199',
       grade: 'raw', as_of: '2026-07-19', price_cents: 24550,
     });
   });

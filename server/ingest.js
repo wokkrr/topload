@@ -23,7 +23,6 @@ import { makeMnstrListingsAdapter } from './adapters/mnstr-listings.js';
 import { runSolanaIndexer, registerListings } from './indexer-solana.js';
 import { importCsv } from './import-pricecharting-csv.js';
 import { matchListings } from './match.js';
-import { opCardRecords } from './universe.js';
 import { writeFileSync } from 'node:fs';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
 import { refreshIndexes } from './indexes.js';
@@ -93,36 +92,31 @@ async function runLive(db, today) {
   })();
   if (freshSkip) console.log('[ingest] fresh-skip: universe + CSVs already current today — running listings + sales only');
 
-  // 1. Card universe: PKMN metadata + manual OP list. Each source is
-  //    independently fault-tolerant — one API being down must not kill ingest.
-  const ptcg = makePokemonTcgAdapter();
-  let pkmnCards = [];
-  if (!freshSkip) {
-  try {
-    pkmnCards = await ptcg.listCards();
-    summary.cards += upsertCards(db, pkmnCards);
-  } catch (e) {
-    rollback();
-    console.warn(`[ingest] pokemontcg universe fetch failed: ${e.message}`);
-  }
-  summary.cards += upsertCards(db, opCardRecords());
-  }
+  // 1. Card universe: OWNED by the canonical catalog seeds (seed:pokemon /
+  //    seed:onepiece / seed:yugioh + weekly catalog:refresh). Ingest no longer
+  //    mutates the universe — the old per-run pokemontcg.io 5-set fetch both
+  //    depended on a flaky API (504s live, 2026-07-20) and re-created retired
+  //    old-scheme cards every run, silently regrowing remnants.
 
   const insMark = db.prepare(
     `INSERT OR REPLACE INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES (?, ?, ?, ?, ?)`
   );
 
   // 1b. Free price bootstrap: TCGplayer market snapshots via pokemontcg.io
-  //     (raw grade, PKMN only — costs nothing, discounted hardest by the oracle).
+  //     (raw grade, PKMN only — costs nothing, discounted hardest by the
+  //     oracle). Keyed to canonical ids (pkmn-<ptcgio id>); tracked set from
+  //     the DB so marks only ever land on cards that exist.
+  if (!freshSkip) {
   try {
-    if (pkmnCards.length) {
-      const freeMarks = await ptcg.fetchExternalMarks(pkmnCards, today);
-      for (const m of freeMarks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
-      console.log(`[ingest] tcgplayer snapshot marks: ${freeMarks.length}`);
-    }
+    const ptcg = makePokemonTcgAdapter();
+    const tracked = db.prepare(`SELECT id FROM cards WHERE ip = 'PKMN'`).all();
+    const freeMarks = await ptcg.fetchExternalMarks(tracked, today);
+    for (const m of freeMarks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
+    console.log(`[ingest] tcgplayer snapshot marks: ${freeMarks.length}`);
   } catch (e) {
     rollback();
     console.warn(`[ingest] tcgplayer snapshot fetch failed: ${e.message}`);
+  }
   }
 
   // 2a. PriceCharting CSV auto-fetch (preferred bulk route, zero-touch daily).

@@ -47,7 +47,9 @@ export function makePokemonTcgAdapter({
     }
   }
 
-  const cardId = (c) => `pkmn-${c.set.id}-${c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${c.number}`;
+  // Canonical id scheme: pkmn-<pokemontcg.io id> — the SAME ids the canonical
+  // catalog seed (pokemon-tcg-data) mints, so marks land on canonical cards.
+  const cardId = (c) => `pkmn-${c.id}`;
 
   return {
     name: 'pokemontcg',
