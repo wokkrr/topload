@@ -9,9 +9,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openDb } from './db.js';
 import { PLATFORMS } from './platforms.js';
+import { refreshLatestMarks } from './oracle.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
+// First boot after the latest_marks migration: build it once so the hot
+// paths have data before the next ingest refreshes it.
+if (db.prepare(`SELECT COUNT(*) n FROM latest_marks`).get().n === 0) {
+  console.log('[api] building latest_marks (one-time)…');
+  console.log(`[api] latest_marks ready: ${refreshLatestMarks(db)} rows`);
+}
 const app = express();
 // Gzip everything — the listings JSON alone is ~2MB raw / ~200KB compressed,
 // and the app bundle drops 245KB → 73KB. This was the "slow to load all the
@@ -35,42 +42,35 @@ app.get('/api/indexes', (req, res) => {
 });
 
 /** GET /api/movers?window=1 → biggest 1D oracle moves with confidence */
-app.get('/api/movers', (req, res) => {
-  const win = parseInt(req.query.window ?? '1', 10);
+app.get('/api/movers', (_req, res) => {
+  // Reads the materialized latest_marks (1D lookback baked in) — the live
+  // version scanned every mark on the latest day (~277k rows) per request.
   const rows = db.prepare(`
-    WITH latest AS (SELECT MAX(as_of) d FROM oracle_prices)
-    SELECT c.ip, c.name, c.set_name, o1.card_id, o1.grade,
-           o1.price_cents AS price_now, o0.price_cents AS price_then,
-           o1.confidence, o1.sales_7d
-    FROM oracle_prices o1
-    JOIN latest ON o1.as_of = latest.d
-    JOIN oracle_prices o0 ON o0.card_id = o1.card_id AND o0.grade = o1.grade
-         AND o0.as_of = date(latest.d, ?)
-    JOIN cards c ON c.id = o1.card_id
-    WHERE o1.confidence >= 0.3`).all(`-${win} day`);
-  const movers = rows
-    .map(r => ({ ...r, change_pct: +((r.price_now / r.price_then - 1) * 100).toFixed(2) }))
-    .sort((a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct))
-    .slice(0, 20);
-  res.json(movers);
+    SELECT c.ip, c.name, c.set_name, lm.card_id, lm.grade,
+           lm.price_cents AS price_now, lm.price_1d AS price_then,
+           lm.confidence, lm.sales_7d,
+           ROUND((lm.price_cents * 100.0 / lm.price_1d) - 100, 2) AS change_pct
+    FROM latest_marks lm
+    JOIN cards c ON c.id = lm.card_id
+    WHERE lm.confidence >= 0.3 AND lm.price_1d > 0
+      AND lm.price_cents != lm.price_1d
+    ORDER BY ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) DESC
+    LIMIT 20`).all();
+  res.json(rows);
 });
 
 /** GET /api/basket?index=PKMN → current membership w/ marks */
 app.get('/api/basket', (req, res) => {
   const indexId = req.query.index ?? 'PKMN';
   const rows = db.prepare(`
-    WITH cur AS (SELECT MAX(as_of) d FROM basket_members WHERE index_id = ?),
-         latest AS (SELECT MAX(as_of) d FROM oracle_prices)
+    WITH cur AS (SELECT MAX(as_of) d FROM basket_members WHERE index_id = ?)
     SELECT bm.card_id, bm.grade, bm.weight, c.name, c.set_name, c.number,
-           o.price_cents, o.confidence, o.sales_7d, o.sales_30d,
-           o1.price_cents AS price_1d, o30.price_cents AS price_30d
+           lm.price_cents, lm.confidence, lm.sales_7d, lm.sales_30d,
+           lm.price_1d, lm.price_30d
     FROM basket_members bm
     JOIN cur ON bm.as_of = cur.d
     JOIN cards c ON c.id = bm.card_id
-    JOIN latest
-    LEFT JOIN oracle_prices o   ON o.card_id = bm.card_id AND o.grade = bm.grade AND o.as_of = latest.d
-    LEFT JOIN oracle_prices o1  ON o1.card_id = bm.card_id AND o1.grade = bm.grade AND o1.as_of = date(latest.d, '-1 day')
-    LEFT JOIN oracle_prices o30 ON o30.card_id = bm.card_id AND o30.grade = bm.grade AND o30.as_of = date(latest.d, '-30 day')
+    LEFT JOIN latest_marks lm ON lm.card_id = bm.card_id AND lm.grade = bm.grade
     WHERE bm.index_id = ?
     ORDER BY bm.weight DESC`).all(indexId, indexId);
   res.json(rows.map(r => ({
@@ -86,7 +86,7 @@ app.get('/api/cards', (req, res) => {
   const clauses = [];
   const args = [];
   if (req.query.ip) { clauses.push(`c.ip = ?`); args.push(req.query.ip); }
-  if (req.query.grade) { clauses.push(`o.grade = ?`); args.push(req.query.grade); }
+  if (req.query.grade) { clauses.push(`lm.grade = ?`); args.push(req.query.grade); }
   if (req.query.q) {
     // Every word must appear somewhere in name/set/number.
     for (const word of String(req.query.q).trim().split(/\s+/).slice(0, 6)) {
@@ -97,25 +97,19 @@ app.get('/api/cards', (req, res) => {
   }
   const ipFilter = clauses.length ? `AND ${clauses.join(' AND ')}` : '';
   const sort = {
-    price: 'o.price_cents DESC',
-    change: 'ABS(COALESCE((o.price_cents * 1.0 / NULLIF(o1.price_cents, 0) - 1), 0)) DESC',
-    volume: 'o.sales_7d DESC, o.price_cents DESC',
-  }[req.query.sort] ?? 'o.price_cents DESC';
+    price: 'lm.price_cents DESC',
+    change: 'ABS(COALESCE((lm.price_cents * 1.0 / NULLIF(lm.price_1d, 0) - 1), 0)) DESC',
+    volume: 'lm.sales_7d DESC, lm.price_cents DESC',
+  }[req.query.sort] ?? 'lm.price_cents DESC';
   const rows = db.prepare(`
-    WITH latest AS (
-      SELECT card_id, grade, MAX(as_of) d FROM oracle_prices GROUP BY card_id, grade
-    )
     SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
            COALESCE(c.image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1)) AS image,
            CASE WHEN c.image IS NOT NULL THEN 'official'
                 WHEN EXISTS (SELECT 1 FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL) THEN 'listing' END AS image_kind,
-           o.grade, o.price_cents, o.confidence, o.basis, o.source, o.sales_7d,
-           o1.price_cents AS price_1d, o30.price_cents AS price_30d
-    FROM latest
-    JOIN oracle_prices o ON o.card_id = latest.card_id AND o.grade = latest.grade AND o.as_of = latest.d
-    JOIN cards c ON c.id = o.card_id
-    LEFT JOIN oracle_prices o1 ON o1.card_id = o.card_id AND o1.grade = o.grade AND o1.as_of = date(latest.d, '-1 day')
-    LEFT JOIN oracle_prices o30 ON o30.card_id = o.card_id AND o30.grade = o.grade AND o30.as_of = date(latest.d, '-30 day')
+           lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
+           lm.price_1d, lm.price_30d
+    FROM latest_marks lm
+    JOIN cards c ON c.id = lm.card_id
     WHERE 1=1 ${ipFilter}
     ORDER BY ${sort} LIMIT ${limit}`).all(...args);
   res.json(rows.map(r => ({
@@ -195,17 +189,15 @@ app.get('/api/platforms', (_req, res) => res.json(PLATFORMS));
 /** GET /api/gacha → current gacha listings with grade-matched oracle comps */
 app.get('/api/gacha', (req, res) => {
   const rows = db.prepare(`
-    WITH latest AS (SELECT MAX(as_of) d FROM oracle_prices)
     SELECT g.platform, g.external_id, g.card_id, g.item_name, g.category, g.grade,
            g.price_cents, g.currency, g.listed_at, g.nft_address, g.image_back, g.proof,
            COALESCE(g.image, c.image) AS image,
            CASE WHEN g.image IS NOT NULL THEN 'actual' WHEN c.image IS NOT NULL THEN 'art' END AS image_kind,
            c.name AS card_name, c.ip,
-           o.price_cents AS comp_cents, o.confidence AS comp_confidence, o.basis AS comp_basis, o.source AS comp_source
+           lm.price_cents AS comp_cents, lm.confidence AS comp_confidence, lm.basis AS comp_basis, lm.source AS comp_source
     FROM gacha_listings g
     LEFT JOIN cards c ON c.id = g.card_id
-    LEFT JOIN latest
-    LEFT JOIN oracle_prices o ON o.card_id = g.card_id AND o.grade = g.grade AND o.as_of = latest.d
+    LEFT JOIN latest_marks lm ON lm.card_id = g.card_id AND lm.grade = g.grade
     ORDER BY g.listed_at DESC, g.price_cents DESC`).all();
   res.json(rows.map(r => {
     // A comp wildly out of line with the ask (ask < 20% of comp, or > 5x) is

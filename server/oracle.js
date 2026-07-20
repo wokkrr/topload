@@ -225,5 +225,32 @@ export function refreshOracle(db, dates, opts = {}) {
   }
 
   db.exec('COMMIT');
+  refreshLatestMarks(db);
   return { series: soldsSeries.length, marks: written, externalMarks: externalUsed };
+}
+
+/**
+ * Rebuild the materialized latest_marks table: one row per (card, grade) with
+ * the newest mark plus 1D/30D lookbacks. Costs a few seconds ONCE per data
+ * change; saves the API from scanning/grouping oracle_prices (millions of
+ * rows) on every request — /api/movers was 5.9s, /api/cards 1.3s without it.
+ * Runs at the end of refreshOracle, so ingest AND every backfill keep it hot.
+ */
+export function refreshLatestMarks(db) {
+  db.exec('BEGIN');
+  db.exec('DELETE FROM latest_marks');
+  db.exec(`
+    INSERT INTO latest_marks (card_id, grade, as_of, price_cents, confidence, basis, source,
+                              sales_7d, sales_30d, price_1d, price_30d)
+    SELECT o.card_id, o.grade, o.as_of, o.price_cents, o.confidence, o.basis, o.source,
+           o.sales_7d, o.sales_30d,
+           (SELECT p.price_cents FROM oracle_prices p
+             WHERE p.card_id = o.card_id AND p.grade = o.grade AND p.as_of = date(o.as_of, '-1 day')),
+           (SELECT p.price_cents FROM oracle_prices p
+             WHERE p.card_id = o.card_id AND p.grade = o.grade AND p.as_of = date(o.as_of, '-30 day'))
+    FROM oracle_prices o
+    JOIN (SELECT card_id, grade, MAX(as_of) d FROM oracle_prices GROUP BY card_id, grade) m
+      ON m.card_id = o.card_id AND m.grade = o.grade AND m.d = o.as_of`);
+  db.exec('COMMIT');
+  return db.prepare(`SELECT COUNT(*) n FROM latest_marks`).get().n;
 }

@@ -102,6 +102,26 @@ CREATE INDEX IF NOT EXISTS idx_external_marks_card ON external_marks(card_id, gr
 -- load is a full-table scan (observed as site-wide slowdown, 2026-07-20).
 CREATE INDEX IF NOT EXISTS idx_oracle_asof ON oracle_prices(as_of, card_id, grade);
 
+-- Materialized latest mark per (card, grade) with 1D/30D lookbacks baked in.
+-- Rebuilt by refreshLatestMarks() whenever marks change (ingest/backfills).
+-- Every hot read path (screener, movers, basket, gacha comps) reads THIS
+-- (~60k rows) instead of scanning/grouping oracle_prices (millions of rows;
+-- /api/movers was 5.9s and /api/cards 1.3s before this — 2026-07-20).
+CREATE TABLE IF NOT EXISTS latest_marks (
+  card_id     TEXT NOT NULL,
+  grade       TEXT NOT NULL,
+  as_of       TEXT NOT NULL,
+  price_cents INTEGER NOT NULL,
+  confidence  REAL NOT NULL,
+  basis       TEXT NOT NULL,
+  source      TEXT,
+  sales_7d    INTEGER NOT NULL,
+  sales_30d   INTEGER NOT NULL,
+  price_1d    INTEGER,
+  price_30d   INTEGER,
+  PRIMARY KEY (card_id, grade)
+);
+
 -- Rules-based basket membership, recorded per rebalance date.
 CREATE TABLE IF NOT EXISTS basket_members (
   index_id TEXT NOT NULL,                  -- 'PKMN','OP'
