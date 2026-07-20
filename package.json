@@ -28,6 +28,7 @@
     "rematch": "node --env-file-if-exists=.env server/rematch.js",
     "coverage": "node --env-file-if-exists=.env server/coverage.js",
     "mnstr:sales": "node --env-file-if-exists=.env server/indexer-mnstr-sales.js",
+    "seed:onepiece": "node --env-file-if-exists=.env server/seed-onepiece.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
   },

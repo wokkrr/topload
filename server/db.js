@@ -29,6 +29,10 @@ function migrate(db) {
   ensureColumn(db, 'external_marks', 'sales_volume', 'INTEGER');
   ensureColumn(db, 'oracle_prices', 'source', 'TEXT');
   ensureColumn(db, 'cards', 'image', 'TEXT');
+  // Language of the printing ('English', 'Japanese', …). Cards always carry an
+  // ENGLISH/romanized name for display + matching; this tags the printing so
+  // the UI can show "· Japanese" without the user ever reading kanji.
+  ensureColumn(db, 'cards', 'language', "TEXT NOT NULL DEFAULT 'English'");
   ensureColumn(db, 'gacha_listings', 'image_back', 'TEXT');
   ensureColumn(db, 'gacha_listings', 'proof', 'TEXT'); // courtyard asset-page hash
 }
