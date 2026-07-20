@@ -112,3 +112,20 @@ describe('Japanese pass: language-variant rows (Kaleb, 2026-07-20)', () => {
       .toBe('op-eb01-006-ja');
   });
 });
+
+describe('EN listings must never be grabbed by -ja promo rows (live mis-tag, 2026-07-20)', () => {
+  it('bare "#006 … One Piece Promos" English title refuses the P-006 -ja row', () => {
+    const universe = [
+      { id: 'op-p-006-ja', name: 'Monkey D. Luffy', number: 'P-006', set_name: 'One Piece Luffy 7 vol.1', language: 'Japanese' },
+    ];
+    // 'P' is a 1-char prefix: split-form number matching must not fire off
+    // \b p inside 'piece'/'psa'; set evidence must also be required.
+    expect(matchListing('2024 #006 Monkey D. Luffy PSA 10 One Piece Promos', universe)).toBeNull();
+  });
+  it('a real contiguous P-code listing still matches', () => {
+    const universe = [
+      { id: 'op-p-006-ja', name: 'Monkey D. Luffy', number: 'P-006', set_name: 'One Piece Luffy 7 vol.1', language: 'Japanese' },
+    ];
+    expect(matchListing('One Piece Japanese Luffy 7 vol.1 Monkey D. Luffy P-006 PSA 10', universe)).toBe('op-p-006-ja');
+  });
+});

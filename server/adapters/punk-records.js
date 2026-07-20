@@ -73,35 +73,36 @@ export const JP_ONLY_NAMES = {
  * latest_marks → correct JP comps.
  */
 export function buildJapaneseRows(jpCards, jpPacks, enCards, enPacks) {
-  const enNameByCode = new Map(Object.values(enCards).map(c => [c.card_id, c.name]));
-  const enNameByBase = new Map();
-  for (const c of Object.values(enCards)) {
-    const b = c.card_id.split('_')[0];
-    if (!enNameByBase.has(b)) enNameByBase.set(b, c.name);
-  }
   // EN set titles keyed by NORMALIZED label ('OP-07' → 'OP07') — resolved from
   // the CARD CODE's set prefix, because JP pack metadata often lacks labels
   // (first dry run left -ja rows with bare set names, so EN siblings out-scored
   // them on set evidence and language routing lost the tie it should win).
-  const enTitleByLabel = new Map();
-  const normLabel = (l) => String(l ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  for (const p of Object.values(enPacks ?? {})) {
-    const key = normLabel(p?.title_parts?.label);
-    const title = p?.title_parts?.title ?? null;
-    if (key && title && !enTitleByLabel.has(key)) enTitleByLabel.set(key, title);
+  // EN sibling rows by code — -ja rows inherit the sibling's set_name so they
+  // carry the SAME set-evidence discipline as English rows. Bare set names
+  // exempted promo -ja rows from rule 3 and made them LESS conservative than
+  // their EN siblings: an English "#006 … One Piece Promos" listing was
+  // grabbed by op-p-006-ja (live mis-tag, 2026-07-20).
+  const enRowByCode = new Map();
+  const enRowByBase = new Map();
+  for (const c of Object.values(enCards)) {
+    const row = mapCard(c, enPacks, { language: 'English' });
+    if (!row) continue;
+    enRowByCode.set(c.card_id, row);
+    const b = c.card_id.split('_')[0];
+    if (!enRowByBase.has(b)) enRowByBase.set(b, row);
   }
   const rows = [];
   for (const c of Object.values(jpCards)) {
     const code = c.card_id;
     if (!code) continue;
     const base = code.split('_')[0];
-    const name = enNameByCode.get(code) ?? enNameByBase.get(base) ?? JP_ONLY_NAMES[base] ?? null;
+    const sib = enRowByCode.get(code) ?? enRowByBase.get(base) ?? null;
+    const name = sib?.name ?? JP_ONLY_NAMES[base] ?? null;
     if (!name) continue;                                 // unknown JP-only — surface via recon, never guess
-    const setPrefix = base.split('-')[0];               // 'OP07' | 'EB01' | 'ST01' | 'P'
-    const enTitle = enTitleByLabel.get(setPrefix) ?? null;
-    // Promos (P-xxx) stay bare 'One Piece': no set-evidence requirement, so
-    // name+code carry the match — promo listings phrase the set a dozen ways.
-    const set_name = enTitle ? `One Piece ${enTitle}` : 'One Piece';
+    // Inherit the EN sibling's set_name (identical evidence rules for both
+    // languages). The 22 JP-only promos have no sibling: explicit promo set —
+    // conservative (may under-match odd promo phrasings; never mis-grabs).
+    const set_name = sib?.set_name ?? 'One Piece Promotion Cards';
     const suffix = code.slice(base.length);              // '_p4' | '_r2' | ''
     rows.push({
       id: `op-${code.toLowerCase()}-ja`,

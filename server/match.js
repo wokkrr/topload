@@ -168,7 +168,11 @@ export function matchListing(itemName, cards) {
         || titleZ.includes(`#${suffixNoZero}`)
         || suffixRe.test(titleZ);
       if (title.includes(prefix + suffixRaw)) numberHit = 2;         // "#op07015" / "swsh285"
-      else if (prefixRe.test(title) && splitHit) numberHit = 2;      // "op07 … #109" / "swsh … #285"
+      // Split form needs a DISTINCTIVE prefix: single letters are worthless
+      // ('P' matched \bp inside 'piece'/'psa', gluing '#006' English listings
+      // onto P-006 promo rows — live mis-tag, 2026-07-20). Real P-code
+      // listings still match via the contiguous form above / numFullStrong.
+      else if (prefix.length >= 2 && prefixRe.test(title) && splitHit) numberHit = 2;
     }
     // Regional-infix set codes (LOB-001 ≡ LOB-E001 ≡ LOB-EN001): accept prefix
     // + digits with ANY (or no) 1–2 letter infix, zero-insensitive. A globally
