@@ -54,7 +54,15 @@ async function loadRows(useSnapshot) {
   return rows;
 }
 
-export function seedPokemon(db, rows) {
+/**
+ * @param {object} db
+ * @param {object[]} rows canonical card rows from the adapter
+ * @param {{migrate?: boolean}} [opts] migrate=true (default) runs the one-time
+ *   FK-safe replacement of old cards (re-point sales, purge, clean). migrate=false
+ *   is the UPSERT-ONLY refresh path — adds/updates canonical cards and touches
+ *   nothing else, so it's safe to run on a schedule as new sets drop.
+ */
+export function seedPokemon(db, rows, { migrate = true } = {}) {
   const ins = db.prepare(
     `INSERT INTO cards (id, ip, name, set_name, number, variant, image, language, external_ids)
      VALUES (?, 'PKMN', ?, ?, ?, ?, ?, ?, ?)
@@ -69,6 +77,9 @@ export function seedPokemon(db, rows) {
   // 1. Upsert the canonical catalog (so re-point targets exist).
   let n = 0;
   for (const r of rows) { ins.run(r.id, r.name, r.set_name, r.number, r.variant, r.image, r.language, JSON.stringify(r.external_ids)); n++; }
+
+  // Refresh path: upsert only. New sets flow in; nothing old is touched.
+  if (!migrate) { db.exec('COMMIT'); return { seeded: n, purgedOld: 0, salesRepointed: 0, oldKeptStillHasSales: 0, mode: 'upsert-only' }; }
 
   // Canonical = has a ptcgdata external_id. Old = any other PKMN card
   // (pkmn-pc* from PriceCharting + the thin pokemontcg-API-seeded ones).
@@ -112,7 +123,7 @@ export function seedPokemon(db, rows) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const db = openDb();
   const rows = await loadRows(process.argv.includes('--snapshot'));
-  const res = seedPokemon(db, rows);
+  const res = seedPokemon(db, rows, { migrate: !process.argv.includes('--upsert-only') });
   console.log('[seed:pokemon]', JSON.stringify({ ...res, sample: rows.slice(0, 2).map(r => ({ id: r.id, name: r.name, number: r.number, set: r.set_name })) }, null, 1));
   console.log('[seed:pokemon] NEXT: `npm run rematch -- --listings-only` to re-point listings, then a full `npm run ingest` so PriceCharting prices merge into canonical.');
 }

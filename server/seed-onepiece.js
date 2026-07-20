@@ -37,7 +37,14 @@ async function loadRows(useSnapshot) {
   return Object.values(cards).map(c => mapCard(c, packs, { language: 'English' })).filter(Boolean);
 }
 
-export function seedOnePiece(db, rows) {
+/**
+ * @param {object} db
+ * @param {object[]} rows canonical card rows from the adapter
+ * @param {{migrate?: boolean}} [opts] migrate=true (default) runs the one-time
+ *   FK-safe replacement of old cards. migrate=false is the UPSERT-ONLY refresh
+ *   path — adds/updates canonical cards only, safe to run on a schedule.
+ */
+export function seedOnePiece(db, rows, { migrate = true } = {}) {
   const ins = db.prepare(
     `INSERT INTO cards (id, ip, name, set_name, number, variant, image, language, external_ids)
      VALUES (?, 'OP', ?, ?, ?, ?, ?, ?, ?)
@@ -52,6 +59,9 @@ export function seedOnePiece(db, rows) {
   // 1. Upsert the canonical catalog (so re-point targets exist).
   let n = 0;
   for (const r of rows) { ins.run(r.id, r.name, r.set_name, r.number, r.variant, r.image, r.language, JSON.stringify(r.external_ids)); n++; }
+
+  // Refresh path: upsert only. New sets flow in; nothing old is touched.
+  if (!migrate) { db.exec('COMMIT'); return { seeded: n, purgedOldOp: 0, salesRepointed: 0, oldKeptStillHasSales: 0, mode: 'upsert-only' }; }
 
   // Canonical = has a punkrecords external_id. Old = any other OP card
   // (op-pc* from PriceCharting + the legacy manual ones).
@@ -92,6 +102,6 @@ export function seedOnePiece(db, rows) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const db = openDb();
   const rows = await loadRows(process.argv.includes('--snapshot'));
-  const res = seedOnePiece(db, rows);
+  const res = seedOnePiece(db, rows, { migrate: !process.argv.includes('--upsert-only') });
   console.log('[seed:onepiece]', JSON.stringify({ ...res, sample: rows.slice(0, 2).map(r => ({ id: r.id, name: r.name, number: r.number, set: r.set_name })) }, null, 1));
 }
