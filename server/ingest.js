@@ -19,6 +19,7 @@ import { makePokemonTcgAdapter } from './adapters/pokemontcg.js';
 import { makePriceChartingAdapter } from './adapters/pricecharting.js';
 import { makeCollectorCryptAdapter } from './adapters/collectorcrypt.js';
 import { makeCourtyardListingsAdapter } from './adapters/courtyard-listings.js';
+import { makeMnstrListingsAdapter } from './adapters/mnstr-listings.js';
 import { runSolanaIndexer, registerListings } from './indexer-solana.js';
 import { importCsv } from './import-pricecharting-csv.js';
 import { matchListings } from './match.js';
@@ -269,6 +270,40 @@ async function runLive(db, today) {
   } catch (e) {
     rollback();
     console.warn(`[ingest] courtyard listings fetch failed: ${e.message}`);
+  }
+
+  // 3c. Gacha listings: MNSTR (MegaETH vault) — official public collection API.
+  //     Full snapshot each run (the API returns the CURRENT in-stock set), so
+  //     snapshot-replace is correct here (unlike Courtyard's rolling feed).
+  try {
+    const mnstr = makeMnstrListingsAdapter();
+    const listings = await mnstr.fetchListings({ seenAt: today });
+    const universeByIp = {};
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+      (universeByIp[c.ip] ??= []).push(c);
+    }
+    const matches = new Map();
+    for (const ip of ['PKMN', 'OP', 'YGO']) {
+      const subset = listings.filter(l => l.ip === ip);
+      if (!subset.length || !universeByIp[ip]) continue;
+      for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
+    }
+    db.exec(`DELETE FROM gacha_listings WHERE platform = 'mnstr'`); // full snapshot refresh
+    const insM = db.prepare(
+      `INSERT OR REPLACE INTO gacha_listings
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+    );
+    for (const l of listings) {
+      insM.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.nft_address, l.slug ?? null, l.seen_at);
+    }
+    summary.mnstrListings = listings.length;
+    summary.mnstrMatched = matches.size;
+    console.log(`[ingest] mnstr listings: ${listings.length} (${matches.size} matched to tracked cards)`);
+  } catch (e) {
+    rollback();
+    console.warn(`[ingest] mnstr listings fetch failed: ${e.message}`);
   }
 
   // 4. Raw solds — on-chain gacha sales (self-collected, first-class oracle input).

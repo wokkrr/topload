@@ -344,6 +344,9 @@ export function listingUrl(l) {
   if (l.platform === 'courtyard' && l.proof) {
     return `https://courtyard.io/asset/${l.proof}`;
   }
+  if (l.platform === 'mnstr' && l.proof) {   // proof column carries the card slug
+    return `https://mnstr.xyz/cards/${l.proof}`;
+  }
   return null;
 }
 

@@ -25,9 +25,9 @@ export const PLATFORMS = [
     url: 'https://beezie.com',
   },
   {
-    id: 'mnstr', name: 'MNSTR', chain: 'MegaETH', status: 'next',
-    listings: false, sales: false,
-    access: 'Fully on-chain on MegaETH (not Solana — early recon looked at the wrong chains). $5M+ volume since Apr 2026, settles in USDm. Kaleb enabled MegaETH on Alchemy 2026-07-20; indexer = standard EVM playbook, contract discovery pending.',
+    id: 'mnstr', name: 'MNSTR', chain: 'MegaETH', status: 'live',
+    listings: true, sales: false,
+    access: 'Listings via official public API (api.mnstr.xyz/mnstr/collection, ~1,164 in-stock). Sales on-chain on MegaETH (contract 0x5db1…, USDm) — indexer next. $5M+ volume.',
     url: 'https://mnstr.xyz',
   },
   {
