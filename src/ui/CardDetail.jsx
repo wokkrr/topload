@@ -227,13 +227,15 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
             </div>
           </div>
         </Panel>
-        <Panel title="News & catalysts">
-          <div style={placeholderStyle}>
-            Reprints, set rotations, tournament results, grading-pop changes —
-            the "why it moved" column. Data source TBD; on the backlog after
-            live pricing.
-          </div>
-        </Panel>
+        {!embedded && (
+          <Panel title="News & catalysts">
+            <div style={placeholderStyle}>
+              Reprints, set rotations, tournament results, grading-pop changes —
+              the "why it moved" column. Data source TBD; on the backlog after
+              live pricing.
+            </div>
+          </Panel>
+        )}
       </div>
     </div>
   );
@@ -250,7 +252,7 @@ function DeltaChip({ label, pct }) {
 
 function Panel({ title, children }) {
   return (
-    <div style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 8, background: tokens.color.surface, padding: '14px 16px' }}>
+    <div style={{ border: `1px solid ${tokens.color.border}`, background: tokens.color.surface, padding: '14px 16px' }}>
       <div style={{ font: `13px ${tokens.font.display}`, color: tokens.color.ink, marginBottom: 10 }}>{title}</div>
       {children}
     </div>

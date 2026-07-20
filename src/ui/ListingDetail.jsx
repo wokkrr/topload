@@ -28,18 +28,42 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
   // Grading company parsed off the normalized grade ('CGC10' → CGC / 10).
   const gm = /^([A-Z]+)([\d.]+)$/.exec(l.grade ?? '');
 
+  // Prev/next through the desk's listings without going back.
+  const idx = (listings ?? []).findIndex(s => s.platform === l.platform && s.external_id === l.external_id);
+  const prev = idx > 0 ? listings[idx - 1] : null;
+  const next = idx >= 0 && idx < (listings?.length ?? 0) - 1 ? listings[idx + 1] : null;
+
+  const navBtn = (enabled) => ({
+    background: 'none', border: `1px solid ${enabled ? tokens.color.inkMuted : tokens.color.border}`,
+    color: enabled ? tokens.color.ink : tokens.color.inkMuted, cursor: enabled ? 'pointer' : 'default',
+    padding: '4px 12px', font: `13px ${tokens.font.mono}`, lineHeight: 1,
+  });
+
   return (
     <section>
-      <button onClick={onBack} className="tl-back" style={{
-        background: 'none', border: 'none', color: tokens.color.inkSecondary,
-        font: `12px ${tokens.font.body}`, cursor: 'pointer', padding: 0,
-      }}>← back to Gacha Desk</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={onBack} className="tl-back" style={{
+          background: 'none', border: 'none', color: tokens.color.inkSecondary,
+          font: `12px ${tokens.font.body}`, cursor: 'pointer', padding: 0,
+        }}>← back to Gacha Desk</button>
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {idx >= 0 && (
+            <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}`, marginRight: 4 }}>
+              {idx + 1} / {listings.length}
+            </span>
+          )}
+          <button onClick={prev ? () => onOpenListing?.(prev) : undefined} title={prev ? prev.item_name : undefined}
+                  style={navBtn(!!prev)}>‹</button>
+          <button onClick={next ? () => onOpenListing?.(next) : undefined} title={next ? next.item_name : undefined}
+                  style={navBtn(!!next)}>›</button>
+        </span>
+      </div>
 
       <div style={{ display: 'flex', gap: 32, marginTop: 16, flexWrap: 'wrap' }}>
         {/* ── Photos ── */}
         <div style={{ flex: '0 0 320px', maxWidth: '100%' }}>
           <div style={{
-            position: 'relative', aspectRatio: '3/4', borderRadius: 10,
+            position: 'relative', aspectRatio: '3/4',
             border: `1px solid ${tokens.color.border}`, background: tokens.color.surfaceRaised,
             overflow: 'hidden',
           }}>
@@ -163,8 +187,8 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
                        borderBottom: `1px solid ${tokens.color.surface}`, cursor: 'pointer',
                      }}>
                   {s.image
-                    ? <img src={s.image} alt="" loading="lazy" style={{ height: 40, width: 30, objectFit: 'contain', borderRadius: 3, background: tokens.color.surfaceRaised, flexShrink: 0 }} />
-                    : <span style={{ height: 40, width: 30, borderRadius: 3, background: tokens.color.surfaceRaised, flexShrink: 0 }} />}
+                    ? <img src={s.image} alt="" loading="lazy" style={{ height: 40, width: 30, objectFit: 'contain', background: tokens.color.surfaceRaised, flexShrink: 0 }} />
+                    : <span style={{ height: 40, width: 30, background: tokens.color.surfaceRaised, flexShrink: 0 }} />}
                   <span style={{ font: `12px ${tokens.font.body}`, color: tokens.color.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {s.item_name}
                   </span>
@@ -189,7 +213,7 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
 function Accordion({ title, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 10, background: tokens.color.surface, overflow: 'hidden' }}>
+    <div style={{ border: `1px solid ${tokens.color.border}`, background: tokens.color.surface, overflow: 'hidden' }}>
       <button onClick={() => setOpen(o => !o)} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
         background: 'none', border: 'none', cursor: 'pointer', padding: '14px 18px',
