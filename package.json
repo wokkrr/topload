@@ -27,6 +27,7 @@
     "import:pc": "node --env-file-if-exists=.env server/import-pricecharting-csv.js",
     "rematch": "node --env-file-if-exists=.env server/rematch.js",
     "coverage": "node --env-file-if-exists=.env server/coverage.js",
+    "oracle:refresh": "node --env-file-if-exists=.env server/oracle-refresh.js",
     "mnstr:sales": "node --env-file-if-exists=.env server/indexer-mnstr-sales.js",
     "seed:onepiece": "node --env-file-if-exists=.env server/seed-onepiece.js",
     "seed:pokemon": "node --env-file-if-exists=.env server/seed-pokemon.js",

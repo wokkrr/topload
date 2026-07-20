@@ -97,6 +97,7 @@ export async function runMnstrSalesIndexer(db, { dry = false, fetchImpl = timedF
      VALUES (?, ?, ?, 'USD', ?, 'mnstr', ?)`
   );
 
+  let rpcStrikes = 0;
   for (const row of rows) {
     // Match by title within the row's franchise universe (serial is a cross-check).
     const ip = CATEGORY_TO_IP[row.card_category] ?? (/one piece/i.test(row.card_title ?? '') ? 'OP' : 'PKMN');
@@ -105,14 +106,22 @@ export async function runMnstrSalesIndexer(db, { dry = false, fetchImpl = timedF
     summary.matched++;
 
     // Price: read first-hand from chain when possible; fall back to feed value.
+    // Circuit breaker: 3 consecutive RPC failures → stop trying for the rest of
+    // the run and keep feed prices (which we've verified equal on-chain USDm).
+    // Without it, a dead endpoint costs one full fetch-timeout PER MATCHED SALE
+    // serially — the hour-long ingest crawl of 2026-07-20.
     let price_usd = Number(row.price_usd);
-    if (verify && apiKey) {
+    if (verify && apiKey && rpcStrikes < 3) {
       try {
         const rec = await rpc('eth_getTransactionReceipt', [row.tx_hash]);
         const onchain = priceFromReceipt(rec);
         if (onchain != null) { price_usd = onchain; summary.verified++; }
         else summary.priceMiss++;
-      } catch { summary.priceMiss++; /* keep feed price */ }
+        rpcStrikes = 0;
+      } catch {
+        summary.priceMiss++; /* keep feed price */
+        if (++rpcStrikes === 3) console.warn('[mnstr-sales] RPC circuit open after 3 consecutive failures — feed prices for the rest of this run');
+      }
     }
 
     const sale = mapSale(row, { card_id, price_usd });
