@@ -26,8 +26,8 @@ export const PLATFORMS = [
   },
   {
     id: 'mnstr', name: 'MNSTR', chain: 'MegaETH', status: 'live',
-    listings: true, sales: false,
-    access: 'Listings via official public API (api.mnstr.xyz/mnstr/collection, ~1,164 in-stock). Sales on-chain on MegaETH (contract 0x5db1…, USDm) — indexer next. $5M+ volume.',
+    listings: true, sales: true,
+    access: 'Listings via official public API (~1,164 in-stock). Sales chain-verified on MegaETH (USDm price decoded from each tx receipt; discovery via mnstr.watch feed — upgrade to direct getLogs on paid Alchemy). $5M+ volume.',
     url: 'https://mnstr.xyz',
   },
   {
