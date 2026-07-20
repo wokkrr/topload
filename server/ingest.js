@@ -81,10 +81,22 @@ async function runLive(db, today) {
   const summary = { mode: 'live', cards: 0, resolved: 0, externalMarks: 0, salesIngested: 0 };
   summary.demoPurged = purgeDemoData(db);
 
+  // Fresh-skip (--if-stale slots): when today's PriceCharting import already
+  // landed, skip the once-daily heavy steps (universe + CSVs) but STILL run
+  // listings accumulation + sales indexers below.
+  const freshSkip = process.env.TOPLOAD_SKIP_FRESH === '1' && (() => {
+    try {
+      const today0 = new Date().toISOString().slice(0, 10);
+      return db.prepare(`SELECT COUNT(*) n FROM external_marks WHERE source = 'pricecharting' AND as_of = ?`).get(today0).n > 0;
+    } catch { return false; }
+  })();
+  if (freshSkip) console.log('[ingest] fresh-skip: universe + CSVs already current today — running listings + sales only');
+
   // 1. Card universe: PKMN metadata + manual OP list. Each source is
   //    independently fault-tolerant — one API being down must not kill ingest.
   const ptcg = makePokemonTcgAdapter();
   let pkmnCards = [];
+  if (!freshSkip) {
   try {
     pkmnCards = await ptcg.listCards();
     summary.cards += upsertCards(db, pkmnCards);
@@ -93,6 +105,7 @@ async function runLive(db, today) {
     console.warn(`[ingest] pokemontcg universe fetch failed: ${e.message}`);
   }
   summary.cards += upsertCards(db, opCardRecords());
+  }
 
   const insMark = db.prepare(
     `INSERT OR REPLACE INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES (?, ?, ?, ?, ?)`
@@ -115,7 +128,7 @@ async function runLive(db, today) {
   //     .env: PC_CSV_URL_PKMN / PC_CSV_URL_YGO / PC_CSV_URL_OP — the download
   //     links from pricecharting.com/subscriptions ("API/Download"); the files
   //     regenerate server-side every 24h behind stable URLs.
-  const csvSources = [
+  const csvSources = freshSkip ? [] : [
     ['PKMN', process.env.PC_CSV_URL_PKMN],
     ['YGO', process.env.PC_CSV_URL_YGO],
     ['OP', process.env.PC_CSV_URL_OP],
@@ -351,21 +364,13 @@ export async function ingest({ db = null, dates = null } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  // --if-stale: exit quietly when today's PriceCharting import already landed.
-  // Lets cron fire at several times a day (9am/12pm/6pm) as fallbacks for a
-  // sleeping Mac — the first successful run wins, later slots no-op.
+  // --if-stale: skip only the HEAVY, once-daily steps (card universe + CSV
+  // imports) when today's PriceCharting data already landed. Listings
+  // accumulation and sales indexing run on EVERY slot — the old exit-early
+  // semantics (a fallback chain for a sleeping Mac) silently froze Courtyard
+  // listings at the 18:00 run only (caught 2026-07-20 morning: stuck at 38).
   if (process.argv.includes('--if-stale')) {
-    try {
-      const db = openDb();
-      const today = new Date().toISOString().slice(0, 10);
-      const done = db.prepare(
-        `SELECT COUNT(*) n FROM external_marks WHERE source = 'pricecharting' AND as_of = ?`
-      ).get(today).n;
-      if (done > 0) {
-        console.log(`[ingest] --if-stale: today's pricecharting data already imported (${done} marks) — skipping`);
-        process.exit(0);
-      }
-    } catch { /* no db yet → proceed with full ingest */ }
+    process.env.TOPLOAD_SKIP_FRESH = '1';
   }
   ingest().catch(e => { console.error(e); process.exit(1); });
 }
