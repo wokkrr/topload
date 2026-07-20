@@ -148,7 +148,8 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
         ))}
       </div>
 
-      <MarkChart series={series} color={seriesColor} />
+      <MarkChart series={series} color={seriesColor}
+                 dots={sales?.filter(s => s.grade === grade)} />
 
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%', marginTop: 24 }}>
         <thead><tr>
@@ -250,10 +251,17 @@ function DeltaChip({ label, pct }) {
   );
 }
 
+/** Section-heading style — the uppercase letterspaced label treatment
+ *  (matches the sales-tape header; Kaleb 2026-07-20). */
+export const headingStyle = {
+  font: `11px ${tokens.font.body}`, color: tokens.color.inkSecondary,
+  textTransform: 'uppercase', letterSpacing: '0.08em',
+};
+
 function Panel({ title, children }) {
   return (
     <div style={{ border: `1px solid ${tokens.color.border}`, background: tokens.color.surface, padding: '14px 16px' }}>
-      <div style={{ font: `13px ${tokens.font.display}`, color: tokens.color.ink, marginBottom: 10 }}>{title}</div>
+      <div style={{ ...headingStyle, marginBottom: 10 }}>{title}</div>
       {children}
     </div>
   );
@@ -288,23 +296,29 @@ function marketLinks(card) {
   ];
 }
 
-function MarkChart({ series, color }) {
+function MarkChart({ series, color, dots }) {
   const [hover, setHover] = useState(null);
   const svgRef = useRef(null);
 
   const model = useMemo(() => {
     if (!series?.length) return null;
-    const vals = series.map(p => p.price_cents);
+    // Individual sales plotted as dots — with sparse mark history (external
+    // marks accrue one point/day) the raw trades ARE the texture of the chart.
+    const byDate = new Map(series.map((p, i) => [p.as_of, i]));
+    const pts = (dots ?? [])
+      .map(s => ({ i: byDate.get((s.sold_at ?? '').slice(0, 10)), price: s.price_cents, outlier: !!s.is_outlier }))
+      .filter(p => p.i != null);
+    const vals = series.map(p => p.price_cents).concat(pts.filter(p => !p.outlier).map(p => p.price));
     const lo = Math.min(...vals), hi = Math.max(...vals);
     const pad = (hi - lo) * 0.1 || lo * 0.05 || 1;
     const y = (v) => PAD.t + (H - PAD.t - PAD.b) * (1 - (v - (lo - pad)) / ((hi + pad) - (lo - pad)));
-    const x = (i) => PAD.l + (W - PAD.l - PAD.r) * (series.length < 2 ? 0 : i / (series.length - 1));
-    return { y, x, gridVals: [lo, (lo + hi) / 2, hi] };
-  }, [series]);
+    const x = (i) => PAD.l + (W - PAD.l - PAD.r) * (series.length < 2 ? 0.5 : i / (series.length - 1));
+    return { y, x, gridVals: [lo, (lo + hi) / 2, hi], pts };
+  }, [series, dots]);
 
   if (!series) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>Loading…</div>;
   if (!series.length) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>No oracle marks for this grade yet.</div>;
-  const { x, y, gridVals } = model;
+  const { x, y, gridVals, pts } = model;
 
   // Split into provenance runs so external stretches render dashed.
   const segs = [];
@@ -362,6 +376,21 @@ function MarkChart({ series, color }) {
               strokeDasharray={s.basis === 'external' ? '5 4' : undefined}
               opacity={s.basis === 'external' ? 0.85 : 1} />
       ))}
+
+      {/* Individual sales — jittered slightly so same-day trades don't stack
+          into one dot; outliers faded (they're excluded from marks). */}
+      {pts.map((p, k) => (
+        <circle key={`d${k}`}
+                cx={x(p.i) + ((k % 5) - 2) * 2.2} cy={y(p.price)} r="2.6"
+                fill={color} opacity={p.outlier ? 0.18 : 0.45}
+                stroke={tokens.color.bg} strokeWidth="0.6" />
+      ))}
+      {pts.length > 0 && (
+        <text x={W - PAD.r} y={PAD.t - 2} textAnchor="end" fill={tokens.color.inkMuted}
+              style={{ font: `9px ${tokens.font.mono}` }}>
+          ● individual sales · — oracle mark
+        </text>
+      )}
 
       {hover != null && (
         <g pointerEvents="none">

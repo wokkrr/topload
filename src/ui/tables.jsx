@@ -151,19 +151,22 @@ export function PlatformStrip({ platforms, hidden, onToggle }) {
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
       {platforms.map(p => {
         const off = hidden?.has(p.id);
+        const live = p.listings || p.sales; // any real data flowing
+        // Honest coverage labels: bare = listings + sales; SALES = solds only
+        // (feeds the tape + oracle, listings ingestion TBD); SOON = neither.
+        const suffix = off ? ' · HIDDEN' : p.listings ? '' : p.sales ? ' · SALES' : ' · SOON';
         return (
           <button key={p.id}
                   onClick={interactive ? () => onToggle(p.id) : undefined}
-                  title={interactive ? (off ? `Show ${p.name} listings & sales` : `Hide ${p.name} listings & sales`) : undefined}
+                  title={interactive ? (off ? `Show ${p.name}` : `Hide ${p.name}${p.listings ? ' listings & sales' : p.sales ? ' sales (listings coming)' : ''}`) : undefined}
                   style={{
                     font: `10px ${tokens.font.mono}`, padding: '3px 9px', borderRadius: 3,
-                    border: off ? `1px dashed ${tokens.color.border}` : `1px solid ${p.status === 'live' ? tokens.color.brass : tokens.color.border}`,
-                    color: off ? tokens.color.inkMuted : p.status === 'live' ? tokens.color.ink : tokens.color.inkMuted,
-                    background: !off && p.status === 'live' ? tokens.color.surfaceRaised : 'none',
+                    border: off ? `1px dashed ${tokens.color.border}` : `1px solid ${live ? tokens.color.brass : tokens.color.border}`,
+                    color: off ? tokens.color.inkMuted : live ? tokens.color.ink : tokens.color.inkMuted,
+                    background: !off && p.listings ? tokens.color.surfaceRaised : 'none',
                     opacity: off ? 0.55 : 1, cursor: interactive ? 'pointer' : 'default',
                   }}>
-            {p.name.toUpperCase()}
-            {off ? ' · HIDDEN' : p.status === 'live' ? '' : ' · SOON'}
+            {p.name.toUpperCase()}{suffix}
           </button>
         );
       })}

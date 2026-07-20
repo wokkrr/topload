@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { tokens } from '../tokens.js';
 import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 import { listingUrl } from './tables.jsx';
-import { CardResearch } from './CardDetail.jsx';
+import { CardResearch, headingStyle } from './CardDetail.jsx';
 
 /**
  * In-app listing page — the user stays on Topload for everything except the
@@ -217,7 +217,7 @@ function Accordion({ title, defaultOpen = false, children }) {
       <button onClick={() => setOpen(o => !o)} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
         background: 'none', border: 'none', cursor: 'pointer', padding: '14px 18px',
-        color: tokens.color.ink, font: `14px ${tokens.font.display}`, textAlign: 'left',
+        ...headingStyle, color: tokens.color.ink, textAlign: 'left',
       }}>
         {title}
         <span style={{ color: tokens.color.inkSecondary, fontSize: 11, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▼</span>

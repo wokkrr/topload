@@ -10,29 +10,36 @@
  * platform websites is ruled out (ToS/credibility risk).
  */
 export const PLATFORMS = [
+  // listings: active-listing ingestion live; sales: on-chain solds indexing
+  // live. The UI labels chips from these flags — never overstate coverage.
   {
     id: 'collectorcrypt', name: 'Collector Crypt', chain: 'Solana', status: 'live',
-    access: 'Official keyless marketplace API (listings). On-chain sales indexing next.',
+    listings: true, sales: true,
+    access: 'Official keyless marketplace API (listings). On-chain sales indexed.',
     url: 'https://collectorcrypt.com',
   },
   {
-    id: 'beezie', name: 'Beezie', chain: 'Flow + Solana', status: 'next',
-    access: 'Kaleb-priority #2. Solana side (May 2026) = Helius-indexable like CC; Flow side later. Docs have no API section; recon under way.',
+    id: 'beezie', name: 'Beezie', chain: 'Flow + Solana', status: 'live',
+    listings: false, sales: true,
+    access: 'On-chain sales indexed (Base). Listings ingestion TBD.',
     url: 'https://beezie.com',
   },
   {
     id: 'mnstr', name: 'MNSTR', chain: 'Solana', status: 'next',
-    access: 'Kaleb-priority #3. Marketplace live (PKMN; OP soon), FMV sorting. No public API; Helius program indexing candidate.',
+    listings: false, sales: false,
+    access: 'Custodial/non-tokenized per recon — no chain anchors. Outreach target.',
     url: 'https://mnstr.xyz',
   },
   {
     id: 'courtyard', name: 'Courtyard', chain: 'Polygon', status: 'live',
+    listings: false, sales: true,
     access: 'Sales indexed on-chain (escrow-pattern secondary sales; mints excluded). $99M lifetime volume. Listings TBD.',
     url: 'https://courtyard.io',
   },
   {
     id: 'phygitals', name: 'Phygitals', chain: 'Solana', status: 'live',
-    access: 'Sales indexed on-chain via Core collection anchor (no marketplace program — direct USDC+Core composition). Fanatics-integrated. Listings TBD.',
+    listings: false, sales: true,
+    access: 'Sales indexed on-chain via Core collection anchor. Fanatics-integrated. Listings TBD.',
     url: 'https://www.phygitals.com',
   },
   // RIP.FUN (Base) removed from the roster 2026-07-19 (Kaleb: low usage vs
