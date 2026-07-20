@@ -107,6 +107,13 @@ function compileCard(card) {
     suffixNoZero: stripZeros(op[2]),                 // "15"
     suffixRe: new RegExp(`\\b${escRe(stripZeros(op[2]))}\\b`),
   } : null;
+  // One Piece promo codes ("P-014"): the EXACT code appearing in the title —
+  // '\bp 014\b' post-norm, zero-insensitive — uniquely identifies the promo,
+  // so like a full YGO set code it stands as set evidence (promo pack names
+  // like 'One Piece BLUE Buggy' never appear in titles). A bare '#014' does
+  // NOT qualify — that shape caused the live EN→JA mis-tag (2026-07-20).
+  const promo = /^p\s(\d{1,4})$/.exec(rawNum);
+  const promoRe = promo ? new RegExp(`\\bp 0*${parseInt(promo[1], 10)}\\b`) : null;
   // Regional-infix set codes (LOB-001 ≡ LOB-E001 ≡ LOB-EN001).
   const yg = /^([a-z]{2,5}\d{0,2})\s([a-z]{1,2})?(\d{2,4})$/.exec(rawNum);
   let ygc = null;
@@ -117,7 +124,7 @@ function compileCard(card) {
       codeEvidence: yg[1].length >= 3,
     };
   }
-  c = { name, nameRe, numFullStrong, numShort, numShortRe, op: opc, yg: ygc, remnant, parallel, ja };
+  c = { name, nameRe, numFullStrong, numShort, numShortRe, op: opc, yg: ygc, promoRe, remnant, parallel, ja };
   COMPILED.set(card, c);
   return c;
 }
@@ -183,6 +190,10 @@ export function matchListing(itemName, cards) {
     if (cc.yg && cc.yg.re.test(title)) {
       if (!numberHit) numberHit = 2;
       codeEvidence = cc.yg.codeEvidence;
+    }
+    if (cc.promoRe && cc.promoRe.test(title)) {
+      if (!numberHit) numberHit = 2;
+      codeEvidence = true;                               // exact P-code = unique identity
     }
     if (!numberHit) continue;
 

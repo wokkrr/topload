@@ -129,3 +129,17 @@ describe('EN listings must never be grabbed by -ja promo rows (live mis-tag, 202
     expect(matchListing('One Piece Japanese Luffy 7 vol.1 Monkey D. Luffy P-006 PSA 10', universe)).toBe('op-p-006-ja');
   });
 });
+
+describe('exact P-code = set evidence (promo pack names never appear in titles)', () => {
+  const universe = [
+    { id: 'op-p-006', name: 'Monkey D. Luffy', number: 'P-006', set_name: 'One Piece Luffy 7 vol.1', language: 'English' },
+    { id: 'op-p-006-ja', name: 'Monkey D. Luffy', number: 'P-006', set_name: 'One Piece Luffy 7 vol.1', language: 'Japanese' },
+  ];
+  it('routes real promo listings by language when the full code is present', () => {
+    expect(matchListing('2023 One Piece Japanese Promos Monkey.D.Luffy P-006 PSA 10', universe)).toBe('op-p-006-ja');
+    expect(matchListing('2023 One Piece Promo Monkey D. Luffy P-006 PSA 10', universe)).toBe('op-p-006');
+  });
+  it('still refuses the bare-number shape that caused the mis-tag', () => {
+    expect(matchListing('2024 #006 Monkey D. Luffy PSA 10 One Piece Promos', universe)).toBeNull();
+  });
+});
