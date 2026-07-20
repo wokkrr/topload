@@ -30,6 +30,7 @@
     "test": "vitest run server/test"
   },
   "dependencies": {
+    "compression": "^1.8.1",
     "express": "^5.2.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

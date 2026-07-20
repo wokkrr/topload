@@ -3,6 +3,7 @@
  * Vite dev server proxies /api → here (see vite.config.js).
  */
 import express from 'express';
+import compression from 'compression';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -12,6 +13,10 @@ import { PLATFORMS } from './platforms.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
 const app = express();
+// Gzip everything — the listings JSON alone is ~2MB raw / ~200KB compressed,
+// and the app bundle drops 245KB → 73KB. This was the "slow to load all the
+// cards" (Kaleb, 2026-07-20): payloads shipped uncompressed.
+app.use(compression());
 
 /** GET /api/indexes?days=90 → [{index_id, series:[{as_of, value}]}] */
 app.get('/api/indexes', (req, res) => {
@@ -220,7 +225,14 @@ app.get('/api/gacha', (req, res) => {
 // stays API, everything else falls through to the SPA.
 const dist = join(__dirname, '..', 'dist');
 if (existsSync(join(dist, 'index.html'))) {
-  app.use(express.static(dist));
+  // Vite assets are content-hashed → safe to cache forever; index.html must
+  // revalidate so new deploys are picked up on plain refresh.
+  app.use(express.static(dist, {
+    setHeaders(res, path) {
+      if (path.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      else res.setHeader('Cache-Control', 'no-cache');
+    },
+  }));
   app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(join(dist, 'index.html')));
   console.log('[api] serving built UI from dist/');
 }
