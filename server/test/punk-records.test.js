@@ -29,3 +29,27 @@ describe('punk-records mapCard', () => {
     expect(mapCard({ card_id: 'OP07-109', name: null }, packs)).toBeNull();
   });
 });
+
+import { openDb } from '../db.js';
+import { seedOnePiece } from '../seed-onepiece.js';
+
+describe('seedOnePiece migration (FK-safe)', () => {
+  it('re-points sales from old OP cards to canonical, purges the rest', () => {
+    const db = openDb(':memory:');
+    // old PC-derived OP card with an on-chain sale + a canonical card sharing the code
+    db.prepare(`INSERT INTO cards (id, ip, name, number, external_ids) VALUES ('op-pc99','OP','Luffy Old','OP07-109','{}')`).run();
+    db.prepare(`INSERT INTO cards (id, ip, name, number, external_ids) VALUES ('op-pc-orphan','OP','No Sales','OP01-001','{}')`).run();
+    db.prepare(`INSERT INTO sales (card_id, grade, price_cents, currency, sold_at, source, external_id)
+                VALUES ('op-pc99','raw',5000,'USD','2026-07-01','mnstr','tx:1')`).run();
+    const rows = [
+      { id: 'op-op07-109', name: 'Monkey D. Luffy', set_name: 'One Piece 500 Years', number: 'OP07-109', variant: '', image: null, language: 'English', external_ids: { punkrecords: 'OP07-109' } },
+    ];
+    const res = seedOnePiece(db, rows);
+    expect(res.seeded).toBe(1);
+    // the sale re-pointed to the canonical card
+    expect(db.prepare(`SELECT card_id FROM sales WHERE external_id='tx:1'`).get().card_id).toBe('op-op07-109');
+    // orphan old card (no sales, not canonical) purged; old-with-sales purged after re-point
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id LIKE 'op-pc%'`).get().n).toBe(0);
+    expect(res.salesRepointed).toBe(1);
+  });
+});

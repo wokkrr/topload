@@ -48,14 +48,45 @@ export function seedOnePiece(db, rows) {
        external_ids = json_patch(cards.external_ids, excluded.external_ids)`
   );
   db.exec('BEGIN');
-  // Retire the old PriceCharting-derived OP cards (op-pc*) and the 10 manual
-  // ones — the canonical catalog supersedes them. Their PC prices re-attach to
-  // the canonical cards on the next ingest (import matches by code+name).
-  const purged = db.prepare(`DELETE FROM cards WHERE ip = 'OP' AND id NOT LIKE 'op-op%' AND id NOT LIKE 'op-st%' AND id NOT LIKE 'op-eb%' AND id NOT LIKE 'op-p%' AND id NOT LIKE 'op-prb%'`).run().changes;
+
+  // 1. Upsert the canonical catalog (so re-point targets exist).
   let n = 0;
   for (const r of rows) { ins.run(r.id, r.name, r.set_name, r.number, r.variant, r.image, r.language, JSON.stringify(r.external_ids)); n++; }
+
+  // Canonical = has a punkrecords external_id. Old = any other OP card
+  // (op-pc* from PriceCharting + the legacy manual ones).
+  const isCanonical = `json_extract(external_ids, '$.punkrecords') IS NOT NULL`;
+  const canonicalByNumber = new Map();
+  for (const c of db.prepare(`SELECT id, number FROM cards WHERE ip='OP' AND ${isCanonical} AND number IS NOT NULL`).all())
+    canonicalByNumber.set(c.number.toUpperCase(), c.id);
+
+  // 2. Re-point on-chain SALES from old OP cards → canonical (by code), so we
+  //    never lose real solds. sales.card_id is the only hard FK to cards.
+  const oldOp = db.prepare(`SELECT id, number FROM cards WHERE ip='OP' AND NOT (${isCanonical})`).all();
+  const repoint = db.prepare(`UPDATE sales SET card_id = ? WHERE card_id = ?`);
+  let repointed = 0;
+  for (const o of oldOp) {
+    const canon = o.number ? canonicalByNumber.get(String(o.number).toUpperCase()) : null;
+    if (canon) repointed += Number(repoint.run(canon, o.id).changes);
+  }
+
+  // 3. Delete old OP cards that no longer have sales referencing them (FK-safe).
+  const purged = db.prepare(
+    `DELETE FROM cards WHERE ip='OP' AND NOT (${isCanonical})
+       AND id NOT IN (SELECT DISTINCT card_id FROM sales)`
+  ).run().changes;
+
+  // 4. Clean derived rows orphaned by the delete (these tables have no FK).
+  db.prepare(`DELETE FROM oracle_prices WHERE card_id NOT IN (SELECT id FROM cards)`).run();
+  db.prepare(`DELETE FROM external_marks WHERE card_id NOT IN (SELECT id FROM cards)`).run();
+  db.prepare(`DELETE FROM latest_marks   WHERE card_id NOT IN (SELECT id FROM cards)`).run();
+  db.prepare(`DELETE FROM basket_members WHERE card_id NOT IN (SELECT id FROM cards)`).run();
+  db.prepare(`UPDATE gacha_listings SET card_id = NULL WHERE card_id NOT IN (SELECT id FROM cards)`).run();
+  db.prepare(`UPDATE nft_registry   SET card_id = NULL WHERE card_id NOT IN (SELECT id FROM cards)`).run();
+
   db.exec('COMMIT');
-  return { seeded: n, purgedOldOp: Number(purged) };
+  const keptWithSales = oldOp.length - Number(purged);
+  return { seeded: n, purgedOldOp: Number(purged), salesRepointed: repointed, oldKeptStillHasSales: keptWithSales };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
