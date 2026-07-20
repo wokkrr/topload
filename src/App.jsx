@@ -22,6 +22,10 @@ export default function App() {
   const [recentSales, setRecentSales] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
+  // The filtered+sorted desk list at the moment a listing was opened — the
+  // detail page's prev/next arrows walk THIS, not the whole collection.
+  const [navListings, setNavListings] = useState(null);
+  const openListing = (l, ctx) => { setSelectedListing(l); if (ctx) setNavListings(ctx); };
   const [theme, setTheme] = useState(initialTheme());
   const [err, setErr] = useState(null);
 
@@ -73,8 +77,9 @@ export default function App() {
           <ListingDetail
             listing={selectedListing}
             listings={gacha}
+            navListings={navListings ?? gacha}
             onBack={() => setSelectedListing(null)}
-            onOpenListing={setSelectedListing}
+            onOpenListing={openListing}
             onSelectCard={(id) => { setSelectedListing(null); setSelectedCard(id); }}
           />
         )}
@@ -86,9 +91,13 @@ export default function App() {
           />
         )}
 
-        {!selectedCard && !selectedListing && tab === 'Gacha Desk' && (
-          <GachaDesk listings={gacha} platforms={platforms} sales={recentSales}
-                     onSelect={setSelectedCard} onOpenListing={setSelectedListing} />
+        {/* Kept MOUNTED (hidden) while a card/listing detail is open so filter
+            toggles + scroll survive the back-click (Kaleb, 2026-07-20). */}
+        {tab === 'Gacha Desk' && (
+          <div style={{ display: selectedCard || selectedListing ? 'none' : 'block' }}>
+            <GachaDesk listings={gacha} platforms={platforms} sales={recentSales}
+                       onSelect={setSelectedCard} onOpenListing={openListing} />
+          </div>
         )}
       </main>
     </div>

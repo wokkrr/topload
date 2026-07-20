@@ -362,7 +362,8 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
       <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
         {shown.length.toLocaleString()} card listings
       </div>
-      {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect} onOpenListing={onOpenListing} />}
+      {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect}
+        onOpenListing={onOpenListing ? (l) => onOpenListing(l, shown) : undefined} />}
       {view === 'table' && <div style={{ overflowX: 'auto' }}>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%', tableLayout: 'fixed' }}>
         <colgroup>
@@ -376,7 +377,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
         <tbody>
           {shown.slice(0, 250).map(l => (
             <tr key={`${l.platform}|${l.external_id}`}
-                onClick={onOpenListing ? () => onOpenListing(l)
+                onClick={onOpenListing ? () => onOpenListing(l, shown)
                   : l.card_id ? () => onSelect?.(l.card_id)
                   : listingUrl(l) ? () => window.open(listingUrl(l), '_blank', 'noopener') : undefined}
                 style={{ cursor: 'pointer' }}>

@@ -11,7 +11,7 @@ import { CardResearch, headingStyle } from './CardDetail.jsx';
  * Price history & comps (the embedded research module), More details, and
  * Similar listings. Native in-app buying is the pinned execution-layer phase.
  */
-export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
+export function ListingDetail({ listing: l, listings, navListings, onBack, onOpenListing }) {
   const [side, setSide] = useState('front');
   const url = listingUrl(l);
   const img = side === 'back' && l.image_back ? l.image_back : l.image;
@@ -46,10 +46,12 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
     SGC: 'https://gosgc.com/cert-code-lookup',
   })[gm[1]] ?? null : null;
 
-  // Prev/next through the desk's listings without going back.
-  const idx = (listings ?? []).findIndex(s => s.platform === l.platform && s.external_id === l.external_id);
-  const prev = idx > 0 ? listings[idx - 1] : null;
-  const next = idx >= 0 && idx < (listings?.length ?? 0) - 1 ? listings[idx + 1] : null;
+  // Prev/next walk the FILTERED desk list the user came from (Kaleb,
+  // 2026-07-20), not the whole collection. Similar-listings keeps the full set.
+  const nav = navListings ?? listings ?? [];
+  const idx = nav.findIndex(s => s.platform === l.platform && s.external_id === l.external_id);
+  const prev = idx > 0 ? nav[idx - 1] : null;
+  const next = idx >= 0 && idx < nav.length - 1 ? nav[idx + 1] : null;
 
   const navBtn = (enabled) => ({
     background: 'none', border: `1px solid ${enabled ? tokens.color.inkMuted : tokens.color.border}`,
@@ -67,7 +69,7 @@ export function ListingDetail({ listing: l, listings, onBack, onOpenListing }) {
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
           {idx >= 0 && (
             <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}`, marginRight: 4 }}>
-              {idx + 1} / {listings.length}
+              {idx + 1} / {nav.length}
             </span>
           )}
           <button onClick={prev ? () => onOpenListing?.(prev) : undefined} title={prev ? prev.item_name : undefined}
