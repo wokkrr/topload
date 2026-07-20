@@ -312,7 +312,6 @@ async function runLive(db, today) {
       const idx = await runSolanaIndexer(db, { maxPages: Number(process.env.HELIUS_MAX_PAGES ?? 5) });
       summary.onchainSales = idx.inserted;
     } catch (e) {
-     rollback();
       rollback();
       console.warn(`[ingest] solana indexer failed: ${e.message}`);
     }
@@ -323,7 +322,6 @@ async function runLive(db, today) {
       const idx = await runBaseIndexer(db, {});
       summary.beezieSales = idx.inserted;
     } catch (e) {
-     rollback();
       rollback();
       console.warn(`[ingest] base indexer failed: ${e.message}`);
     }
@@ -334,7 +332,6 @@ async function runLive(db, today) {
       const idx = await runPhygitalsIndexer(db, { maxPages: Number(process.env.HELIUS_MAX_PAGES ?? 5) });
       summary.phygitalsSales = idx.inserted;
     } catch (e) {
-     rollback();
       rollback();
       console.warn(`[ingest] phygitals indexer failed: ${e.message}`);
     }
@@ -345,10 +342,19 @@ async function runLive(db, today) {
       const idx = await runCourtyardIndexer(db, {});
       summary.courtyardSales = idx.inserted;
     } catch (e) {
-     rollback();
       rollback();
       console.warn(`[ingest] courtyard indexer failed: ${e.message}`);
     }
+  }
+  // MNSTR (MegaETH): feed-discovery + on-chain price verification (see indexer).
+  try {
+    const { runMnstrSalesIndexer } = await import('./indexer-mnstr-sales.js');
+    const idx = await runMnstrSalesIndexer(db, {});
+    summary.mnstrSales = idx.inserted;
+    console.log(`[ingest] mnstr sales: ${idx.inserted} inserted (${idx.matched} matched, ${idx.verified} chain-verified of ${idx.fetched} feed rows)`);
+  } catch (e) {
+    rollback();
+    console.warn(`[ingest] mnstr sales indexer failed: ${e.message}`);
   }
   rollback(); // belt-and-suspenders: never hand an open txn to the oracle refresh
 

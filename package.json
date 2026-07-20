@@ -27,6 +27,7 @@
     "import:pc": "node --env-file-if-exists=.env server/import-pricecharting-csv.js",
     "rematch": "node --env-file-if-exists=.env server/rematch.js",
     "coverage": "node --env-file-if-exists=.env server/coverage.js",
+    "mnstr:sales": "node --env-file-if-exists=.env server/indexer-mnstr-sales.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "test": "vitest run server/test"
   },
