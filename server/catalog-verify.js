@@ -34,7 +34,7 @@ for (const [ip, canonSql] of Object.entries(CANON)) {
   const old = total - canon;
   if (canon >= MIN_CANONICAL[ip]) ok(`${canon} canonical cards (floor ${MIN_CANONICAL[ip]})`);
   else fail(`only ${canon} canonical cards — below floor ${MIN_CANONICAL[ip]} (seed missing/truncated?)`);
-  if (old > 0) console.log(`  · ${old} non-canonical remnants (kept for sales FK — fine unless growing)`);
+  if (old > 0) console.log(`  · ${old} non-canonical satellite cards (PriceCharting-priced products outside the canonical EN catalog — JP printings, 1st Eds, etc.; the to-absorb list for later passes)`);
 
   const noName = db.prepare(`SELECT COUNT(*) n FROM cards WHERE ip=? AND ${canonSql} AND (name IS NULL OR name='')`).get(ip).n;
   const noNum = db.prepare(`SELECT COUNT(*) n FROM cards WHERE ip=? AND ${canonSql} AND (number IS NULL OR number='')`).get(ip).n;
