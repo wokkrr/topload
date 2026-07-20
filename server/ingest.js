@@ -18,6 +18,7 @@ import { makeDemoAdapter } from './adapters/demo.js';
 import { makePokemonTcgAdapter } from './adapters/pokemontcg.js';
 import { makePriceChartingAdapter } from './adapters/pricecharting.js';
 import { makeCollectorCryptAdapter } from './adapters/collectorcrypt.js';
+import { makeCourtyardListingsAdapter } from './adapters/courtyard-listings.js';
 import { runSolanaIndexer, registerListings } from './indexer-solana.js';
 import { importCsv } from './import-pricecharting-csv.js';
 import { matchListings } from './match.js';
@@ -197,6 +198,38 @@ async function runLive(db, today) {
     console.log(`[ingest] collectorcrypt listings: ${listings.length} (${matches.size} matched to tracked cards)`);
   } catch (e) {
     console.warn(`[ingest] collectorcrypt fetch failed: ${e.message}`);
+  }
+
+  // 3b. Gacha listings: Courtyard (Polygon vault) — official recently-listed API.
+  try {
+    const yard = makeCourtyardListingsAdapter();
+    const listings = await yard.fetchListings({ seenAt: today, maxPages: Number(process.env.YARD_LISTINGS_MAX_PAGES ?? 20) });
+    const universeByIp = {};
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name FROM cards`).all()) {
+      (universeByIp[c.ip] ??= []).push(c);
+    }
+    // Each listing already carries its franchise (ip); match within that universe.
+    const matches = new Map();
+    for (const ip of ['PKMN', 'OP', 'YGO']) {
+      const subset = listings.filter(l => l.ip === ip);
+      if (!subset.length || !universeByIp[ip]) continue;
+      for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
+    }
+    db.exec(`DELETE FROM gacha_listings WHERE platform = 'courtyard'`); // snapshot refresh
+    const insY = db.prepare(
+      `INSERT OR REPLACE INTO gacha_listings
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+    );
+    for (const l of listings) {
+      insY.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.nft_address, l.seen_at);
+    }
+    summary.yardListings = listings.length;
+    summary.yardMatched = matches.size;
+    console.log(`[ingest] courtyard listings: ${listings.length} (${matches.size} matched to tracked cards)`);
+  } catch (e) {
+    console.warn(`[ingest] courtyard listings fetch failed: ${e.message}`);
   }
 
   // 4. Raw solds — on-chain gacha sales (self-collected, first-class oracle input).

@@ -32,8 +32,8 @@ export const PLATFORMS = [
   },
   {
     id: 'courtyard', name: 'Courtyard', chain: 'Polygon', status: 'live',
-    listings: false, sales: true,
-    access: 'Sales indexed on-chain (escrow-pattern secondary sales; mints excluded). $99M lifetime volume. Listings TBD.',
+    listings: true, sales: true,
+    access: 'Sales indexed on-chain; listings via official recently-listed API. $99M lifetime volume.',
     url: 'https://courtyard.io',
   },
   {
