@@ -73,6 +73,11 @@ function purgeDemoData(db) {
 }
 
 async function runLive(db, today) {
+  // A source that dies mid-write (e.g. 'database is locked' losing a race with
+  // a long backfill) can leave its transaction OPEN on this connection — roll
+  // it back so later steps don't hit 'transaction within a transaction'
+  // (bit us live 2026-07-20 while the first backfill marathon was running).
+  const rollback = () => { try { db.exec('ROLLBACK'); } catch { /* no open txn */ } };
   const summary = { mode: 'live', cards: 0, resolved: 0, externalMarks: 0, salesIngested: 0 };
   summary.demoPurged = purgeDemoData(db);
 
@@ -84,6 +89,7 @@ async function runLive(db, today) {
     pkmnCards = await ptcg.listCards();
     summary.cards += upsertCards(db, pkmnCards);
   } catch (e) {
+    rollback();
     console.warn(`[ingest] pokemontcg universe fetch failed: ${e.message}`);
   }
   summary.cards += upsertCards(db, opCardRecords());
@@ -101,6 +107,7 @@ async function runLive(db, today) {
       console.log(`[ingest] tcgplayer snapshot marks: ${freeMarks.length}`);
     }
   } catch (e) {
+    rollback();
     console.warn(`[ingest] tcgplayer snapshot fetch failed: ${e.message}`);
   }
 
@@ -129,6 +136,7 @@ async function runLive(db, today) {
       summary.externalMarks += r.marks;
       console.log(`[ingest] pricecharting csv ${ip}: ${JSON.stringify(r)}`);
     } catch (e) {
+      rollback();
       console.warn(`[ingest] pricecharting csv ${ip} failed: ${e.message}`);
     }
   }
@@ -156,6 +164,7 @@ async function runLive(db, today) {
         const [best] = await pc.resolveProduct(q);
         if (best) { setId.run(String(best.pcId), row.id); summary.resolved++; }
       } catch (e) {
+        rollback();
         console.warn(`[ingest] resolve failed for ${row.id}: ${e.message}`);
       }
     }
@@ -197,6 +206,7 @@ async function runLive(db, today) {
     summary.registered = registerListings(db, listings, matches);
     console.log(`[ingest] collectorcrypt listings: ${listings.length} (${matches.size} matched to tracked cards)`);
   } catch (e) {
+    rollback();
     console.warn(`[ingest] collectorcrypt fetch failed: ${e.message}`);
   }
 
@@ -244,6 +254,7 @@ async function runLive(db, today) {
     summary.yardMatched = matches.size;
     console.log(`[ingest] courtyard listings: +${listings.length} new (${matches.size} matched) · ${live} accumulated · pruned ${Number(sold.changes)} sold, ${Number(stale.changes)} stale`);
   } catch (e) {
+    rollback();
     console.warn(`[ingest] courtyard listings fetch failed: ${e.message}`);
   }
 
@@ -253,6 +264,8 @@ async function runLive(db, today) {
       const idx = await runSolanaIndexer(db, { maxPages: Number(process.env.HELIUS_MAX_PAGES ?? 5) });
       summary.onchainSales = idx.inserted;
     } catch (e) {
+     rollback();
+      rollback();
       console.warn(`[ingest] solana indexer failed: ${e.message}`);
     }
   }
@@ -262,6 +275,8 @@ async function runLive(db, today) {
       const idx = await runBaseIndexer(db, {});
       summary.beezieSales = idx.inserted;
     } catch (e) {
+     rollback();
+      rollback();
       console.warn(`[ingest] base indexer failed: ${e.message}`);
     }
   }
@@ -271,6 +286,8 @@ async function runLive(db, today) {
       const idx = await runPhygitalsIndexer(db, { maxPages: Number(process.env.HELIUS_MAX_PAGES ?? 5) });
       summary.phygitalsSales = idx.inserted;
     } catch (e) {
+     rollback();
+      rollback();
       console.warn(`[ingest] phygitals indexer failed: ${e.message}`);
     }
   }
@@ -280,9 +297,12 @@ async function runLive(db, today) {
       const idx = await runCourtyardIndexer(db, {});
       summary.courtyardSales = idx.inserted;
     } catch (e) {
+     rollback();
+      rollback();
       console.warn(`[ingest] courtyard indexer failed: ${e.message}`);
     }
   }
+  rollback(); // belt-and-suspenders: never hand an open txn to the oracle refresh
 
   return summary;
 }
