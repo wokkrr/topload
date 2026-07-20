@@ -15,7 +15,9 @@
  * Star comped as the $107k 2005 original; $75 novelty Mew comped at $90k.
  */
 
-const norm = (s) => (s ?? '').toLowerCase().replace(/[^a-z0-9/#\s.]/g, ' ').replace(/\s+/g, ' ').trim();
+// Dots become spaces so "Monkey.D.Luffy" ≡ "Monkey D. Luffy" (MNSTR writes
+// One Piece names both ways). '#' and '/' are kept — they carry number meaning.
+const norm = (s) => (s ?? '').toLowerCase().replace(/[^a-z0-9/#\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
 const SET_STOPWORDS = new Set([
   'pokemon', 'japanese', 'chinese', 'korean', 'card', 'cards', 'game', 'tcg',
@@ -93,15 +95,21 @@ export function matchListing(itemName, cards) {
     // set prefix AND the card-number suffix both hit. Set evidence (rule 3)
     // still guards against cross-set collisions.
     if (!numberHit) {
-      // norm() turns the hyphen in "OP07-109" into a space → "op07 109".
-      const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(numFull);
+      // Set-prefixed numbers ("OP07-109", "OP07-015", "EB02-098"). Parse from
+      // the UN-zero-stripped form (norm turns the hyphen into a space) so the
+      // padded suffix survives — MNSTR writes both "#OP07015" (concatenated,
+      // padded) and "Op07 … #109" (split). op[2] is the raw suffix.
+      const rawNum = norm(card.number ?? '');
+      const op = /^([a-z]{1,3}\d{0,3})[\s-]([a-z]?\d{1,4})$/.exec(rawNum);
       if (op) {
-        const prefix = op[1];                            // "op07"
-        const suffix = stripZeros(op[2]);                // "109"
-        const concat = prefix + op[2];                   // "op07109"
-        const suffixHit = titleZ.includes(`#${suffix}`) || new RegExp(`\\b${suffix}\\b`).test(titleZ);
-        if (titleZ.includes(concat)) numberHit = 2;               // "#op02120" style
-        else if (title.includes(prefix) && suffixHit) numberHit = 2; // "op07 … #109" style
+        const prefix = op[1];                              // "op07"
+        const suffixRaw = op[2];                            // "015" (padded)
+        const suffixNoZero = stripZeros(suffixRaw);         // "15"
+        const splitHit = title.includes(`#${suffixRaw}`)
+          || titleZ.includes(`#${suffixNoZero}`)
+          || new RegExp(`\\b${suffixNoZero}\\b`).test(titleZ);
+        if (title.includes(prefix + suffixRaw)) numberHit = 2;         // "#op07015"
+        else if (title.includes(prefix) && splitHit) numberHit = 2;    // "op07 … #109"
       }
     }
     if (!numberHit) continue;

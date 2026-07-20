@@ -164,3 +164,11 @@ describe('One Piece set-prefixed numbers (MNSTR formats, 2026-07-20)', () => {
     expect(matchListing('2024 One Piece Op09 Emperors Monkey D. Luffy #109 PSA 10', op)).toBeNull();
   });
 });
+
+describe('name punctuation: dotted vs spaced (MNSTR One Piece)', () => {
+  const c = [{ id: 'op-op07-dragon-015', name: 'Monkey D. Dragon', number: 'OP07-015', set_name: 'One Piece Op07 Emperors in the New World' }];
+  it('matches "Monkey.D.Dragon" (dots, no spaces) to "Monkey D. Dragon"', () => {
+    expect(matchListing('2024 One Piece Card Game Emperors in the New World Monkey.D.Dragon SP #OP07015 BGS 10', c))
+      .toBe('op-op07-dragon-015');
+  });
+});
