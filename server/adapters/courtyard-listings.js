@@ -88,7 +88,11 @@ export function makeCourtyardListingsAdapter({ fetchImpl = fetch, throttleMs = 3
         await throttle();
         let json;
         try {
-          const res = await fetchImpl(`${API}/index/recently-listed?page=${page}`);
+          // Their edge 403s the default node/curl user-agent (verified from the
+          // VPS 2026-07-20); a generic browser UA passes. Not IP-blocking.
+          const res = await fetchImpl(`${API}/index/recently-listed?page=${page}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+          });
           if (!res.ok) break;
           json = await res.json();
         } catch { break; }
