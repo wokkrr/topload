@@ -1,21 +1,30 @@
 import { tokens } from '../tokens.js';
-import { MoversTable, BasketTable, Chip } from './tables.jsx';
+import { Chip } from './tables.jsx';
 import { Screener } from './Screener.jsx';
 import { IndexChart } from './IndexChart.jsx';
 
 /**
  * The Terminal tab — one dashboard replacing the old Cards / Movers / Basket
- * tabs (Kaleb, 2026-07-20: "combine them into one singular tab… keep things
- * simple"). Three stacked sections, each with a one-line explanation so the
- * surface reads instantly: franchise indexes (chart), market pulse (movers +
- * basket constituents side by side), and the card lookup (full screener).
+ * tabs. v2 after the first cut overflowed (side-by-side panels strangled
+ * full-width tables): single column, essentials only (Kaleb: "figure out the
+ * most important information to display and go with that to start").
+ *
+ *   1. Indexes  — is the market up or down (franchise benchmark chart)
+ *   2. Movers   — what's hot: name · grade · mark · Δ1D, top 8, nothing else
+ *   3. Lookup   — find anything (full screener)
+ *
+ * Basket constituents intentionally left off this first dashboard — tables
+ * and API remain (tables.jsx BasketTable) for the richer dashboard later.
  */
 
 const RANGES = [7, 30, 90];
 
+const fmtUsd = (c) => c == null ? '—' : `$${(c / 100).toLocaleString('en-US', { maximumFractionDigits: c >= 100000 ? 0 : 2 })}`;
+const fmtPct = (p) => p == null ? '—' : `${p >= 0 ? '+' : ''}${p.toFixed(1)}%`;
+
 function SectionHead({ title, hint }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '0 0 10px' }}>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '0 0 12px', flexWrap: 'wrap' }}>
       <h2 style={{
         margin: 0, font: `12px ${tokens.font.mono}`, textTransform: 'uppercase',
         letterSpacing: '1.5px', color: tokens.color.ink,
@@ -28,19 +37,41 @@ function SectionHead({ title, hint }) {
 const panel = {
   border: `1px solid ${tokens.color.border}`, borderRadius: 0,
   padding: '14px 16px', background: tokens.color.surface,
-  flex: '1 1 420px', minWidth: 0,
+  boxSizing: 'border-box', width: '100%', overflow: 'hidden',
 };
 
-export function Terminal({
-  indexes, days, setDays,
-  movers, basket, basketIp, setBasketIp,
-  onSelect,
-}) {
+/** One mover, overflow-proof: dot + name ellipsize; price + Δ pinned right. */
+function MoverRow({ m, onSelect }) {
+  const up = (m.change_pct ?? 0) >= 0;
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+    <div onClick={() => onSelect?.(m.card_id)} style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '7px 2px',
+      borderTop: `1px solid ${tokens.color.border}`, cursor: 'pointer', minWidth: 0,
+    }}>
+      <span style={{
+        flex: 'none', width: 8, height: 8, borderRadius: 2,
+        background: tokens.series[m.ip]?.data ?? tokens.color.inkMuted,
+      }} title={tokens.series[m.ip]?.label ?? m.ip} />
+      <span style={{
+        flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap', font: `13px ${tokens.font.body}`,
+      }}>
+        {m.name} <span style={{ color: tokens.color.inkMuted }}>· {m.grade}</span>
+      </span>
+      <span style={{ flex: 'none', font: `13px ${tokens.font.mono}` }}>{fmtUsd(m.price_now)}</span>
+      <span style={{
+        flex: 'none', width: 62, textAlign: 'right', font: `13px ${tokens.font.mono}`,
+        color: m.change_pct == null ? tokens.color.inkMuted : up ? tokens.color.up : tokens.color.down,
+      }}>{fmtPct(m.change_pct)}</span>
+    </div>
+  );
+}
 
-      {/* 1. Franchise indexes — the market at a glance. */}
-      <div style={{ ...panel, flex: 'none' }}>
+export function Terminal({ indexes, days, setDays, movers, onSelect }) {
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      <div style={panel}>
         <SectionHead title="Indexes" hint="liquidity-weighted franchise benchmarks · base 100" />
         <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
           {RANGES.map(r => (
@@ -50,25 +81,14 @@ export function Terminal({
         <IndexChart data={indexes} />
       </div>
 
-      {/* 2. Market pulse — movers and basket constituents side by side. */}
-      <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div style={panel}>
-          <SectionHead title="Movers · 24h" hint="biggest one-day moves among cards with live marks" />
-          <MoversTable movers={movers?.slice(0, 10)} onSelect={onSelect} />
-        </div>
-        <div style={panel}>
-          <SectionHead title="Basket" hint="index constituents · top by 90D volume, monthly rebalance" />
-          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-            {Object.entries(tokens.series).map(([id, s]) => (
-              <Chip key={id} active={basketIp === id} onClick={() => setBasketIp(id)} color={s.data}>{s.label}</Chip>
-            ))}
-          </div>
-          <BasketTable basket={basket?.slice(0, 10)} onSelect={onSelect} />
-        </div>
+      <div style={panel}>
+        <SectionHead title="Movers · 24h" hint="biggest one-day moves among cards with live marks" />
+        {movers?.length
+          ? movers.slice(0, 8).map(m => <MoverRow key={`${m.card_id}|${m.grade}`} m={m} onSelect={onSelect} />)
+          : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '8px 2px' }}>no movers yet — marks refresh with each ingest</div>}
       </div>
 
-      {/* 3. Card lookup — the full screener over the whole universe. */}
-      <div style={{ ...panel, flex: 'none' }}>
+      <div style={panel}>
         <SectionHead title="Card Lookup" hint="search the full Topload Card Database — every tracked card, priced or not" />
         <Screener onSelect={onSelect} />
       </div>

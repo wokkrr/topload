@@ -15,10 +15,8 @@ const TABS = ['Terminal', 'Gacha Desk'];
 export default function App() {
   const [tab, setTab] = useState('Terminal');
   const [days, setDays] = useState(90);
-  const [basketIp, setBasketIp] = useState('PKMN');
   const [indexes, setIndexes] = useState(null);
   const [movers, setMovers] = useState(null);
-  const [basket, setBasket] = useState(null);
   const [gacha, setGacha] = useState(null);
   const [platforms, setPlatforms] = useState(null);
   const [recentSales, setRecentSales] = useState(null);
@@ -38,7 +36,6 @@ export default function App() {
   useEffect(() => { api.recentSales().then(setRecentSales).catch(() => setRecentSales([])); }, []);
   useEffect(() => { api.indexes(days).then(setIndexes).catch(e => setErr(String(e))); }, [days]);
   useEffect(() => { api.movers(1).then(setMovers).catch(e => setErr(String(e))); }, []);
-  useEffect(() => { api.basket(basketIp).then(setBasket).catch(e => setErr(String(e))); }, [basketIp]);
 
   return (
     <div style={{ minHeight: '100vh', background: tokens.color.bg, color: tokens.color.ink, fontFamily: tokens.font.body }}>
@@ -85,8 +82,7 @@ export default function App() {
         {!selectedCard && !selectedListing && tab === 'Terminal' && (
           <Terminal
             indexes={indexes} days={days} setDays={setDays}
-            movers={movers} basket={basket} basketIp={basketIp} setBasketIp={setBasketIp}
-            onSelect={setSelectedCard}
+            movers={movers} onSelect={setSelectedCard}
           />
         )}
 
