@@ -295,8 +295,9 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
         <tbody>
           {shown.map(l => (
             <tr key={`${l.platform}|${l.external_id}`}
-                onClick={l.card_id ? () => onSelect?.(l.card_id) : undefined}
-                style={{ cursor: l.card_id ? 'pointer' : 'default' }}>
+                onClick={l.card_id ? () => onSelect?.(l.card_id)
+                  : listingUrl(l) ? () => window.open(listingUrl(l), '_blank', 'noopener') : undefined}
+                style={{ cursor: l.card_id || listingUrl(l) ? 'pointer' : 'default' }}>
               <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}>
                 <Thumb src={l.image} size={42} badge={l.image_kind === 'art' ? 'NOT ITEM' : null} />
                 <span>
@@ -322,6 +323,18 @@ export function GachaDesk({ listings, platforms, sales, onSelect }) {
   );
 }
 
+/**
+ * Outbound listing URL per marketplace (verified live 2026-07-20: CC's router
+ * is /assets/:blockchain/:cardAddress). Research stays here; buying happens
+ * on the marketplace — unmatched listings open this directly.
+ */
+export function listingUrl(l) {
+  if (l.platform === 'collectorcrypt' && l.nft_address) {
+    return `https://collectorcrypt.com/assets/solana/${l.nft_address}`;
+  }
+  return null;
+}
+
 /** Thumbnail grid — slabs as visual merchandise. Hover lift via injected CSS
  *  (inline styles can't express :hover); colors ride the theme CSS vars. */
 const GRID_CSS = `
@@ -333,14 +346,16 @@ function GachaGrid({ listings, onSelect }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
       <style>{GRID_CSS}</style>
-      {listings.map(l => (
+      {listings.map(l => {
+        const url = listingUrl(l);
+        return (
         <div key={`${l.platform}|${l.external_id}`}
              className="tl-gacha-card"
-             onClick={l.card_id ? () => onSelect?.(l.card_id) : undefined}
-             title={l.item_name}
+             onClick={l.card_id ? () => onSelect?.(l.card_id) : url ? () => window.open(url, '_blank', 'noopener') : undefined}
+             title={l.card_id ? l.item_name : url ? `${l.item_name} — no research page yet, opens the marketplace listing` : l.item_name}
              style={{
                border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
-               background: tokens.color.surface, cursor: l.card_id ? 'pointer' : 'default',
+               background: tokens.color.surface, cursor: l.card_id || url ? 'pointer' : 'default',
                display: 'flex', flexDirection: 'column',
              }}>
           <div style={{ position: 'relative', aspectRatio: '3/4', background: tokens.color.surfaceRaised }}>
@@ -375,11 +390,21 @@ function GachaGrid({ listings, onSelect }) {
             }}>{l.card_name ?? l.item_name}</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 'auto' }}>
               <span>{l.comp_cents && !l.comp_suspect ? `comp ${fmtUsd(l.comp_cents)}` : l.comp_suspect ? 'comp suspect' : 'no comp'}</span>
-              <span style={{ whiteSpace: 'nowrap' }}>{PLATFORM_LABELS[l.platform] ?? l.platform}</span>
+              {url ? (
+                <a href={url} target="_blank" rel="noopener noreferrer"
+                   onClick={e => e.stopPropagation()}
+                   title={`View this listing on ${PLATFORM_LABELS[l.platform] ?? l.platform}`}
+                   style={{ whiteSpace: 'nowrap', color: tokens.color.inkMuted, textDecoration: 'none' }}>
+                  {PLATFORM_LABELS[l.platform] ?? l.platform} ↗
+                </a>
+              ) : (
+                <span style={{ whiteSpace: 'nowrap' }}>{PLATFORM_LABELS[l.platform] ?? l.platform}</span>
+              )}
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
