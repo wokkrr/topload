@@ -1,37 +1,36 @@
 /**
- * Probe apitcg card shape. Run on the server (no CORS):
- *   node server/probe-apitcg.js one-piece luffy
- * Tries the known host variants and reports which returns valid card JSON.
+ * Probe apitcg card shape. Run on the server:
+ *   node server/probe-apitcg.js one-piece
  */
 const game = process.argv[2] ?? 'one-piece';
-const q = process.argv[3] ?? 'luffy';
 const key = process.env.APITCG_API_KEY;
 if (!key) { console.error('APITCG_API_KEY not set'); process.exit(1); }
+const BASE = 'https://apitcg.com/api';
 
-const bases = [
-  'https://www.apitcg.com/api',
-  'https://apitcg.com/api',
-  'https://api.apitcg.com/api',
+const queries = [
+  `/${game}/cards`,
+  `/${game}/cards?limit=3`,
+  `/${game}/cards?page=1&limit=3`,
+  `/${game}/cards?name=luffy`,
+  `/${game}/cards?property=name&value=luffy`,
+  `/${game}/cards?code=OP01-001`,
+  `/${game}/sets`,
 ];
 
-for (const base of bases) {
-  const url = `${base}/${game}/cards?name=${encodeURIComponent(q)}&limit=3`;
+for (const path of queries) {
   try {
-    const res = await fetch(url, { headers: { 'x-api-key': key }, redirect: 'follow' });
-    const ct = res.headers.get('content-type') ?? '';
+    const res = await fetch(`${BASE}${path}`, { headers: { 'x-api-key': key } });
     const body = await res.text();
-    console.log(`\n=== ${base} → HTTP ${res.status} (${ct.slice(0, 30)}) ===`);
-    if (!ct.includes('json')) { console.log('  (non-JSON:', body.slice(0, 80).replace(/\s+/g, ' '), ')'); continue; }
-    const json = JSON.parse(body);
-    console.log('  top-level keys:', Object.keys(json));
+    let json = null; try { json = JSON.parse(body); } catch {}
+    console.log(`\n=== ${path} → HTTP ${res.status} ===`);
+    if (!json) { console.log('  non-JSON:', body.slice(0, 100).replace(/\s+/g, ' ')); continue; }
+    if (json.error) { console.log('  error:', JSON.stringify(json.error).slice(0, 200)); continue; }
     const list = json.data ?? json.cards ?? (Array.isArray(json) ? json : []);
-    console.log('  page count:', list.length, '| total:', json.totalCount ?? json.total ?? json.count ?? '?');
+    console.log('  top keys:', Object.keys(json), '| page count:', list.length, '| total:', json.totalCount ?? json.total ?? '?');
     if (list[0]) {
-      console.log('  card field names:', Object.keys(list[0]));
-      console.log('  sample card:', JSON.stringify(list[0], null, 1).slice(0, 1400));
+      console.log('  card fields:', Object.keys(list[0]));
+      console.log('  sample:', JSON.stringify(list[0], null, 1).slice(0, 1400));
+      break;
     }
-    if (list.length) break; // found the working host
-  } catch (e) {
-    console.log(`\n=== ${base} → ERROR ${String(e.message).slice(0, 60)} ===`);
-  }
+  } catch (e) { console.log(`\n=== ${path} → ERR ${String(e.message).slice(0, 60)} ===`); }
 }
