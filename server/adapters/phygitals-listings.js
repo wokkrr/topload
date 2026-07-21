@@ -95,7 +95,7 @@ export function mapListing(l, category, seenAt) {
     exact_card_id: exactId,
     language: lang,
     fmv_usd: Number.isFinite(Number(l.altFmv)) && Number(l.altFmv) > 0 ? Number(l.altFmv) : null,
-    seen_at: seenAt ?? (l.updatedAt ?? '').slice(0, 10) || null,
+    seen_at: seenAt ?? ((l.updatedAt ?? '').slice(0, 10) || null),
   };
 }
 
