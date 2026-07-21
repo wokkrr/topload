@@ -192,6 +192,18 @@ describe('JA-3: OP satellite mop-up (marks/sales/pc → canonical, retire satell
     return db;
   };
 
+  it('variant-tagged satellites ([Alternate Art] etc.) are NEVER merged into base rows', () => {
+    const db = setup();
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, language, external_ids) VALUES
+      ('op-pc888','OP','Uta [Alternate Art]','OP02-120','One Piece Japanese Paramount War','Japanese','{"pricecharting":"888"}')`).run();
+    db.prepare(`INSERT INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES ('pricecharting','op-pc888','PSA10','2026-07-20',500000)`).run();
+    const r = mopupOpSatellites(db);
+    expect(r.keptVariant).toBe(1);
+    // the alt-art's $5,000 mark must NOT land on the base -ja row
+    expect(db.prepare(`SELECT COUNT(*) n FROM external_marks WHERE card_id='op-op02-120-ja' AND price_cents=500000`).get().n).toBe(0);
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id='op-pc888'`).get().n).toBe(1);
+  });
+
   it('dry run reports without writing', () => {
     const db = setup();
     const r = mopupOpSatellites(db, { dry: true });

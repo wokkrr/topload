@@ -34,7 +34,7 @@ export function mopupOpSatellites(db, { dry = false } = {}) {
      WHERE ip='OP' AND id LIKE 'op-pc%'`
   ).all();
 
-  const res = { satellites: sats.length, matched: 0, marksMoved: 0, marksDroppedDup: 0, salesMoved: 0, listingsRepointed: 0, registryRepointed: 0, retired: 0, keptUnmatched: 0, samples: [] };
+  const res = { satellites: sats.length, matched: 0, marksMoved: 0, marksDroppedDup: 0, salesMoved: 0, listingsRepointed: 0, registryRepointed: 0, retired: 0, keptUnmatched: 0, keptVariant: 0, samples: [] };
   if (!dry) db.exec('BEGIN');
 
   const moveMarks = db.prepare(`UPDATE OR IGNORE external_marks SET card_id = ? WHERE card_id = ?`);
@@ -53,7 +53,16 @@ export function mopupOpSatellites(db, { dry = false } = {}) {
     db.prepare(`DELETE FROM basket_members WHERE card_id = ?`),
   ];
 
+  // Variant-tagged satellites ([Alternate Art], [SP Foil], [Manga], [Winner],
+  // [Magazine], …) are PC's SEPARATE products for parallel printings that
+  // trade at multiples of the base card. PC's label can't tell us WHICH
+  // parallel row they belong to, so merging them into the base would pollute
+  // base comps with alt-art prices — the exact mis-comp sin the oracle exists
+  // to prevent (caught in the live dry run, 2026-07-21). They stay satellites.
+  const VARIANT_RE = /\[|\]|\balternate art\b|\bparallel\b|\bmanga\b/i;
+
   for (const sat of sats) {
+    if (VARIANT_RE.test(sat.name ?? '')) { res.keptVariant++; continue; }
     // The satellite's own fields ARE a listing-shaped title; the matcher's
     // language routing reads 'Japanese' straight out of the PC set name.
     const title = `${sat.name ?? ''} ${sat.number ?? ''} ${sat.set_name ?? ''}`.trim();
