@@ -16,11 +16,12 @@
 const DAY_MS = 86_400_000;
 
 export const INDEX_DEFAULTS = {
-  // 100 (was 400, was 25): 400 read as noise once the constituent view
-  // shipped — "maybe 100 is enough to get an idea of price action" (Kaleb,
-  // 2026-07-21 evening). 100 liquid, confidence-gated constituents per game
-  // still tracks the market's breadth while every row stays meaningful.
-  topN: 100,
+  // 150 (was 400, was 25): Kaleb settled on 100–200, my pick 2026-07-21 —
+  // deep enough that no single card's grade-drift steers a franchise number
+  // (~0.7% avg weight before the cap), shallow enough that the tail is still
+  // genuinely-traded cards rather than noise. Revisit when eBay velocity
+  // lands and the liquid universe grows.
+  topN: 150,
   minConfidence: 0.3,
   // Weekly (was 30): a monthly cadence left baskets frozen on July 4th while
   // the PriceCharting feeds + Phygitals landed — the index ran on a snapshot

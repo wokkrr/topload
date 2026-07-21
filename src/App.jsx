@@ -142,7 +142,9 @@ export default function App() {
       <TickerTape onSelect={openCard} />
       <div style={{ height: 20 }} />
 
-      <main style={{ padding: '0 28px 40px', maxWidth: 1000, margin: '0 auto' }}>
+      {/* 1400 (was 1000): the terminal should FILL the screen — wasted margins
+          made the market read small (Kaleb, 2026-07-21). */}
+      <main style={{ padding: '0 28px 40px', maxWidth: 1400, margin: '0 auto' }}>
         {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 12 }}>{err}</div>}
 
         {route.page === 'card' && (

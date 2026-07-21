@@ -1,23 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { tokens } from '../tokens.js';
+import { smoothPath, spreadLabels } from './chart-utils.js';
 
 const W = 860, H = 320, PAD = { t: 16, r: 96, b: 28, l: 48 };
 
-/**
- * Catmull-Rom → cubic bezier smoothing (presentation only — hover reports
- * exact values). Degrades to a straight segment for 2 points.
- */
-function smoothPath(pts) {
-  if (pts.length < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : '';
-  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? p2;
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
-    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
-  }
-  return d;
-}
 
 /**
  * Two-series indexed line chart (base = 100 at window start).
@@ -71,7 +57,6 @@ export function IndexChart({ data }) {
             <span key={d.index_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: `12px ${tokens.font.body}`, color: tokens.color.inkSecondary }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: s.data, display: 'inline-block' }} />
               {s.label}
-              <Deltas series={d.series} />
             </span>
           );
         })}
@@ -102,37 +87,43 @@ export function IndexChart({ data }) {
                   style={{ font: `10px ${tokens.font.mono}` }}>{d.slice(5)}</text>
           ))}
 
-          {rows.map(d => {
-            const s = tokens.series[d.index_id] ?? { data: tokens.color.ink };
-            // Smooth monotone-ish curve + soft gradient fill beneath — the
-            // visual-appeal pass (Kaleb, 2026-07-21). Tooltip still reports
-            // the true point values; the curve is presentation only.
-            const pts = d.series.map((p, i) => [x(i), y(p.value)]);
-            const line = smoothPath(pts);
-            const last = d.series[d.series.length - 1];
-            const lastX = x(d.series.length - 1);
-            const gid = `grad-${d.index_id}`;
-            return (
-              <g key={d.index_id}>
-                <defs>
-                  <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={s.data} stopOpacity="0.22" />
-                    <stop offset="100%" stopColor={s.data} stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {pts.length > 1 && (
-                  <path d={`${line} L${lastX.toFixed(1)},${H - PAD.b} L${pts[0][0].toFixed(1)},${H - PAD.b} Z`}
-                        fill={`url(#${gid})`} stroke="none" />
-                )}
-                <path d={line} fill="none" stroke={s.data} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-                <circle cx={lastX} cy={y(last.value)} r="3.5" fill={s.data} />
-                <circle cx={lastX} cy={y(last.value)} r="7" fill={s.data} opacity="0.2" />
-                <text x={W - PAD.r + 10} y={y(last.value) + 4} fill={s.data} style={{ font: `600 12px ${tokens.font.mono}` }}>
-                  {last.value.toFixed(1)}
-                </text>
-              </g>
-            );
-          })}
+          {(() => {
+            // Endpoint labels get collision-spread so near-equal indexes never
+            // print on top of each other (live "funky numbers", 2026-07-21).
+            const labelYs = spreadLabels(
+              rows.map(d => ({ y: y(d.series[d.series.length - 1].value) })),
+              15, [PAD.t + 8, H - PAD.b - 4]);
+            return rows.map((d, ri) => {
+              const s = tokens.series[d.index_id] ?? { data: tokens.color.ink };
+              // Smooth curve + soft gradient fill beneath — presentation only;
+              // tooltip still reports the true point values.
+              const pts = d.series.map((p, i) => [x(i), y(p.value)]);
+              const line = smoothPath(pts);
+              const last = d.series[d.series.length - 1];
+              const lastX = x(d.series.length - 1);
+              const gid = `grad-${d.index_id}`;
+              return (
+                <g key={d.index_id}>
+                  <defs>
+                    <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={s.data} stopOpacity="0.22" />
+                      <stop offset="100%" stopColor={s.data} stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {pts.length > 1 && (
+                    <path d={`${line} L${lastX.toFixed(1)},${H - PAD.b} L${pts[0][0].toFixed(1)},${H - PAD.b} Z`}
+                          fill={`url(#${gid})`} stroke="none" />
+                  )}
+                  <path d={line} fill="none" stroke={s.data} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                  <circle cx={lastX} cy={y(last.value)} r="3.5" fill={s.data} />
+                  <circle cx={lastX} cy={y(last.value)} r="7" fill={s.data} opacity="0.2" />
+                  <text x={W - PAD.r + 10} y={labelYs[ri] + 4} fill={s.data} style={{ font: `600 12px ${tokens.font.mono}` }}>
+                    {last.value.toFixed(1)}
+                  </text>
+                </g>
+              );
+            });
+          })()}
 
           {hover && (
             <g pointerEvents="none">
@@ -173,21 +164,6 @@ function Tooltip({ x, date, rows }) {
 
 /** 'is Pokémon down from a week ago / the window start?' at a glance
  *  (Kaleb, 2026-07-21). Series is window-renormalized to 100 at start. */
-function Deltas({ series }) {
-  if (!Array.isArray(series) || series.length < 2) return null;
-  const last = series[series.length - 1]?.value;
-  const wk = series.length > 7 ? series[series.length - 8]?.value : null;
-  const d7 = wk ? +((last / wk - 1) * 100).toFixed(1) : null;
-  const dw = +((last / 100 - 1) * 100).toFixed(1);
-  const c = (v) => v == null ? tokens.color.inkMuted : v >= 0 ? tokens.color.up : tokens.color.down;
-  const f = (v) => v == null ? '—' : `${v >= 0 ? '+' : ''}${v}%`;
-  return (
-    <span style={{ font: `10px ${tokens.font.mono}` }}>
-      <span style={{ color: tokens.color.inkMuted }}>7D </span><span style={{ color: c(d7) }}>{f(d7)}</span>
-      <span style={{ color: tokens.color.inkMuted }}> · window </span><span style={{ color: c(dw) }}>{f(dw)}</span>
-    </span>
-  );
-}
 
 export function IndexTable({ data, dates }) {
   const step = Math.max(1, Math.floor(dates.length / 12));

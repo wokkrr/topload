@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '../tokens.js';
 import { api, fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
+import { smoothPath } from './chart-utils.js';
 
 const W = 860, H = 280, PAD = { t: 16, r: 24, b: 28, l: 56 };
 
@@ -419,17 +420,25 @@ function MarkChart({ series, color, dots }) {
         </linearGradient>
       </defs>
       <path d={
-        series.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.price_cents).toFixed(1)}`).join('')
+        smoothPath(series.map((p, i) => [x(i), y(p.price_cents)]))
         + `L${x(series.length - 1).toFixed(1)},${H - PAD.b}L${x(0).toFixed(1)},${H - PAD.b}Z`
       } fill="url(#tl-mark-fill)" stroke="none" />
 
+      {/* Shared chart language (chart-utils): smoothed curves; provenance
+          dashing preserved — solds solid, external dashed. */}
       {segs.map((s, k) => (
         <path key={k}
-              d={s.pts.map((i, j) => `${j ? 'L' : 'M'}${x(i).toFixed(1)},${y(series[i].price_cents).toFixed(1)}`).join('')}
-              fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"
+              d={smoothPath(s.pts.map(i => [x(i), y(series[i].price_cents)]))}
+              fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"
               strokeDasharray={s.basis === 'external' ? '5 4' : undefined}
               opacity={s.basis === 'external' ? 0.85 : 1} />
       ))}
+      {series.length > 0 && (
+        <g>
+          <circle cx={x(series.length - 1)} cy={y(series[series.length - 1].price_cents)} r="3.5" fill={color} />
+          <circle cx={x(series.length - 1)} cy={y(series[series.length - 1].price_cents)} r="7" fill={color} opacity="0.2" />
+        </g>
+      )}
 
       {/* Individual sales — jittered slightly so same-day trades don't stack
           into one dot; outliers faded (they're excluded from marks). */}
