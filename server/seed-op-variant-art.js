@@ -62,13 +62,19 @@ export function pickArt(name, entry, code, curated = {}) {
     return hit?.url ?? null;
   }
   if (EDITION_RE.test(name)) return base?.url ?? null;          // stamped printing, base artwork
-  if (parallels.length === 1) return parallels[0].url;          // only one alt art → no ambiguity
   const lk = labelKey(name);
+  // '[Foil]' EXACTLY (not 'SP Foil'/'Manga Foil …') = foiled BASE printing
+  // (PRB "The Best" reprints) — base artwork, different treatment.
+  if (lk === 'foil') return base?.url ?? null;
+  if (parallels.length === 1) return parallels[0].url;          // only one alt art → no ambiguity
   // VISUALLY VERIFIED CONVENTIONS (2026-07-21, screenshots vs Bandai gallery):
   // 1. '_p1' is the STANDARD Alternate Art across sets (checked OP01-016,
   //    OP05-119 Gear-5 Luffy, OP07-051) — a bare '[Alternate Art]' label maps
-  //    to p1. Labels with extra words (manga/prb/…) do NOT take this path.
-  if (lk === 'alternate art') {
+  //    to p1. 'Alternate Art PRB01/PRB-02' is the SAME artwork reprinted with
+  //    premium-booster foil (verified EB01-006: the PRB parallel repeats the
+  //    p1 art), so it takes the p1 path too. Labels with other extra words
+  //    (manga/red/…) do NOT take this path.
+  if (/^alternate art( prb-?\d{2})?$/.test(lk)) {
     const p1 = parallels.find(pp => pp.url?.includes('_p1.'));
     if (p1) return p1.url;
   }

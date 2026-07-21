@@ -98,4 +98,13 @@ describe('verified conventions (2026-07-21 visual pass)', () => {
     expect(pickArt('Boa Hancock [Alternate Art Manga]', en.get('OP07-051'), 'OP07-051', { 'OP07-051|alternate art manga': 'p2' }))
       .toBe('https://e/OP07-051_p2.png');
   });
+  it("'[Alternate Art PRB01]'/'[Alternate Art PRB-02]' = same artwork as p1 (premium-booster reprint)", () => {
+    expect(pickArt('Boa Hancock [Alternate Art PRB01]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p1.png');
+    expect(pickArt('Boa Hancock [Alternate Art PRB-02]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p1.png');
+  });
+  it("bare '[Foil]' = foiled BASE printing → base art; 'SP Foil'/'Manga Foil …' unaffected", () => {
+    expect(pickArt('Boa Hancock [Foil]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051.png');
+    expect(pickArt('Boa Hancock [SP Foil]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p3.png');
+    expect(pickArt('Boa Hancock [Manga Foil PRB01]', en.get('OP07-051'), 'OP07-051')).toBeNull();
+  });
 });
