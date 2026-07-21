@@ -33,6 +33,15 @@ const Conf = ({ c }) => (
 // stays, the browser's broken-image icon never shows.
 export const BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
+// Some Phygitals ids have no '-cropped' variant on their CDN (found live:
+// raw Wailmer, 2026-07-21) — retry the plain image before giving up.
+export const imgFallback = (e) => {
+  const el = e.currentTarget;
+  if (el.src.includes('-cropped')) { el.src = el.src.replace('-cropped', ''); return; }
+  el.onerror = null;
+  el.src = BLANK_IMG;
+};
+
 /**
  * Card/listing thumbnail. `badge` marks images that are NOT the actual item
  * (reference art on a listing, or a borrowed slab photo on a card page) —
@@ -51,7 +60,7 @@ export const Thumb = ({ src, size = 34, badge = null }) => {
     <span style={{ position: 'relative', display: 'inline-block', marginRight: 10, flexShrink: 0, lineHeight: 0 }}
           title={badge ? 'Reference image — not a photo of the actual item' : undefined}>
       <img src={src} alt="" loading="lazy"
-           onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = BLANK_IMG; }}
+           onError={imgFallback}
            style={{
         height: size, width: w, objectFit: 'contain', borderRadius: 3,
         background: tokens.color.surfaceRaised, border: `1px solid ${tokens.color.border}`,
@@ -489,7 +498,7 @@ function GachaGrid({ listings, onSelect, onOpenListing }) {
              }}>
           <div style={{ position: 'relative', aspectRatio: '3/4', background: tokens.color.surfaceRaised }}>
             {l.image
-              ? <img src={l.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              ? <img src={l.image} alt="" loading="lazy" onError={imgFallback} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
               : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `10px ${tokens.font.body}` }}>no photo</div>}
             {l.image && l.image_kind === 'art' && (
               <span style={{

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { tokens } from '../tokens.js';
 import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
-import { listingUrl, listingLanguage } from './tables.jsx';
+import { listingUrl, listingLanguage, imgFallback } from './tables.jsx';
 import { CardResearch, headingStyle } from './CardDetail.jsx';
 
 /**
@@ -90,7 +90,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             overflow: 'hidden',
           }}>
             {img
-              ? <img src={img} alt={l.item_name} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              ? <img src={img} alt={l.item_name} onError={imgFallback} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
               : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}` }}>no photo</div>}
             {img && l.image_kind === 'art' && (
               <span style={{
@@ -225,7 +225,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                        borderBottom: `1px solid ${tokens.color.surface}`, cursor: 'pointer',
                      }}>
                   {s.image
-                    ? <img src={s.image} alt="" loading="lazy" style={{ height: 40, width: 30, objectFit: 'contain', background: tokens.color.surfaceRaised, flexShrink: 0 }} />
+                    ? <img src={s.image} alt="" loading="lazy" onError={imgFallback} style={{ height: 40, width: 30, objectFit: 'contain', background: tokens.color.surfaceRaised, flexShrink: 0 }} />
                     : <span style={{ height: 40, width: 30, background: tokens.color.surfaceRaised, flexShrink: 0 }} />}
                   <span style={{ font: `12px ${tokens.font.body}`, color: tokens.color.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {s.item_name}
