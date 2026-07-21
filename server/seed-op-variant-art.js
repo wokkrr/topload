@@ -63,6 +63,22 @@ export function pickArt(name, entry, code, curated = {}) {
   }
   if (EDITION_RE.test(name)) return base?.url ?? null;          // stamped printing, base artwork
   if (parallels.length === 1) return parallels[0].url;          // only one alt art → no ambiguity
+  const lk = labelKey(name);
+  // VISUALLY VERIFIED CONVENTIONS (2026-07-21, screenshots vs Bandai gallery):
+  // 1. '_p1' is the STANDARD Alternate Art across sets (checked OP01-016,
+  //    OP05-119 Gear-5 Luffy, OP07-051) — a bare '[Alternate Art]' label maps
+  //    to p1. Labels with extra words (manga/prb/…) do NOT take this path.
+  if (lk === 'alternate art') {
+    const p1 = parallels.find(pp => pp.url?.includes('_p1.'));
+    if (p1) return p1.url;
+  }
+  // 2. '[SP]'/'[SP Foil]' = the SP treatment, which carries rarity 'Special'
+  //    AND an SP-prefixed card code (verified OP07-051_p3 face: 'SP OP07-051').
+  //    Only when exactly ONE Special parallel exists — else curation.
+  if (/^sp( foil)?$/.test(lk)) {
+    const specials = parallels.filter(pp => pp.rarity === 'Special');
+    if (specials.length === 1) return specials[0].url;
+  }
   return null;                                                  // multi-parallel → curation queue
 }
 

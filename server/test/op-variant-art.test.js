@@ -78,3 +78,23 @@ describe('opVariantArt', () => {
     expect(db.prepare(`SELECT image FROM cards WHERE id = 'op-pc2'`).get().image).toBeNull();
   });
 });
+
+describe('verified conventions (2026-07-21 visual pass)', () => {
+  const en = indexSnapshot({ cards: {
+    'OP07-051': { rarity: 'SuperRare', img_url: 'https://e/OP07-051.png' },
+    'OP07-051_p1': { rarity: 'SuperRare', img_url: 'https://e/OP07-051_p1.png' },
+    'OP07-051_p2': { rarity: 'SuperRare', img_url: 'https://e/OP07-051_p2.png' },
+    'OP07-051_p3': { rarity: 'Special', img_url: 'https://e/OP07-051_p3.png' },
+  } });
+  it("bare '[Alternate Art]' → _p1 (the standard alt-art slot)", () => {
+    expect(pickArt('Boa Hancock [Alternate Art]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p1.png');
+  });
+  it("'[SP Foil]' → the unique Special-rarity parallel", () => {
+    expect(pickArt('Boa Hancock [SP Foil]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p3.png');
+  });
+  it("'[Alternate Art Manga]' does NOT take the p1 path — curation only", () => {
+    expect(pickArt('Boa Hancock [Alternate Art Manga]', en.get('OP07-051'), 'OP07-051')).toBeNull();
+    expect(pickArt('Boa Hancock [Alternate Art Manga]', en.get('OP07-051'), 'OP07-051', { 'OP07-051|alternate art manga': 'p2' }))
+      .toBe('https://e/OP07-051_p2.png');
+  });
+});
