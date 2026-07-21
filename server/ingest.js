@@ -356,7 +356,14 @@ async function runLive(db, today) {
     );
     for (const l of listings) {
       const prior = prevListedP.get(l.external_id);
-      const listedAt = prior && l.listed_at ? (prior < l.listed_at ? prior : l.listed_at) : (prior ?? l.listed_at);
+      let listedAt;
+      if (prior && l.listed_at) {
+        // Precision upgrade: a date-only stamp (migration era) replaced by a
+        // SAME-DAY exact time is refinement, not re-freshening — without this
+        // the pin froze rows at midnight forever (Kaleb, 2026-07-21).
+        if (prior.length === 10 && String(l.listed_at).startsWith(prior)) listedAt = l.listed_at;
+        else listedAt = prior < l.listed_at ? prior : l.listed_at;
+      } else listedAt = prior ?? l.listed_at;
       insP.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
                l.grade, l.price_cents, l.currency, listedAt, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
     }
