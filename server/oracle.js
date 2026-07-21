@@ -251,6 +251,23 @@ export function refreshLatestMarks(db) {
     FROM oracle_prices o
     JOIN (SELECT card_id, grade, MAX(as_of) d FROM oracle_prices GROUP BY card_id, grade) m
       ON m.card_id = o.card_id AND m.grade = o.grade AND m.d = o.as_of`);
+  markTopGrades(db);
   db.exec('COMMIT');
   return db.prepare(`SELECT COUNT(*) n FROM latest_marks`).get().n;
+}
+
+/**
+ * Precompute per-card lookup flags: is_top marks each card's highest-value
+ * grade row; grades_tracked counts the ladder. Window functions at REQUEST
+ * time over ~277k rows took /api/cards to 12s on the droplet (live,
+ * 2026-07-21) — this runs once per rebuild instead.
+ */
+export function markTopGrades(db) {
+  db.exec(`
+    UPDATE latest_marks SET is_top = (r.rn = 1), grades_tracked = r.gt
+    FROM (SELECT rowid AS rid,
+                 ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY price_cents DESC) AS rn,
+                 COUNT(*) OVER (PARTITION BY card_id) AS gt
+          FROM latest_marks) r
+    WHERE latest_marks.rowid = r.rid`);
 }

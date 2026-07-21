@@ -39,6 +39,8 @@ function migrate(db) {
   // Grading-slab certification number (verifiable on the grader's site).
   // Sources: Courtyard 'Serial' attribute; MNSTR serialNumber. Never guessed.
   ensureColumn(db, 'gacha_listings', 'cert', 'TEXT');
+  ensureColumn(db, 'latest_marks', 'is_top', 'INTEGER');        // per-card top-grade flag (lookup dedup)
+  ensureColumn(db, 'latest_marks', 'grades_tracked', 'INTEGER');
 }
 
 function ensureColumn(db, table, column, ddl) {

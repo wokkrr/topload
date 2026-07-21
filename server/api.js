@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { timedFetch } from './net.js';
 import { openDb } from './db.js';
 import { PLATFORMS } from './platforms.js';
-import { refreshLatestMarks } from './oracle.js';
+import { refreshLatestMarks, markTopGrades } from './oracle.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -20,6 +20,10 @@ const db = openDb();
 if (db.prepare(`SELECT COUNT(*) n FROM latest_marks`).get().n === 0) {
   console.log('[api] building latest_marks (one-time)…');
   console.log(`[api] latest_marks ready: ${refreshLatestMarks(db)} rows`);
+} else if (!db.prepare(`SELECT 1 FROM latest_marks WHERE is_top = 1 LIMIT 1`).get()) {
+  // Migration self-heal: flags are new — compute once for the existing table.
+  console.log('[api] computing top-grade flags (one-time)…');
+  markTopGrades(db);
 }
 const app = express();
 // Gzip everything — the listings JSON alone is ~2MB raw / ~200KB compressed,
