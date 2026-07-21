@@ -34,7 +34,7 @@ export function borrowArt(db, { dry = false } = {}) {
   const donorById = new Map();
   for (const c of db.prepare(
     `SELECT id, ip, name, number, set_name, language, image FROM cards
-     WHERE image IS NOT NULL AND (image_kind IS NULL OR image_kind != 'borrowed')`
+     WHERE image IS NOT NULL AND image_kind IS NULL`   // own art only: borrowed/variant rows never donate
   ).all()) {
     (donorsByIp[c.ip] ??= []).push(c);
     donorById.set(c.id, c);

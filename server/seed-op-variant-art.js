@@ -3,22 +3,24 @@
  * satellites the mop-up deliberately kept ([Alt Art], [Manga], [Winner], …).
  *
  * Bandai publishes every parallel printing's art as its own file (OP13-118,
- * OP13-118_p1 … _p4) and our vendored punk-records snapshots enumerate them
- * with rarity labels — the manga-art printings are rarity 'Special'. So the
- * art for these rows already sits in files we own; this pass maps each PC
- * variant label to a parallel image ONLY when the mapping is unambiguous:
+ * OP13-118_p1 … _p4) and our vendored punk-records snapshots enumerate them.
+ * VERIFIED LIVE 2026-07-21 (Sabo OP13-120 vs TCGplayer): the snapshot's
+ * rarity field does NOT reliably identify which parallel is which artwork —
+ * 'Special' pointed at the wanted-poster art while the red-manga art sat on a
+ * 'SecretRare' parallel. So NO rarity heuristics. Assignment happens only
+ * when it cannot be wrong:
  *
- *   1. Edition-style tags ([Winner]/[Prize]/[Serial] …) reuse the BASE
- *      artwork (stamped printings) → base image.
- *   2. Manga-class labels → the code's Special-rarity parallel, iff exactly 1.
- *   3. Any other variant label → the code's parallel, iff the code has
- *      exactly 1 (564 EN codes), else exactly 1 non-Special parallel.
- *   4. Anything still ambiguous stays artless — honest empty beats wrong art
- *      on rows whose entire premium IS the artwork.
+ *   1. CURATED MAP first (seed/op-variant-map.json: "CODE|label words" →
+ *      parallel suffix, built by visually comparing parallels) — authoritative.
+ *   2. Edition-style tags ([Winner]/[Prize]/[Serial] …) → BASE artwork
+ *      (stamped printings share it).
+ *   3. Any variant label on a code with EXACTLY ONE parallel → that parallel.
+ *   4. Everything else stays artless and lands in the curation queue —
+ *      honest empty beats wrong art on rows whose premium IS the artwork.
  *
- * Japanese satellites resolve against the JA snapshot (Japanese printings'
- * own art). Assigned rows get image_kind='borrowed' (inferred assignment —
- * distinguishable + reversible), and never become borrow-art donors.
+ * Assignments are tagged image_kind='variant' and the pass RESETS its own
+ * prior assignments first — fully re-derivable, trivially reversible, never
+ * a borrow-art donor. Japanese satellites resolve against the JA snapshot.
  *
  *   node server/seed-op-variant-art.js --dry
  *   node server/seed-op-variant-art.js
@@ -31,7 +33,6 @@ import { openDb } from './db.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const EDITION_RE = /\[(.*?(winner|champion|finalist|prize|serial|pre-?release|anniversary|judge|event|tournament).*?)\]/i;
-const MANGA_RE = /\[(.*?(manga|\bsp\b).*?)\]/i;
 const CODE_RE = /\b((?:OP|ST|EB|PRB)\d{2}-\d{3}|P-\d{3})\b/i;
 
 /** snapshot {cards:{CODE:…, CODE_p1:…}} → Map(code → {base, parallels:[{url,rarity}]}) */
@@ -48,37 +49,46 @@ export function indexSnapshot(snap) {
   return byCode;
 }
 
-export function pickArt(name, entry) {
+/** Normalize a bracket label for curated-map keys: '[Red Manga]' → 'red manga'. */
+export const labelKey = (name) => (/\[([^\]]+)\]/.exec(name ?? '')?.[1] ?? '').toLowerCase().trim();
+
+export function pickArt(name, entry, code, curated = {}) {
   if (!entry) return null;
   const { base, parallels } = entry;
-  if (EDITION_RE.test(name)) return base?.url ?? null;          // stamped printing, base artwork
-  if (MANGA_RE.test(name)) {
-    const specials = parallels.filter(p => p.rarity === 'Special');
-    return specials.length === 1 ? specials[0].url : null;
+  const curatedSuffix = curated[`${code}|${labelKey(name)}`];    // e.g. 'p3' or 'base'
+  if (curatedSuffix) {
+    if (curatedSuffix === 'base') return base?.url ?? null;
+    const hit = parallels.find(p => p.url?.includes(`_${curatedSuffix}.`));
+    return hit?.url ?? null;
   }
-  if (parallels.length === 1) return parallels[0].url;
-  const nonSpecial = parallels.filter(p => p.rarity !== 'Special');
-  return nonSpecial.length === 1 ? nonSpecial[0].url : null;    // else ambiguous → stay empty
+  if (EDITION_RE.test(name)) return base?.url ?? null;          // stamped printing, base artwork
+  if (parallels.length === 1) return parallels[0].url;          // only one alt art → no ambiguity
+  return null;                                                  // multi-parallel → curation queue
 }
 
-export function opVariantArt(db, { dry = false, snapEn, snapJa } = {}) {
+export function opVariantArt(db, { dry = false, snapEn, snapJa, curated } = {}) {
   snapEn ??= JSON.parse(readFileSync(join(__dirname, '..', 'seed', 'onepiece-catalog.json'), 'utf8'));
   snapJa ??= JSON.parse(readFileSync(join(__dirname, '..', 'seed', 'onepiece-catalog-ja.json'), 'utf8'));
+  if (!curated) {
+    try { curated = JSON.parse(readFileSync(join(__dirname, '..', 'seed', 'op-variant-map.json'), 'utf8')); } catch { curated = {}; }
+  }
   const en = indexSnapshot(snapEn);
   const ja = indexSnapshot(snapJa);
 
+  // Re-derive from scratch each run: rules/curation may have changed.
+  if (!dry) db.prepare(`UPDATE cards SET image = NULL, image_kind = NULL WHERE image_kind = 'variant'`).run();
   const targets = db.prepare(
     `SELECT id, name, number, language FROM cards
      WHERE ip = 'OP' AND image IS NULL AND id LIKE 'op-pc%' AND instr(name, '[') > 0`
   ).all();
-  const upd = db.prepare(`UPDATE cards SET image = ?, image_kind = 'borrowed' WHERE id = ?`);
-  const res = { targets: targets.length, noCode: 0, assigned: 0, ambiguous: 0, samples: [] };
+  const upd = db.prepare(`UPDATE cards SET image = ?, image_kind = 'variant' WHERE id = ?`);
+  const res = { targets: targets.length, curatedEntries: Object.keys(curated).filter(k => k.includes('|')).length, noCode: 0, assigned: 0, ambiguous: 0, samples: [] };
 
   for (const t of targets) {
     const code = (CODE_RE.exec(t.number ?? '') ?? CODE_RE.exec(t.name ?? ''))?.[1]?.toUpperCase();
     if (!code) { res.noCode++; continue; }
     const map = /^japanese$/i.test(t.language ?? '') ? ja : en;
-    const url = pickArt(t.name ?? '', map.get(code) ?? (map === ja ? en : ja).get(code));
+    const url = pickArt(t.name ?? '', map.get(code) ?? (map === ja ? en : ja).get(code), code, curated);
     if (!url) { res.ambiguous++; continue; }
     res.assigned++;
     if (res.samples.length < 10) res.samples.push(`${t.id} (${t.name.slice(0, 40)}) ← ${url.slice(url.lastIndexOf('/') + 1)}`);

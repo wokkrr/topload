@@ -1,0 +1,5 @@
+{
+  "_comment": "Curated variant-art map: 'CODE|pc label (lowercased)' → parallel suffix ('p3') or 'base'. Entries are added ONLY after visually comparing Bandai's parallel images against a marketplace reference (TCGplayer product art) — never inferred from metadata. Consumed by server/seed-op-variant-art.js; keys with no matching satellite are harmless.",
+  "OP13-118|red manga": "p3",
+  "OP13-120|red manga": "p3"
+}
