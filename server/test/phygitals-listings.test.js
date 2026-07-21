@@ -100,6 +100,18 @@ describe('mapListing', () => {
     expect(r.cert).toBe('9998887770');
   });
 
+  it("attributes CC-vaulted mirrors (vault:'cc') to the host platform, keeping phyg: provenance", () => {
+    // Live shape 2026-07-21 (CGC-10 Mew flag): vault:'cc' + marketplace
+    // 'MAGICEDEN' = a Collector Crypt-vaulted item mirrored on Phygitals;
+    // native rows carry vault:null + 'TENSOR'.
+    const cc = { ...PSA_JP_PROMO, vault: 'cc', marketplace: 'MAGICEDEN' };
+    const r = mapListing(cc, 'Pokemon', '2026-07-21');
+    expect(r.platform).toBe('collectorcrypt');           // desk says "listed on Collector Crypt"
+    expect(r.external_id).toBe(`phyg:${PSA_JP_PROMO.address}`); // snapshot-replace key unchanged
+    expect(r.nft_address).toBe(PSA_JP_PROMO.address);    // listingUrl → collectorcrypt.com/assets/solana/<mint>
+    expect(mapListing({ ...PSA_JP_PROMO, vault: null }, 'Pokemon', '2026-07-21').platform).toBe('phygitals');
+  });
+
   it('drops troll asks, unlisted, and zero prices; keeps Authentic slabs', () => {
     expect(mapListing({ ...RAW_EN_GLALIE, price: '999999999000000' }, 'Pokemon', 'd')).toBeNull();
     expect(mapListing({ ...RAW_EN_GLALIE, listed: false }, 'Pokemon', 'd')).toBeNull();

@@ -107,8 +107,19 @@ export function mapListing(l, category, seenAt) {
   const exactId = ip === 'PKMN' && meta['Card Id'] && !/^japanese$/i.test(lang ?? '')
     ? `pkmn-${String(meta['Card Id']).toLowerCase()}` : null;
 
+  // HOST ATTRIBUTION (Kaleb, 2026-07-21 — the CGC-10 Mew flag): Phygitals
+  // mirrors Collector Crypt-vaulted items listed via Magic Eden escrow
+  // (payload: vault:'cc', marketplace:'MAGICEDEN'; native rows are vault:null,
+  // marketplace:'TENSOR'). CC's own listings feed does NOT carry these
+  // ME-escrowed listings, so the mirror is our only sighting — but the HOST
+  // listing lives on collectorcrypt.com (same on-chain ask; Phygitals adds a
+  // checkout markup on top). Attribute the row to the host: platform
+  // 'collectorcrypt' makes the desk say "listed on Collector Crypt" and
+  // listingUrl() link straight to collectorcrypt.com/assets/solana/<mint>.
+  // external_id keeps the phyg: prefix — it marks provenance and keys the
+  // ingest snapshot-replace.
   return {
-    platform: 'phygitals',
+    platform: l.vault === 'cc' ? 'collectorcrypt' : 'phygitals',
     external_id: `phyg:${l.address}`,
     item_name: title,
     category: IP_LABEL[ip] ?? category,

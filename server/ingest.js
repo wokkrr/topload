@@ -206,7 +206,9 @@ async function runLive(db, today) {
       if (!subset.length || !universeByIp[ip]) continue;
       for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
     }
-    db.exec(`DELETE FROM gacha_listings WHERE platform = 'collectorcrypt'`); // snapshot refresh
+    // Exclude phyg:-provenance rows: CC-vaulted Phygitals mirrors are
+    // attributed to this platform but owned by the phygitals snapshot block.
+    db.exec(`DELETE FROM gacha_listings WHERE platform = 'collectorcrypt' AND external_id NOT LIKE 'phyg:%'`); // snapshot refresh
     const insL = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
        (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, cert, seen_at)
@@ -345,10 +347,13 @@ async function runLive(db, today) {
     // Anti-restamp: a listing's listed_at is the EARLIEST time we've ever
     // seen for it — source-side edits can never float old inventory back to
     // the top of the desk's Recent sort (Kaleb, 2026-07-21).
+    // Snapshot keyed by the phyg: provenance prefix, NOT platform — rows for
+    // CC-vaulted mirrors are attributed to platform 'collectorcrypt' (host
+    // attribution) but remain Phygitals-sourced and refresh with this block.
     const prevListedP = new Map(db.prepare(
-      `SELECT external_id, listed_at FROM gacha_listings WHERE platform = 'phygitals'`
+      `SELECT external_id, listed_at FROM gacha_listings WHERE external_id LIKE 'phyg:%'`
     ).all().map(r => [r.external_id, r.listed_at]));
-    db.exec(`DELETE FROM gacha_listings WHERE platform = 'phygitals'`); // full snapshot refresh
+    db.exec(`DELETE FROM gacha_listings WHERE external_id LIKE 'phyg:%'`); // full snapshot refresh
     const insP = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
        (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)

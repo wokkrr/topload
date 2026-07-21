@@ -333,7 +333,11 @@ app.get('/api/gacha', (req, res) => {
   for (const group of byMint.values()) {
     if (group.length < 2) continue;
     const keep = [...group].sort((a, b) =>
-      ((a.platform === 'phygitals') - (b.platform === 'phygitals'))
+      // Host wins over the Phygitals mirror. phyg: provenance (not platform)
+      // is the discriminator: CC-vaulted mirrors carry platform
+      // 'collectorcrypt' but external_id 'phyg:…' — a CC-native sighting of
+      // the same mint should still outrank them.
+      (String(a.external_id ?? '').startsWith('phyg:') - String(b.external_id ?? '').startsWith('phyg:'))
       || String(a.listed_at ?? '9999').localeCompare(String(b.listed_at ?? '9999'))
     )[0];
     for (const g of group) if (g !== keep) drop.add(g);
