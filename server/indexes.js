@@ -18,7 +18,10 @@ const DAY_MS = 86_400_000;
 export const INDEX_DEFAULTS = {
   topN: 25,
   minConfidence: 0.3,
-  rebalanceDays: 30,
+  // Weekly (was 30): a monthly cadence left baskets frozen on July 4th while
+  // the PriceCharting feeds + Phygitals landed — the index ran on a snapshot
+  // of the pre-data era (Kaleb, 2026-07-21: "severe lack of data").
+  rebalanceDays: 7,
   volumeLookbackDays: 90,
   maxWeight: 0.10,   // per-constituent cap — one $21M Pikachu must not BE the index
 };
@@ -149,8 +152,10 @@ export function refreshIndexes(db, opts = {}) {
   let points = 0;
   db.exec('BEGIN');
   for (const ip of ips) {
-    // Rebalance schedule: first date, then every rebalanceDays.
-    const rebalanceDates = dates.filter((_, i) => i % o.rebalanceDays === 0);
+    // Rebalance schedule anchored to the NEWEST date (counting back), so the
+    // latest data era always has a freshly-selected basket — anchoring at the
+    // start left the current basket up to a full period stale.
+    const rebalanceDates = dates.filter((_, i) => (dates.length - 1 - i) % o.rebalanceDays === 0);
     const baskets = new Map();
     for (const rd of rebalanceDates) {
       const basket = selectBasket(candStmt.all(ip, rd), o);

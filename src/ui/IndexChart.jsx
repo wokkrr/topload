@@ -9,7 +9,6 @@ const W = 860, H = 320, PAD = { t: 16, r: 96, b: 28, l: 48 };
  */
 export function IndexChart({ data }) {
   const [hover, setHover] = useState(null); // {i, x}
-  const [showTable, setShowTable] = useState(false);
   const svgRef = useRef(null);
 
   // Defensive: the API can return an index with a missing or empty series
@@ -59,10 +58,10 @@ export function IndexChart({ data }) {
                   {d.members} cards · {d.window_sales ?? 0} sales{d.window_vol_cents > 0 ? ` · $${Math.round(d.window_vol_cents / 100).toLocaleString()}` : ''}
                 </span>
               )}
+              <Deltas series={d.series} />
             </span>
           );
         })}
-        <button onClick={() => setShowTable(t => !t)} style={btnStyle}>{showTable ? 'Chart' : 'Table'}</button>
       </div>
       {building.length > 0 && (
         <div style={{ font: `11px ${tokens.font.body}`, color: tokens.color.inkMuted, margin: '0 0 10px' }}>
@@ -73,7 +72,7 @@ export function IndexChart({ data }) {
         </div>
       )}
 
-      {showTable ? <IndexTable data={rows} dates={dates} /> : (
+      {(
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}
              onMouseMove={onMove} onMouseLeave={() => setHover(null)} role="img" aria-label="Index performance, base 100">
           {gridVals.map(v => (
@@ -138,6 +137,24 @@ function Tooltip({ x, date, rows }) {
         </g>
       ))}
     </g>
+  );
+}
+
+/** 'is Pokémon down from a week ago / the window start?' at a glance
+ *  (Kaleb, 2026-07-21). Series is window-renormalized to 100 at start. */
+function Deltas({ series }) {
+  if (!Array.isArray(series) || series.length < 2) return null;
+  const last = series[series.length - 1]?.value;
+  const wk = series.length > 7 ? series[series.length - 8]?.value : null;
+  const d7 = wk ? +((last / wk - 1) * 100).toFixed(1) : null;
+  const dw = +((last / 100 - 1) * 100).toFixed(1);
+  const c = (v) => v == null ? tokens.color.inkMuted : v >= 0 ? tokens.color.up : tokens.color.down;
+  const f = (v) => v == null ? '—' : `${v >= 0 ? '+' : ''}${v}%`;
+  return (
+    <span style={{ font: `10px ${tokens.font.mono}` }}>
+      <span style={{ color: tokens.color.inkMuted }}>7D </span><span style={{ color: c(d7) }}>{f(d7)}</span>
+      <span style={{ color: tokens.color.inkMuted }}> · window </span><span style={{ color: c(dw) }}>{f(dw)}</span>
+    </span>
   );
 }
 

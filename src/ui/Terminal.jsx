@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { tokens } from '../tokens.js';
-import { Chip, Thumb } from './tables.jsx';
+import { api } from '../data/client.js';
+import { Chip, Thumb, BasketTable } from './tables.jsx';
 import { Screener } from './Screener.jsx';
 import { IndexChart } from './IndexChart.jsx';
 
@@ -69,17 +71,47 @@ function MoverRow({ m, onSelect }) {
 }
 
 export function Terminal({ indexes, days, setDays, movers, onSelect }) {
+  // 'What IS this index?' answered with the actual cards (Kaleb, 2026-07-21):
+  // the Cards view lists each published index's current constituents with
+  // weights and marks — replaces the old numbers table.
+  const [view, setView] = useState('chart');
+  const [baskets, setBaskets] = useState({});
+  const published = (indexes ?? []).filter(d => d.published !== false && d.series?.length);
+  useEffect(() => {
+    if (view !== 'cards') return;
+    for (const d of published) {
+      if (baskets[d.index_id]) continue;
+      api.basket(d.index_id)
+        .then(rows => setBaskets(b => ({ ...b, [d.index_id]: rows })))
+        .catch(() => setBaskets(b => ({ ...b, [d.index_id]: [] })));
+    }
+  }, [view, indexes]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       <div style={panel}>
         <SectionHead title="Indexes" hint="liquidity-weighted franchise benchmarks · base 100 · built from first-hand recorded sales (history begins Jun 2026)" />
-        <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
           {RANGES.map(r => (
             <Chip key={r} active={days === r} onClick={() => setDays(r)}>{r}D</Chip>
           ))}
+          <span style={{ flex: 1 }} />
+          <Chip active={view === 'chart'} onClick={() => setView('chart')}>Chart</Chip>
+          <Chip active={view === 'cards'} onClick={() => setView('cards')}>Cards in index</Chip>
         </div>
-        <IndexChart data={indexes} />
+        {view === 'chart' ? <IndexChart data={indexes} /> : (
+          published.length ? published.map(d => (
+            <div key={d.index_id} style={{ marginBottom: 22 }}>
+              <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.inkSecondary, margin: '4px 0 8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {tokens.series[d.index_id]?.label ?? d.index_id} — current constituents
+              </div>
+              {baskets[d.index_id]
+                ? <BasketTable basket={baskets[d.index_id]} onSelect={onSelect} />
+                : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>Loading…</div>}
+            </div>
+          )) : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '8px 2px' }}>No published indexes yet.</div>
+        )}
       </div>
 
       <div style={panel}>
