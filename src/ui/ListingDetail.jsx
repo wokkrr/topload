@@ -81,9 +81,12 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
         </span>
       </div>
 
+      {/* ── Hero, card-page treatment (Kaleb, 2026-07-21: "clean it up similar
+          to the card lookup card page"): the slab leads at card-page scale,
+          identity + numbers in a tight column beside it. ── */}
       <div style={{ display: 'flex', gap: 32, marginTop: 16, flexWrap: 'wrap' }}>
         {/* ── Photos ── */}
-        <div style={{ flex: '0 0 320px', maxWidth: '100%' }}>
+        <div style={{ flex: '0 0 400px', maxWidth: '100%' }}>
           <div style={{
             position: 'relative', aspectRatio: '3/4',
             border: `1px solid ${tokens.color.border}`, background: tokens.color.surfaceRaised,
@@ -121,28 +124,34 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
 
         {/* ── Facts + comp analysis + actions ── */}
         <div style={{ flex: 1, minWidth: 280 }}>
-          <h2 style={{ font: `20px ${tokens.font.display}`, margin: '0 0 4px', lineHeight: 1.3 }}>{l.item_name}</h2>
-          <div style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}`, marginBottom: 16 }}>
-            {l.grade !== 'raw' ? `${l.grade} · ` : ''}{l.category ?? ''}{listingLanguage(l) === 'Japanese' ? ' · Japanese' : ''} · listed on {platform}
-            {l.listed_at ? ` · ${String(l.listed_at).slice(0, 10)}` : ''}
+          <h2 style={{ font: `22px ${tokens.font.display}`, margin: '0 0 10px', lineHeight: 1.3 }}>{l.item_name}</h2>
+
+          {/* Identity as a chip row (card-page language), not a text run. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+            <MetaChip strong>{l.grade === 'raw' ? 'Raw' : l.grade}</MetaChip>
+            {listingLanguage(l) === 'Japanese' && <MetaChip>Japanese</MetaChip>}
+            {l.category && <MetaChip>{l.category}</MetaChip>}
+            <MetaChip>{platform}</MetaChip>
+            {l.listed_at && (
+              <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkMuted, marginLeft: 4 }}>
+                listed {String(l.listed_at).slice(0, 10)}
+              </span>
+            )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
-            <div>
-              <div style={labelStyle}>Asking</div>
-              <div style={{ font: `30px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</div>
-            </div>
-            {hasComp && (
-              <div>
-                <div style={labelStyle}>Oracle comp ({l.grade})</div>
-                <div style={{ font: `20px ${tokens.font.mono}`, color: tokens.color.inkSecondary }}>{fmtUsd(l.comp_cents)}</div>
-              </div>
-            )}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+            <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</span>
             {l.delta_pct != null && (
-              <div>
-                <div style={labelStyle}>vs comp</div>
-                <div style={{ font: `20px ${tokens.font.mono}`, color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down }}>{fmtPct(l.delta_pct)}</div>
-              </div>
+              <span style={{
+                font: `600 13px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 9px',
+                color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down,
+                border: `1px solid ${tokens.color.border}`,
+              }}>{fmtPct(l.delta_pct)} vs mark</span>
+            )}
+            {hasComp && (
+              <span style={{ font: `13px ${tokens.font.mono}`, color: tokens.color.inkSecondary }}>
+                oracle mark {fmtUsd(l.comp_cents)}
+              </span>
             )}
           </div>
 
@@ -271,6 +280,18 @@ function Row({ k, v }) {
       <span style={{ color: tokens.color.inkMuted }}>{k}</span>
       <span style={{ color: tokens.color.ink, font: `12px ${tokens.font.mono}`, textAlign: 'right' }}>{v}</span>
     </div>
+  );
+}
+
+/** Small identity chip — the card-page meta language on the listing hero. */
+function MetaChip({ strong = false, children }) {
+  return (
+    <span style={{
+      font: `11px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 10px',
+      border: `1px solid ${tokens.color.border}`,
+      color: strong ? tokens.color.ink : tokens.color.inkSecondary,
+      background: strong ? tokens.color.surfaceRaised : 'none',
+    }}>{children}</span>
   );
 }
 
