@@ -37,6 +37,17 @@ const IP_LABEL = { PKMN: 'Pokemon', OP: 'One Piece', YGO: 'YuGiOh' };
 
 const MAX_PRICE_CENTS = 25_000_000;                    // $250k sanity cap (troll asks)
 
+/**
+ * Their API hands out gateway.irys.xyz URLs that REFUSE browser loads (found
+ * live 2026-07-21: 6,638 of 7,703 images failed on the desk). Their own site
+ * serves the same ids via img.phygitals.com — the '-cropped' variant is a
+ * tight card-shaped cut. Rewrite at ingest; arweave.net URLs load fine as-is.
+ */
+export function fixImageUrl(url) {
+  const m = /^https?:\/\/gateway\.irys\.xyz\/([A-Za-z0-9_-]+)$/.exec(url ?? '');
+  return m ? `https://img.phygitals.com/${m[1]}-cropped` : (url ?? null);
+}
+
 /** metadata array → plain object (first value wins per key). */
 function metaOf(l) {
   const m = {};
@@ -88,7 +99,7 @@ export function mapListing(l, category, seenAt) {
     price_cents: cents,
     currency: 'USDC',
     listed_at: (l.updatedAt ?? '').slice(0, 10) || (seenAt ?? null),
-    image: l.image ?? null,
+    image: fixImageUrl(l.image),
     nft_address: l.address,
     cert: cert != null && String(cert).trim() !== '' ? String(cert).trim() : null,
     slug: l.slug ?? null,                              // → phygitals.com/card/<slug>

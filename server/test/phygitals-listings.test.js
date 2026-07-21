@@ -131,3 +131,13 @@ describe('makePhygitalsListingsAdapter', () => {
     await expect(bad.fetchListings({})).rejects.toThrow(/403/);
   });
 });
+
+describe('fixImageUrl', () => {
+  it('rewrites browser-hostile irys gateway URLs to their CDN, leaves others alone', async () => {
+    const { fixImageUrl } = await import('../adapters/phygitals-listings.js');
+    expect(fixImageUrl('https://gateway.irys.xyz/52yzJNjNdyy1rJKeDT6QRpnH4Q7iYnXRzEaDuENvURZq'))
+      .toBe('https://img.phygitals.com/52yzJNjNdyy1rJKeDT6QRpnH4Q7iYnXRzEaDuENvURZq-cropped');
+    expect(fixImageUrl('https://arweave.net/abc123')).toBe('https://arweave.net/abc123');
+    expect(fixImageUrl(null)).toBeNull();
+  });
+});
