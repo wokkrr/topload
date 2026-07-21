@@ -136,7 +136,7 @@ describe('fixImageUrl', () => {
   it('rewrites browser-hostile irys gateway URLs to their CDN, leaves others alone', async () => {
     const { fixImageUrl } = await import('../adapters/phygitals-listings.js');
     expect(fixImageUrl('https://gateway.irys.xyz/52yzJNjNdyy1rJKeDT6QRpnH4Q7iYnXRzEaDuENvURZq'))
-      .toBe('https://img.phygitals.com/52yzJNjNdyy1rJKeDT6QRpnH4Q7iYnXRzEaDuENvURZq-cropped');
+      .toBe('https://img.phygitals.com/52yzJNjNdyy1rJKeDT6QRpnH4Q7iYnXRzEaDuENvURZq'); // PLAIN — matches their own presentation; '-cropped' exists for only some items
     expect(fixImageUrl('https://arweave.net/abc123')).toBe('https://arweave.net/abc123');
     expect(fixImageUrl(null)).toBeNull();
   });

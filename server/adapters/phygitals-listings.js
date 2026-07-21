@@ -40,12 +40,15 @@ const MAX_PRICE_CENTS = 25_000_000;                    // $250k sanity cap (trol
 /**
  * Their API hands out gateway.irys.xyz URLs that REFUSE browser loads (found
  * live 2026-07-21: 6,638 of 7,703 images failed on the desk). Their own site
- * serves the same ids via img.phygitals.com — the '-cropped' variant is a
- * tight card-shaped cut. Rewrite at ingest; arweave.net URLs load fine as-is.
+ * serves the same ids via img.phygitals.com — the PLAIN file, which is what
+ * their product pages render (slab photo for graded, the black 'Ungraded
+ * Card' sleeve for raw). A '-cropped' derivative exists for only SOME items
+ * (raw Wailmer had none, live), so using it made our desk inconsistent —
+ * plain everywhere matches their own presentation exactly (Kaleb).
  */
 export function fixImageUrl(url) {
   const m = /^https?:\/\/gateway\.irys\.xyz\/([A-Za-z0-9_-]+)$/.exec(url ?? '');
-  return m ? `https://img.phygitals.com/${m[1]}-cropped` : (url ?? null);
+  return m ? `https://img.phygitals.com/${m[1]}` : (url ?? null);
 }
 
 /**
