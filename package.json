@@ -41,7 +41,8 @@
     "catalog:verify": "node --env-file-if-exists=.env server/catalog-verify.js",
     "api": "node --env-file-if-exists=.env server/api.js",
     "check:syntax": "for f in server/*.js server/adapters/*.js; do node --check \"$f\" || exit 1; done && echo syntax OK",
-    "test": "npm run check:syntax && vitest run server/test"
+    "test": "npm run check:syntax && vitest run server/test",
+    "indexes:refresh": "node --env-file-if-exists=.env server/indexes-refresh.js"
   },
   "dependencies": {
     "compression": "^1.8.1",
