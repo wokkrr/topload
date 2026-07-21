@@ -131,35 +131,33 @@ function BasketSummary({ basket }) {
  * texture, not furniture. Click = the receipts (chart focus + constituents).
  * Unpublished indexes say so in plain words instead of faking a line.
  */
-function IndexTile({ d, id, days, active, onClick }) {
+function IndexTile({ d, id, active, onClick }) {
   const s = tokens.series[id] ?? { label: id, data: tokens.color.ink };
   const series = d?.series ?? [];
   const ret = series.length >= 2 ? +(series[series.length - 1].value - series[0].value).toFixed(1) : null;
   const up = (ret ?? 0) >= 0;
   const publishable = d?.published !== false && ret != null;
   return (
-    <button onClick={onClick} style={{
-      flex: '0 1 170px', minWidth: 140, textAlign: 'left', cursor: 'pointer',
-      background: active ? tokens.color.surfaceRaised : 'none',
-      border: `1px solid ${active ? s.data : tokens.color.border}`, borderRadius: 8,
-      padding: '10px 12px', color: tokens.color.ink,
-    }}>
+    <button onClick={onClick}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = s.data; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = tokens.color.border; }}
+      style={{
+        flex: '0 1 170px', minWidth: 140, textAlign: 'left', cursor: 'pointer',
+        background: active ? tokens.color.surfaceRaised : 'none',
+        border: `1px solid ${active ? s.data : tokens.color.border}`, borderRadius: 8,
+        padding: '10px 12px', color: tokens.color.ink, transition: 'border-color .12s ease',
+      }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 6, font: `11px ${tokens.font.body}`, color: tokens.color.inkSecondary }}>
         <span style={{ width: 8, height: 8, borderRadius: 2, background: s.data, display: 'inline-block' }} />
         {s.label}
       </span>
+      {/* One number, nothing else — the sublines read as clutter (Kaleb). */}
       {publishable ? (
-        <>
-          <span style={{ display: 'block', font: `600 24px ${tokens.font.mono}`, margin: '4px 0 2px', color: up ? tokens.color.up : tokens.color.down }}>
-            {up ? '+' : ''}{ret}%
-          </span>
-          <span style={{ font: `10px ${tokens.font.mono}`, color: tokens.color.inkMuted }}>{days}D · {d?.members ?? '—'} cards</span>
-        </>
+        <span style={{ display: 'block', font: `600 26px ${tokens.font.mono}`, margin: '4px 0 0', color: up ? tokens.color.up : tokens.color.down }}>
+          {up ? '+' : ''}{ret}%
+        </span>
       ) : (
-        <>
-          <span style={{ display: 'block', font: `600 18px ${tokens.font.mono}`, margin: '6px 0 2px', color: tokens.color.inkMuted }}>building</span>
-          <span style={{ font: `10px ${tokens.font.mono}`, color: tokens.color.inkMuted }}>{d?.members ?? 0}/{d?.min_members ?? 8} cards</span>
-        </>
+        <span style={{ display: 'block', font: `600 18px ${tokens.font.mono}`, margin: '7px 0 1px', color: tokens.color.inkMuted }}>building</span>
       )}
     </button>
   );
@@ -186,14 +184,14 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'stretch' }}>
         <div style={{ flex: '2 1 520px', minWidth: 0 }}>
       <div style={{ ...panel, height: '100%' }}>
-        <SectionHead title="The Market" hint="how the big three are trading · built from recorded sales" />
+        <SectionHead title="The Market" />
 
         {/* ── Apple pass (Kaleb, 2026-07-21: "small and clunky… simple is
             always better"): three tiles, one number each. The window return
             IS the story; everything else lives a click deeper. ── */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
           {['PKMN', 'OP', 'YGO'].map(id => (
-            <IndexTile key={id} d={meta(id)} id={id} days={days}
+            <IndexTile key={id} d={meta(id)} id={id}
                        active={view === id} onClick={() => setView(v => v === id ? 'chart' : id)} />
           ))}
           <span style={{ flex: 1 }} />
@@ -204,29 +202,33 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
           </span>
         </div>
 
-        <IndexChart data={view === 'chart' ? indexes : (indexes ?? []).filter(d => d.index_id === view)} />
+        {/* Locked frame: the panel never grows on tile click — the content
+            below the tiles scrolls inside instead (Kaleb, 2026-07-21). */}
+        <div style={{ maxHeight: 460, overflowY: 'auto' }}>
+          <IndexChart data={view === 'chart' ? indexes : (indexes ?? []).filter(d => d.index_id === view)} />
 
-        {/* Constituents live BEHIND the tile click — receipts on demand. */}
-        {view !== 'chart' && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.inkSecondary, margin: '4px 0 8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              The {meta(view)?.members ?? ''} cards behind this number
-            </div>
-            {meta(view)?.published === false && (
-              <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, marginBottom: 8 }}>
-                This index publishes at {meta(view)?.min_members ?? 8} actively-traded cards ({meta(view)?.members ?? 0} now) — the basket below is filling as history builds.
+          {/* Constituents live BEHIND the tile click — receipts on demand. */}
+          {view !== 'chart' && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.inkSecondary, margin: '4px 0 8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                The {meta(view)?.members ?? ''} cards behind this number
               </div>
-            )}
-            {baskets[view]
-              ? (baskets[view].length
-                  ? <>
-                      <BasketSummary basket={baskets[view]} />
-                      <BasketTable basket={baskets[view]} onSelect={onSelect} />
-                    </>
-                  : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>No constituents yet — this basket fills as sales history builds.</div>)
-              : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>Loading…</div>}
-          </div>
-        )}
+              {meta(view)?.published === false && (
+                <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, marginBottom: 8 }}>
+                  This index publishes at {meta(view)?.min_members ?? 8} actively-traded cards ({meta(view)?.members ?? 0} now) — the basket below is filling as history builds.
+                </div>
+              )}
+              {baskets[view]
+                ? (baskets[view].length
+                    ? <>
+                        <BasketSummary basket={baskets[view]} />
+                        <BasketTable basket={baskets[view]} onSelect={onSelect} maxHeight={null} />
+                      </>
+                    : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>No constituents yet — this basket fills as sales history builds.</div>)
+                : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>Loading…</div>}
+            </div>
+          )}
+        </div>
       </div>
         </div>
         <div style={{ flex: '1 1 300px', minWidth: 0 }}>

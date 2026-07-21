@@ -8,14 +8,18 @@ const td = { textAlign: 'right', padding: '5px 12px', borderBottom: `1px solid $
 const tdL = { ...td, textAlign: 'left', font: `12px ${tokens.font.body}` };
 
 export function Chip({ active, onClick, color, children }) {
+  // Edge highlight on hover — clickability must be visible (Kaleb, 2026-07-21).
   return (
-    <button onClick={onClick} style={{
-      background: active ? tokens.color.surfaceRaised : 'none',
-      border: `1px solid ${active ? (color ?? tokens.color.inkMuted) : tokens.color.border}`,
-      color: active ? tokens.color.ink : tokens.color.inkSecondary,
-      borderRadius: 4, padding: '4px 11px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
-      whiteSpace: 'nowrap',
-    }}>{children}</button>
+    <button onClick={onClick}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = color ?? tokens.color.inkMuted; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = tokens.color.border; }}
+      style={{
+        background: active ? tokens.color.surfaceRaised : 'none',
+        border: `1px solid ${active ? (color ?? tokens.color.inkMuted) : tokens.color.border}`,
+        color: active ? tokens.color.ink : tokens.color.inkSecondary,
+        borderRadius: 4, padding: '4px 11px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
+        whiteSpace: 'nowrap', transition: 'border-color .12s ease',
+      }}>{children}</button>
   );
 }
 
@@ -108,13 +112,16 @@ export function MoversTable({ movers, onSelect }) {
  * largest holding) + $Vol/wk (mark × weekly sales — the exact quantity the
  * weighting is computed from).
  */
-export function BasketTable({ basket, onSelect }) {
+export function BasketTable({ basket, onSelect, maxHeight = 440 }) {
   if (!basket?.length) return <Empty label="basket" />;
   const maxW = Math.max(...basket.map(b => b.weight || 0), 0.0001);
   const thS = { ...th, position: 'sticky', top: 0, background: tokens.color.surfaceRaised, zIndex: 1 };
   const thSL = { ...thS, textAlign: 'left' };
   return (
-    <div style={{ maxHeight: 440, overflowY: 'auto', border: `1px solid ${tokens.color.border}`, borderRadius: 6 }}>
+    // maxHeight null = no inner scroll box (host provides the ONE scroll
+    // container — nested scrollbars are clutter); sticky header works in
+    // whichever scroll ancestor applies.
+    <div style={{ ...(maxHeight ? { maxHeight, overflowY: 'auto' } : {}), border: `1px solid ${tokens.color.border}`, borderRadius: 6 }}>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
         <thead><tr>
           <th style={thSL}>#</th><th style={thSL}>Card</th><th style={thSL}>Grade</th><th style={thS}>Weight</th><th style={thS}>Mark</th>

@@ -4,6 +4,22 @@ import { tokens } from '../tokens.js';
 const W = 860, H = 320, PAD = { t: 16, r: 96, b: 28, l: 48 };
 
 /**
+ * Catmull-Rom → cubic bezier smoothing (presentation only — hover reports
+ * exact values). Degrades to a straight segment for 2 points.
+ */
+function smoothPath(pts) {
+  if (pts.length < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : '';
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+/**
  * Two-series indexed line chart (base = 100 at window start).
  * Crosshair + tooltip, direct end-labels + legend, table toggle.
  */
@@ -46,6 +62,8 @@ export function IndexChart({ data }) {
 
   return (
     <div>
+      {/* Legend, decluttered (Kaleb, 2026-07-21: small text = clutter): dot,
+          name, window Δ. The receipts live behind the tiles. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
         {rows.map(d => {
           const s = tokens.series[d.index_id] ?? { label: d.index_id, data: tokens.color.ink };
@@ -53,11 +71,6 @@ export function IndexChart({ data }) {
             <span key={d.index_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: `12px ${tokens.font.body}`, color: tokens.color.inkSecondary }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: s.data, display: 'inline-block' }} />
               {s.label}
-              {d.members != null && (
-                <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}` }}>
-                  {d.members} cards · {d.window_sales ?? 0} sales{d.window_vol_cents > 0 ? ` · $${Math.round(d.window_vol_cents / 100).toLocaleString()}` : ''}
-                </span>
-              )}
               <Deltas series={d.series} />
             </span>
           );
@@ -91,13 +104,31 @@ export function IndexChart({ data }) {
 
           {rows.map(d => {
             const s = tokens.series[d.index_id] ?? { data: tokens.color.ink };
-            const path = d.series.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join('');
+            // Smooth monotone-ish curve + soft gradient fill beneath — the
+            // visual-appeal pass (Kaleb, 2026-07-21). Tooltip still reports
+            // the true point values; the curve is presentation only.
+            const pts = d.series.map((p, i) => [x(i), y(p.value)]);
+            const line = smoothPath(pts);
             const last = d.series[d.series.length - 1];
+            const lastX = x(d.series.length - 1);
+            const gid = `grad-${d.index_id}`;
             return (
               <g key={d.index_id}>
-                <path d={path} fill="none" stroke={s.data} strokeWidth="2" strokeLinejoin="round" />
-                <text x={W - PAD.r + 8} y={y(last.value) + 4} fill={s.data} style={{ font: `11px ${tokens.font.mono}` }}>
-                  {(tokens.series[d.index_id]?.label ?? d.index_id)} {last.value.toFixed(1)}
+                <defs>
+                  <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={s.data} stopOpacity="0.22" />
+                    <stop offset="100%" stopColor={s.data} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {pts.length > 1 && (
+                  <path d={`${line} L${lastX.toFixed(1)},${H - PAD.b} L${pts[0][0].toFixed(1)},${H - PAD.b} Z`}
+                        fill={`url(#${gid})`} stroke="none" />
+                )}
+                <path d={line} fill="none" stroke={s.data} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                <circle cx={lastX} cy={y(last.value)} r="3.5" fill={s.data} />
+                <circle cx={lastX} cy={y(last.value)} r="7" fill={s.data} opacity="0.2" />
+                <text x={W - PAD.r + 10} y={y(last.value) + 4} fill={s.data} style={{ font: `600 12px ${tokens.font.mono}` }}>
+                  {last.value.toFixed(1)}
                 </text>
               </g>
             );
