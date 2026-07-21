@@ -71,21 +71,19 @@ function MoverRow({ m, onSelect }) {
 }
 
 export function Terminal({ indexes, days, setDays, movers, onSelect }) {
-  // 'What IS this index?' answered with the actual cards (Kaleb, 2026-07-21):
-  // the Cards view lists each published index's current constituents with
-  // weights and marks — replaces the old numbers table.
+  // 'What IS this index?' answered with the actual cards. Four toggles
+  // (Kaleb, 2026-07-21): Chart, then one per game showing THAT index's
+  // current constituents. Three focused indexes on purpose — Card Ladder
+  // fragments into dozens; we'd rather three lines with receipts.
   const [view, setView] = useState('chart');
   const [baskets, setBaskets] = useState({});
-  const published = (indexes ?? []).filter(d => d.published !== false && d.series?.length);
   useEffect(() => {
-    if (view !== 'cards') return;
-    for (const d of published) {
-      if (baskets[d.index_id]) continue;
-      api.basket(d.index_id)
-        .then(rows => setBaskets(b => ({ ...b, [d.index_id]: rows })))
-        .catch(() => setBaskets(b => ({ ...b, [d.index_id]: [] })));
-    }
-  }, [view, indexes]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (view === 'chart' || baskets[view]) return;
+    api.basket(view)
+      .then(rows => setBaskets(b => ({ ...b, [view]: rows })))
+      .catch(() => setBaskets(b => ({ ...b, [view]: [] })));
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+  const meta = (ip) => (indexes ?? []).find(d => d.index_id === ip);
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -97,20 +95,29 @@ export function Terminal({ indexes, days, setDays, movers, onSelect }) {
             <Chip key={r} active={days === r} onClick={() => setDays(r)}>{r}D</Chip>
           ))}
           <span style={{ flex: 1 }} />
-          <Chip active={view === 'chart'} onClick={() => setView('chart')}>Chart</Chip>
-          <Chip active={view === 'cards'} onClick={() => setView('cards')}>Cards in index</Chip>
+          {[['chart', 'Chart'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']].map(([id, label]) => (
+            <Chip key={id} active={view === id} onClick={() => setView(id)}
+                  color={id !== 'chart' ? tokens.series[id]?.data : undefined}>{label}</Chip>
+          ))}
         </div>
         {view === 'chart' ? <IndexChart data={indexes} /> : (
-          published.length ? published.map(d => (
-            <div key={d.index_id} style={{ marginBottom: 22 }}>
-              <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.inkSecondary, margin: '4px 0 8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                {tokens.series[d.index_id]?.label ?? d.index_id} — current constituents
-              </div>
-              {baskets[d.index_id]
-                ? <BasketTable basket={baskets[d.index_id]} onSelect={onSelect} />
-                : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>Loading…</div>}
+          <div>
+            <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.inkSecondary, margin: '4px 0 8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              {tokens.series[view]?.label ?? view} index — current constituents
+              {meta(view)?.members != null && ` · ${meta(view).members} cards`}
             </div>
-          )) : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '8px 2px' }}>No published indexes yet.</div>
+            {meta(view)?.published === false && (
+              <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, marginBottom: 8 }}>
+                This index isn't drawn on the chart yet — it publishes at {meta(view)?.min_members ?? 8} actively-traded
+                cards ({meta(view)?.members ?? 0} now). The cards below are its basket so far.
+              </div>
+            )}
+            {baskets[view]
+              ? (baskets[view].length
+                  ? <BasketTable basket={baskets[view]} onSelect={onSelect} />
+                  : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>No constituents yet — this basket fills as sales history builds.</div>)
+              : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>Loading…</div>}
+          </div>
         )}
       </div>
 
