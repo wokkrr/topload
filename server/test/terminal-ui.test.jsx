@@ -32,3 +32,14 @@ describe('Terminal renders without throwing across payload shapes', () => {
     });
   }
 });
+
+describe('isSealed', () => {
+  it('never marks Pokémon NAMED after products as sealed', async () => {
+    const { isSealed } = await import('../../src/ui/tables.jsx');
+    expect(isSealed({ grade: 'raw', platform: 'phygitals', item_name: '2023 Iron Bundle Paradox Rift #056' })).toBe(false);
+    expect(isSealed({ grade: 'PSA10', platform: 'phygitals', item_name: 'Booster Box Collection Promo' })).toBe(false); // graded never sealed
+    expect(isSealed({ grade: 'raw', platform: 'phygitals', item_name: 'Paldea Evolved Booster Bundle' })).toBe(true);
+    expect(isSealed({ grade: 'raw', platform: 'phygitals', item_name: 'Elite Trainer Box Scarlet & Violet' })).toBe(true);
+    expect(isSealed({ grade: 'raw', platform: 'mnstr', item_name: 'Ascended Heroes' })).toBe(true); // ungraded MNSTR = pack
+  });
+});

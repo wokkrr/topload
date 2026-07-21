@@ -263,7 +263,7 @@ const LANG_FILTERS = [['', 'All'], ['English', 'English'], ['Japanese', 'Japanes
 // BGS = Beckett Grading Services — one chip covers both spellings.
 // 'Raw' chip returned 2026-07-21: Phygitals brought ~2,900 ungraded singles
 // to the desk (it left 2026-07-20 when every listing was a slab or pack).
-const GRADER_FILTERS = [['', 'All'], ['raw', 'Raw'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['CGC', 'CGC'], ['TAG', 'TAG'], ['sealed', 'Sealed']];
+const GRADER_FILTERS = [['', 'All'], ['PSA', 'PSA'], ['BGS', 'BGS/Beckett'], ['CGC', 'CGC'], ['TAG', 'TAG'], ['raw', 'Raw'], ['sealed', 'Sealed']];
 
 // Sealed product (packs/boxes) is its own category, not "raw" — Kaleb wants a
 // dedicated section eventually; for now the chip separates it and Raw stays
@@ -277,7 +277,10 @@ const GRADER_FILTERS = [['', 'All'], ['raw', 'Raw'], ['PSA', 'PSA'], ['BGS', 'BG
 export function isSealed(l) {
   if ((l.grade ?? 'raw') !== 'raw') return false;
   if (l.platform === 'mnstr') return true;
-  return /\b(booster|packs?|box|etb|elite trainer|display|bundle|blister|tins?|case)\b/i.test(l.item_name ?? '');
+  // 'bundle' alone is NOT sealed evidence — Iron Bundle is a Pokémon
+  // (live false positive, Kaleb 2026-07-21); real products say 'booster
+  // bundle', which 'booster' already catches. Same trap as the tin promos.
+  return /\b(booster|packs?|box|etb|elite trainer|display|blister|tins?|case)\b/i.test(l.item_name ?? '');
 }
 
 export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing }) {
