@@ -179,52 +179,51 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
               Purchase completes on {platform} — in-app buying is on the roadmap.
             </div>
           )}
+
+          {/* ── Listing details fill the hero's dead space (Kaleb, 2026-07-21:
+              the right half under the buy button was wasted) — two quiet
+              columns of receipts beside the slab, no accordion click needed. ── */}
+          <div style={{ borderTop: `1px solid ${tokens.color.border}`, marginTop: 24, paddingTop: 14 }}>
+            <div style={{ ...headingStyle, marginBottom: 8 }}>Listing Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '4px 40px', maxWidth: 760 }}>
+              {gm && <Row k="Grading company" v={gm[1]} />}
+              {gm && <Row k="Grade" v={gm[2] ?? 'Authentic (ungraded)'} />}
+              {cert && (
+                <Row k="Certification #" v={certUrl
+                  ? <a href={certUrl} target="_blank" rel="noopener noreferrer"
+                       style={{ color: tokens.color.brass, textDecoration: 'underline' }}
+                       title="Verify this cert on the grader's site">{cert} ↗</a>
+                  : cert} />
+              )}
+              {!gm && <Row k="Condition" v="Raw / ungraded" />}
+              {l.pop_count != null && (
+                <Row k="PSA population" v={`${Number(l.pop_count).toLocaleString()} at this grade${l.pop_higher != null ? ` · ${Number(l.pop_higher).toLocaleString()} higher` : ''}`} />
+              )}
+              <Row k="Language" v={listingLanguage(l)} />
+              <Row k="Listed" v={l.listed_at ? String(l.listed_at).slice(0, 10) : '—'} />
+              <Row k="Currency" v={/^usd/i.test(l.currency ?? '') ? 'USD' : (l.currency ?? '—')} />
+              {l.card_id
+                ? <Row k="Tracked card" v={l.card_name ?? l.card_id} />
+                : <Row k="Tracked card" v="not matched yet" />}
+              <Row k="Photo" v={l.image_kind === 'art' ? 'reference art (not the item)' : l.image ? 'actual item' : '—'} />
+              {l.nft_address && <Row k="Vault ID" v={`${l.nft_address.slice(0, 6)}…${l.nft_address.slice(-4)}`} />}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── Accordion sections, marketplace-style ── */}
-      <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* ── Research + similar, open panels (details moved into the hero;
+          the collapsed accordion hid the chart — freshened 2026-07-21). ── */}
+      <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {l.card_id && (
-          <Accordion title="Price history & comps" defaultOpen={false}>
+          <Panel title="Price History & Comps"
+                 hint="the tracked card behind this listing — oracle marks by grade, real solds plotted">
             <CardResearch cardId={l.card_id} initialGrade={l.grade} embedded onOpenCard={onSelectCard} />
-          </Accordion>
+          </Panel>
         )}
 
-        <Accordion title="Listing Details" defaultOpen>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '4px 40px', maxWidth: 760 }}>
-            {gm && <Row k="Grading company" v={gm[1]} />}
-            {gm && <Row k="Grade" v={gm[2] ?? 'Authentic (ungraded)'} />}
-            {cert && (
-              <Row k="Certification #" v={certUrl
-                ? <a href={certUrl} target="_blank" rel="noopener noreferrer"
-                     style={{ color: tokens.color.brass, textDecoration: 'underline' }}
-                     title="Verify this cert on the grader's site">{cert} ↗</a>
-                : cert} />
-            )}
-            {!gm && <Row k="Condition" v="Raw / ungraded" />}
-            {/* PSA-reported population: how many copies exist at this grade,
-                and how many graded higher — scarcity at a glance. */}
-            {l.pop_count != null && (
-              <Row k="PSA population" v={`${Number(l.pop_count).toLocaleString()} at this grade${l.pop_higher != null ? ` · ${Number(l.pop_higher).toLocaleString()} higher` : ''}`} />
-            )}
-            <Row k="Category" v={l.category ?? '—'} />
-            <Row k="Language" v={listingLanguage(l)} />
-            <Row k="Marketplace" v={platform} />
-            <Row k="Listed" v={l.listed_at ? String(l.listed_at).slice(0, 10) : '—'} />
-            {/* Crypto-invisible UX (Kaleb, 2026-07-21): stablecoin tickers
-                (USDC/USDm) settle 1:1 in dollars — collectors see USD, full
-                stop. The rail is our infrastructure, not their problem. */}
-            <Row k="Currency" v={/^usd/i.test(l.currency ?? '') ? 'USD' : (l.currency ?? '—')} />
-            {l.card_id
-              ? <Row k="Tracked card" v={l.card_name ?? l.card_id} />
-              : <Row k="Tracked card" v="not matched yet" />}
-            <Row k="Photo" v={l.image_kind === 'art' ? 'reference art (not the item)' : l.image ? 'actual item' : '—'} />
-            {l.nft_address && <Row k="Vault ID" v={`${l.nft_address.slice(0, 6)}…${l.nft_address.slice(-4)}`} />}
-          </div>
-        </Accordion>
-
         {similar.length > 0 && (
-          <Accordion title="Similar listings" defaultOpen>
+          <Panel title="Similar Listings">
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {similar.map(s => (
                 <div key={`${s.platform}|${s.external_id}`}
@@ -249,27 +248,22 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                 </div>
               ))}
             </div>
-          </Accordion>
+          </Panel>
         )}
       </div>
     </section>
   );
 }
 
-/** Full-width expandable section — the marketplace listing-page pattern. */
-function Accordion({ title, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen);
+/** Open full-width section — panel look shared with the Terminal page. */
+function Panel({ title, hint, children }) {
   return (
-    <div style={{ border: `1px solid ${tokens.color.border}`, background: tokens.color.surface, overflow: 'hidden' }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
-        background: 'none', border: 'none', cursor: 'pointer', padding: '14px 18px',
-        ...headingStyle, color: tokens.color.ink, textAlign: 'left',
-      }}>
-        {title}
-        <span style={{ color: tokens.color.inkSecondary, fontSize: 11, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▼</span>
-      </button>
-      {open && <div style={{ padding: '2px 18px 16px' }}>{children}</div>}
+    <div style={{ border: `1px solid ${tokens.color.border}`, background: tokens.color.surface, padding: '14px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+        <span style={{ ...headingStyle, color: tokens.color.ink }}>{title}</span>
+        {hint && <span style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}` }}>{hint}</span>}
+      </div>
+      {children}
     </div>
   );
 }
