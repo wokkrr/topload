@@ -74,28 +74,30 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
 
   return (
     <div>
-      {/* ── Hero: card art + identity + big price + delta chips ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24, margin: '14px 0 4px', flexWrap: 'wrap' }}>
+      {/* ── Hero: large art LEFT · identity + price + chart RIGHT (Kaleb,
+          2026-07-21: the card is the product — let it lead, chart beside it).
+          Embedded mode has no image, so the right column takes full width. ── */}
+      <div style={{ display: 'flex', gap: 28, margin: '14px 0 4px', flexWrap: 'wrap' }}>
         {!embedded && card.image && (
           <span style={{ position: 'relative', alignSelf: 'flex-start', lineHeight: 0 }}
                 title={card.image_kind === 'listing' ? 'Sample slab photo from a marketplace listing — not a specific item for sale' : undefined}>
             <img src={card.image} alt={card.name} style={{
-              height: 260, borderRadius: 8, border: `1px solid ${tokens.color.border}`,
+              height: 480, maxWidth: '100%', borderRadius: 10, border: `1px solid ${tokens.color.border}`,
               background: tokens.color.surfaceRaised,
             }} />
             {card.image_kind === 'listing' && (
               <span style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
-                font: `600 8px ${tokens.font.body}`, letterSpacing: '0.06em',
+                font: `600 9px ${tokens.font.body}`, letterSpacing: '0.06em',
                 color: tokens.color.inkSecondary, background: tokens.color.overlay,
-                borderRadius: '0 0 6px 6px', padding: '3px 2px',
+                borderRadius: '0 0 8px 8px', padding: '4px 2px',
               }}>SAMPLE PHOTO</span>
             )}
           </span>
         )}
-        <div>
+        <div style={{ flex: '1 1 460px', minWidth: 0 }}>
           {!embedded && (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
               <h2 style={{ font: `24px ${tokens.font.display}`, margin: 0 }}>{card.name}</h2>
               <span style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}` }}>
                 {card.set_name} {card.number} · {tokens.series[card.ip]?.label ?? card.ip}
@@ -108,7 +110,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
             </div>
           )}
           {cur && (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
               <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(cur.price_cents)}</span>
               <DeltaChip label="1D" pct={cur.change_1d_pct} />
               <DeltaChip label="7D" pct={range?.d7} />
@@ -119,37 +121,37 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
               </span>
             </div>
           )}
-        </div>
-        <div style={{ display: 'flex', gap: 24, marginLeft: 'auto', flexWrap: 'wrap' }}>
-          {range && <Stat label={`${days}D high`} value={fmtUsd(range.hi)} />}
-          {range && <Stat label={`${days}D low`} value={fmtUsd(range.lo)} />}
-          {cur && <Stat label="Sales 7D / 30D" value={`${cur.sales_7d} / ${cur.sales_30d}`} />}
-          {range && <Stat label={`${days}D return`} value={fmtPct(range.window)} color={deltaColor(range.window)} />}
+          <div style={{ display: 'flex', gap: 24, marginTop: 12, flexWrap: 'wrap' }}>
+            {range && <Stat label={`${days}D high`} value={fmtUsd(range.hi)} />}
+            {range && <Stat label={`${days}D low`} value={fmtUsd(range.lo)} />}
+            {cur && <Stat label="Sales 7D / 30D" value={`${cur.sales_7d} / ${cur.sales_30d}`} />}
+            {range && <Stat label={`${days}D return`} value={fmtPct(range.window)} color={deltaColor(range.window)} />}
+          </div>
+
+          <div style={{ display: 'flex', gap: 4, margin: '14px 0 16px', flexWrap: 'wrap' }}>
+            {card.grades.map(g => (
+              <button key={g.grade} onClick={() => setGrade(g.grade)} style={{
+                background: grade === g.grade ? tokens.color.surfaceRaised : 'none',
+                border: `1px solid ${grade === g.grade ? seriesColor : tokens.color.border}`,
+                color: grade === g.grade ? tokens.color.ink : tokens.color.inkSecondary,
+                borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
+              }}>{g.grade}</button>
+            ))}
+            <span style={{ flex: 1 }} />
+            {[30, 90, 180].map(r => (
+              <button key={r} onClick={() => setDays(r)} style={{
+                background: days === r ? tokens.color.surfaceRaised : 'none',
+                border: `1px solid ${days === r ? tokens.color.inkMuted : tokens.color.border}`,
+                color: days === r ? tokens.color.ink : tokens.color.inkSecondary,
+                borderRadius: 4, padding: '3px 10px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
+              }}>{r}D</button>
+            ))}
+          </div>
+
+          <MarkChart series={series} color={seriesColor}
+                     dots={sales?.filter(s => s.grade === grade)} />
         </div>
       </div>
-
-      <div style={{ display: 'flex', gap: 4, margin: '14px 0 16px', flexWrap: 'wrap' }}>
-        {card.grades.map(g => (
-          <button key={g.grade} onClick={() => setGrade(g.grade)} style={{
-            background: grade === g.grade ? tokens.color.surfaceRaised : 'none',
-            border: `1px solid ${grade === g.grade ? seriesColor : tokens.color.border}`,
-            color: grade === g.grade ? tokens.color.ink : tokens.color.inkSecondary,
-            borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
-          }}>{g.grade}</button>
-        ))}
-        <span style={{ flex: 1 }} />
-        {[30, 90, 180].map(r => (
-          <button key={r} onClick={() => setDays(r)} style={{
-            background: days === r ? tokens.color.surfaceRaised : 'none',
-            border: `1px solid ${days === r ? tokens.color.inkMuted : tokens.color.border}`,
-            color: days === r ? tokens.color.ink : tokens.color.inkSecondary,
-            borderRadius: 4, padding: '3px 10px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
-          }}>{r}D</button>
-        ))}
-      </div>
-
-      <MarkChart series={series} color={seriesColor}
-                 dots={sales?.filter(s => s.grade === grade)} />
 
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%', marginTop: 24 }}>
         <thead><tr>

@@ -123,7 +123,10 @@ export function CardsTable({ cards, onSelect }) {
       <tbody>
         {cards.map(c => (
           <tr key={`${c.card_id}|${c.grade}`} onClick={() => onSelect?.(c.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
-            <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}><Thumb src={c.image} size={54} badge={c.image_kind === 'listing' ? 'REF' : null} /><IpDot ip={c.ip} /><span>{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></span></td>
+            {/* No thumbnail here — at table-row size the art reads as noise
+                (Kaleb, 2026-07-21). A desk-style thumbnail GRID view is the
+                future home for browsing the database visually. */}
+            <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}><IpDot ip={c.ip} /><span>{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></span></td>
             <td style={tdL}>{c.grade}</td>
             <td style={td}>{fmtUsd(c.price_cents)}</td>
             <td style={td}><Delta pct={c.change_1d_pct} /></td>
