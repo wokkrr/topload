@@ -247,7 +247,7 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
 
       <div style={panel}>
         <SectionHead title="Value Pulse"
-          hint="live asks sitting under the oracle mark, grade-matched · a discount is a starting point, not a verdict — check the card's history before you buy" />
+          hint="experimental value driven insight - live asks sitting under the price oracle mark" />
         <DealsPanel onOpenListing={onOpenListing} onSelect={onSelect} />
       </div>
 

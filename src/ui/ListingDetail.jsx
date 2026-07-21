@@ -67,7 +67,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
         <button onClick={onBack} className="tl-back" style={{
           background: 'none', border: 'none', color: tokens.color.inkSecondary,
           font: `12px ${tokens.font.body}`, cursor: 'pointer', padding: 0,
-        }}>← Back to Listings</button>
+        }}>← Back</button>
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
           {idx >= 0 && (
             <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}`, marginRight: 4 }}>
