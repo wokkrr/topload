@@ -32,7 +32,14 @@ import { openDb } from './db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const EDITION_RE = /\[(.*?(winner|champion|finalist|prize|serial|pre-?release|anniversary|judge|event|tournament).*?)\]/i;
+// Edition/event-stamped printings: the physical carries a stamp/foil mark on
+// the BASE artwork (tournament prizes, campaign promos, collab stamps). The
+// 2026-07-21 late pass added the tournament-placement and campaign tokens
+// (Top 8/16/64, Flagship Battle, Get Campaign, Participant, Promotion Pack,
+// Playmat, Storage Box, Dodgers collab) — chase-card sweep, Kaleb's list.
+// NOT here: Treasure Cup / Best Selection / SP / Gold / Silver — those can be
+// distinct artworks and go through the curated map only.
+const EDITION_RE = /\[(.*?(winner|champion|finalist|prize|serial|pre-?release|anniversary|judge|event|tournament|top ?\d+|flagship|participant|get campaign|promotion pack|playmat|storage box|dodgers).*?)\]/i;
 const CODE_RE = /\b((?:OP|ST|EB|PRB)\d{2}-\d{3}|P-\d{3})\b/i;
 
 /** snapshot {cards:{CODE:…, CODE_p1:…}} → Map(code → {base, parallels:[{url,rarity}]}) */
@@ -61,11 +68,25 @@ export function pickArt(name, entry, code, curated = {}) {
     const hit = parallels.find(p => p.url?.includes(`_${curatedSuffix}.`));
     return hit?.url ?? null;
   }
-  if (EDITION_RE.test(name)) return base?.url ?? null;          // stamped printing, base artwork
   const lk = labelKey(name);
+  // Treasure Cup / Best Selection labels can carry DISTINCT artwork even when
+  // they also contain edition tokens ('Treasure Cup - Top 8') — verified live
+  // 2026-07-21: Uta OP09-002's Treasure Cup is its own art (= _p2). They must
+  // never fall through to the base-art edition path; curation only.
+  // Treasure Cup / Best Selection are ART PROGRAMS, not stamp editions —
+  // verified live 2026-07-21 (Uta OP09-002 TC = own art = _p2; Usopp OP01-004
+  // TC = own art NOT in our snapshot, whose _p1 even carries Bandai's 'NOW
+  // DESIGNING' placeholder → snapshots go stale; refresh + curate only).
+  // They must never take the edition/base path OR the single-parallel path.
+  if (/treasure cup|best selection/.test(lk)) return null;
+  if (EDITION_RE.test(name)) return base?.url ?? null;          // stamped printing, base artwork
   // '[Foil]' EXACTLY (not 'SP Foil'/'Manga Foil …') = foiled BASE printing
   // (PRB "The Best" reprints) — base artwork, different treatment.
   if (lk === 'foil') return base?.url ?? null;
+  // Bare '[PRB01]'/'[PRB-02]' = the premium booster's STANDARD reprint slot —
+  // base artwork with the set's foil. Labels with extra words (manga/alt/sp)
+  // route through their own rules or curation.
+  if (/^prb-?\d{2}$/.test(lk)) return base?.url ?? null;
   if (parallels.length === 1) return parallels[0].url;          // only one alt art → no ambiguity
   // VISUALLY VERIFIED CONVENTIONS (2026-07-21, screenshots vs Bandai gallery):
   // 1. '_p1' is the STANDARD Alternate Art across sets (checked OP01-016,
@@ -78,10 +99,11 @@ export function pickArt(name, entry, code, curated = {}) {
     const p1 = parallels.find(pp => pp.url?.includes('_p1.'));
     if (p1) return p1.url;
   }
-  // 2. '[SP]'/'[SP Foil]' = the SP treatment, which carries rarity 'Special'
-  //    AND an SP-prefixed card code (verified OP07-051_p3 face: 'SP OP07-051').
-  //    Only when exactly ONE Special parallel exists — else curation.
-  if (/^sp( foil)?$/.test(lk)) {
+  // 2. '[SP]'/'[SP Foil]'/'[SP PRB-02]'/'[Special Alternate Art]' = the SP
+  //    treatment, which carries rarity 'Special' AND an SP-prefixed card code
+  //    (verified OP07-051_p3 face: 'SP OP07-051'). Only when exactly ONE
+  //    Special parallel exists — else curation (OP05-091 has two, stays null).
+  if (/^(sp( foil| prb-?\d{2})?|special alternate art)$/.test(lk)) {
     const specials = parallels.filter(pp => pp.rarity === 'Special');
     if (specials.length === 1) return specials[0].url;
   }

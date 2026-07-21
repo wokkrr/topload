@@ -1,5 +1,5 @@
 {
-  "_comment": "Curated variant-art map: 'CODE|pc label (lowercased)' → parallel suffix ('p3') or 'base'. Entries are added ONLY after visually comparing Bandai's parallel images against a marketplace reference (TCGplayer product art) — never inferred from metadata. Full manga-label pass 2026-07-21 (Bandai EN gallery contact sheets): manga art is _p2 for nearly every code, with verified exceptions OP01-016 (_p8), OP06-119 (_p3), and OP13 'Red Manga' (_p3). PRB01/Foil manga labels map to the same manga artwork slot — the foil differs, the art does not. Consumed by server/seed-op-variant-art.js; keys with no matching satellite are harmless.",
+  "_comment": "Curated variant-art map: 'CODE|pc label (lowercased)' → parallel suffix ('p3') or 'base'. Entries are added ONLY after visually comparing Bandai's parallel images against a marketplace reference (TCGplayer product art) — never inferred from metadata. Full manga-label pass 2026-07-21 (Bandai EN gallery contact sheets): manga art is _p2 for nearly every code, with verified exceptions OP01-016 (_p8), OP06-119 (_p3), and OP13 'Red Manga' (_p3). PRB01/Foil manga labels map to the same manga artwork slot — the foil differs, the art does not. Consumed by server/seed-op-variant-art.js; keys with no matching satellite are harmless. 2026-07-21 late chase-card pass: Treasure Cup = ART PROGRAM (Uta OP09-002 TC verified = _p2 vs TCGplayer product photo; Usopp OP01-004 TC art absent from stale snapshot — 'NOW DESIGNING' placeholder found); Buggy OP09-051 SP Gold verified = _p5 (blue frame/gold trim vs TCGplayer product photo), Silver = _p4.",
   "EB01-006|alternate art manga": "p2",
   "EB01-006|manga prb01": "p2",
   "EB02-061|manga": "p2",
@@ -64,5 +64,9 @@
   "OP16-065|manga": "p2",
   "OP16-073|manga": "p2",
   "ST01-012|wanted": "p1",
-  "ST04-003|wanted": "p1"
+  "ST04-003|wanted": "p1",
+  "OP09-002|treasure cup": "p2",
+  "OP09-002|treasure cup 2025": "p2",
+  "OP09-051|sp gold": "p5",
+  "OP09-051|sp silver": "p4"
 }

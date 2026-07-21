@@ -107,4 +107,35 @@ describe('verified conventions (2026-07-21 visual pass)', () => {
     expect(pickArt('Boa Hancock [SP Foil]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p3.png');
     expect(pickArt('Boa Hancock [Manga Foil PRB01]', en.get('OP07-051'), 'OP07-051')).toBeNull();
   });
+  it('tournament/campaign editions = base art with a stamp (chase-card sweep 2026-07-21)', () => {
+    for (const label of ['Top 8', 'Top 16', 'Top 64', 'Flagship Battle', 'Get Campaign', 'Participant',
+                         'Promotion Pack EX', 'Playmat Limited Edition', 'Storage Box Set Gold', 'Dodgers',
+                         'Champiosnhip 25-26 Top 8' /* PC's typo, caught via the top-N token */]) {
+      expect(pickArt(`Boa Hancock [${label}]`, en.get('OP07-051'), 'OP07-051'), label).toBe('https://e/OP07-051.png');
+    }
+  });
+  it("bare '[PRB01]'/'[PRB-02]' = standard premium-booster reprint → base art", () => {
+    expect(pickArt('Boa Hancock [PRB01]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051.png');
+    expect(pickArt('Boa Hancock [PRB-02]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051.png');
+  });
+  it("'[Treasure Cup]' and '[Best Selection]' stay curation-only (verified ART PROGRAMS, not stamps)", () => {
+    expect(pickArt('Boa Hancock [Treasure Cup]', en.get('OP07-051'), 'OP07-051')).toBeNull();
+    expect(pickArt('Boa Hancock [Best Selection]', en.get('OP07-051'), 'OP07-051')).toBeNull();
+    // Even 'Treasure Cup - Top 8' must NOT take the top-N edition path…
+    expect(pickArt('Vinsmoke Reiju [Treasure Cup - Top 8]', en.get('OP07-051'), 'OP07-051')).toBeNull();
+    // …and single-parallel codes must NOT auto-assign for these labels (live
+    // proof 2026-07-21: Usopp OP01-004 TC art ≠ the lone snapshot parallel).
+    const single = indexSnapshot({ cards: {
+      'OP01-004': { rarity: 'Rare', img_url: 'https://e/OP01-004.png' },
+      'OP01-004_p1': { rarity: 'Rare', img_url: 'https://e/OP01-004_p1.png' },
+    } });
+    expect(pickArt('Usopp [Treasure Cup]', single.get('OP01-004'), 'OP01-004')).toBeNull();
+    // Curated treasure-cup keys still resolve (Uta OP09-002 → _p2, verified).
+    expect(pickArt('Uta [Treasure Cup]', en.get('OP07-051'), 'OP07-051', { 'OP07-051|treasure cup': 'p2' }))
+      .toBe('https://e/OP07-051_p2.png');
+  });
+  it("SP family extends to '[SP PRB-02]' and '[Special Alternate Art]' (unique-Special gate)", () => {
+    expect(pickArt('Boa Hancock [SP PRB-02]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p3.png');
+    expect(pickArt('Boa Hancock [Special Alternate Art]', en.get('OP07-051'), 'OP07-051')).toBe('https://e/OP07-051_p3.png');
+  });
 });
