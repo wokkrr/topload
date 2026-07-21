@@ -166,17 +166,34 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             {' '}Asking prices never feed the oracle.
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
-            {url && (
-              <a href={url} target="_blank" rel="noopener noreferrer" style={{
-                background: tokens.color.brass, color: tokens.color.bg, textDecoration: 'none',
-                borderRadius: 6, padding: '10px 22px', font: `600 13px ${tokens.font.body}`,
-              }}>Buy on {platform} ↗</a>
-            )}
-          </div>
+          {/* ── Purchase block, native-checkout shape (Kaleb, 2026-07-21):
+              price ON the button, full-width primary, quiet provenance line.
+              When in-app buying ships, only the caption changes — the button
+              already looks like ours. ── */}
           {url && (
-            <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 8 }}>
-              Purchase completes on {platform} — in-app buying is on the roadmap.
+            <div style={{ marginTop: 22, maxWidth: 380 }}>
+              <style>{`
+                .tl-buy-now { transition: transform .12s ease, box-shadow .12s ease, filter .12s ease; }
+                .tl-buy-now:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.18); filter: brightness(1.05); }
+                .tl-buy-now:active { transform: translateY(0); box-shadow: none; }
+              `}</style>
+              <a href={url} target="_blank" rel="noopener noreferrer" className="tl-buy-now" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                background: tokens.color.brass, color: tokens.color.bg, textDecoration: 'none',
+                borderRadius: 8, padding: '13px 20px',
+              }}>
+                <span style={{ font: `600 14px ${tokens.font.body}`, letterSpacing: '0.02em' }}>Buy Now</span>
+                <span style={{ font: `600 15px ${tokens.font.mono}` }}>{fmtUsd(l.price_cents)}</span>
+              </a>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 7 }}>
+                <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>
+                  Checkout completes on {platform} for now
+                </span>
+                <a href={url} target="_blank" rel="noopener noreferrer"
+                   style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkSecondary, textDecoration: 'none' }}>
+                  view on {platform} ↗
+                </a>
+              </div>
             </div>
           )}
 
