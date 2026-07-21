@@ -157,21 +157,27 @@ app.get('/api/cards', (req, res) => {
   }[req.query.sort] ?? 'price_cents DESC';
   // ONE row per card (Kaleb, 2026-07-21): the lookup lists CARDS — the top-
   // value grade represents each; the card page holds the full grade ladder.
-  // grades_tracked lets the UI hint at the depth behind the row.
+  // PERF: the correlated image subselects must join AFTER rn=1 + LIMIT —
+  // inside the windowed subquery they ran for every one of ~277k mark rows
+  // and the endpoint hung for minutes (live outage, 2026-07-21 morning).
   const rows = db.prepare(`
-    SELECT * FROM (
-      SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
-             c.image AS card_image, c.image_kind AS card_kind,
-             (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo,
-             lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
-             lm.price_1d, lm.price_30d,
-             COUNT(*) OVER (PARTITION BY c.id) AS grades_tracked,
-             ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY lm.price_cents DESC) AS rn
-      FROM latest_marks lm
-      JOIN cards c ON c.id = lm.card_id
-      WHERE 1=1 ${ipFilter}
-    ) WHERE rn = 1
-    ORDER BY ${sort} LIMIT ${limit}`).all(...args);
+    SELECT o.*, c2.image AS card_image, c2.image_kind AS card_kind,
+           (SELECT g.image FROM gacha_listings g WHERE g.card_id = o.card_id AND g.image IS NOT NULL LIMIT 1) AS listing_photo
+    FROM (
+      SELECT * FROM (
+        SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
+               lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
+               lm.price_1d, lm.price_30d,
+               COUNT(*) OVER (PARTITION BY c.id) AS grades_tracked,
+               ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY lm.price_cents DESC) AS rn
+        FROM latest_marks lm
+        JOIN cards c ON c.id = lm.card_id
+        WHERE 1=1 ${ipFilter}
+      ) WHERE rn = 1
+      ORDER BY ${sort} LIMIT ${limit}
+    ) o
+    JOIN cards c2 ON c2.id = o.card_id
+    ORDER BY ${sort}`).all(...args);
   res.json(rows.map(({ card_image, card_kind, listing_photo, ...r }) => ({
     ...r,
     ...pickImage(r.card_id, card_image, card_kind, listing_photo),
