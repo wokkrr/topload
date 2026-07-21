@@ -56,8 +56,10 @@ export default function App() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
-  const navigate = (to) => {
-    if (to !== window.location.pathname) window.history.pushState(null, '', to);
+  const navigate = (to, replace = false) => {
+    if (to !== window.location.pathname) {
+      window.history[replace ? 'replaceState' : 'pushState'](null, '', to);
+    }
     setPath(to);
   };
   const goBack = (fallback) => {
@@ -69,7 +71,12 @@ export default function App() {
   const openListing = (l, ctx) => {
     if (route.page === 'desk') setOrigin('desk');
     if (ctx) setNavListings(ctx);
-    navigate(`/listing/${encodeURIComponent(l.platform)}/${encodeURIComponent(l.external_id)}`);
+    // Listing→listing moves (prev/next arrows, similar-listings) REPLACE the
+    // history entry — shuffling through 20 slabs is one browsing session, and
+    // Back returns to the desk thumbnails, not back through every slab
+    // (Kaleb, 2026-07-21).
+    const listingToListing = route.page === 'listing';
+    navigate(`/listing/${encodeURIComponent(l.platform)}/${encodeURIComponent(l.external_id)}`, listingToListing);
   };
 
   const toggleTheme = () => {
