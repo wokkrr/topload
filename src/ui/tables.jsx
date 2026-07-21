@@ -508,7 +508,8 @@ function GachaGrid({ listings, onSelect, onOpenListing }) {
   const visible = listings.slice(0, shown);
   return (
     <div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
+    {/* Breathing room (Kaleb, 2026-07-21): larger tiles, wider gutters. */}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 22 }}>
       <style>{GRID_CSS}</style>
       {visible.map(l => {
         const url = listingUrl(l);
@@ -524,9 +525,15 @@ function GachaGrid({ listings, onSelect, onOpenListing }) {
                background: tokens.color.surface, cursor: onOpenListing || l.card_id || url ? 'pointer' : 'default',
                display: 'flex', flexDirection: 'column',
              }}>
+          {/* Every image lives in the SAME 3:4 frame with uniform inner
+              padding — mixed source shapes (slab scans, card art, vault
+              renders) read as one orderly wall instead of a ragged one.
+              'contain' (never crop): slab labels and cert numbers are part
+              of what's being sold. */}
           <div style={{ position: 'relative', aspectRatio: '3/4', background: tokens.color.surfaceRaised }}>
             {l.image
-              ? <img src={l.image} alt="" loading="lazy" onError={imgFallback} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              ? <img src={l.image} alt="" loading="lazy" onError={imgFallback}
+                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', padding: 10, boxSizing: 'border-box' }} />
               : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `10px ${tokens.font.body}` }}>no photo</div>}
             {l.image && l.image_kind === 'art' && (
               <span style={{
