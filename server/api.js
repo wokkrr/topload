@@ -280,7 +280,7 @@ app.get('/api/gacha', (req, res) => {
                FROM pop_counts WHERE source = 'psa' GROUP BY card_id, grade) pop
       ON pop.card_id = g.card_id AND pop.grade = g.grade
     ORDER BY g.listed_at DESC, g.price_cents DESC`).all();
-  res.json(rows.map(r => {
+  const out = rows.map(r => {
     // A comp wildly out of line with the ask (ask < 20% of comp, or > 5x) is
     // almost always bad data (penny/auction-start listings, residual mis-
     // attribution) — not free money. Surface it as suspect, never as a delta.
@@ -292,7 +292,30 @@ app.get('/api/gacha', (req, res) => {
       delta_pct: ratio != null && !suspect ? +((ratio - 1) * 100).toFixed(2) : null,
       comp_suspect: suspect || undefined,
     };
-  }));
+  });
+  // Cross-marketplace duplicates: vault tokens are portable, so the SAME
+  // physical item can be live on two venues at once (52 CC×Phygitals pairs
+  // found live, 2026-07-21). Kaleb: never double-list — keep only the HOST
+  // listing. Phygitals labels these 'external items' (the vault lives
+  // elsewhere), so its copy is the guest; ties fall back to the earliest-
+  // created listing.
+  const byMint = new Map();
+  for (const r of out) {
+    if (!r.nft_address) continue;
+    const g = byMint.get(r.nft_address) ?? [];
+    g.push(r);
+    byMint.set(r.nft_address, g);
+  }
+  const drop = new Set();
+  for (const group of byMint.values()) {
+    if (group.length < 2) continue;
+    const keep = [...group].sort((a, b) =>
+      ((a.platform === 'phygitals') - (b.platform === 'phygitals'))
+      || String(a.listed_at ?? '9999').localeCompare(String(b.listed_at ?? '9999'))
+    )[0];
+    for (const g of group) if (g !== keep) drop.add(g);
+  }
+  res.json(out.filter(r => !drop.has(r)));
 });
 
 // Production: serve the built UI from the same process (VPS mode) — /api/*
