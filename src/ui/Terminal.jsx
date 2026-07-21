@@ -197,7 +197,7 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
       </div>
 
       <div style={panel}>
-        <SectionHead title="Deal Radar"
+        <SectionHead title="Value Pulse"
           hint="live asks sitting under the oracle mark, grade-matched · a discount is a starting point, not a verdict — check the card's history before you buy" />
         <DealsPanel onOpenListing={onOpenListing} onSelect={onSelect} />
       </div>
@@ -207,7 +207,7 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
 }
 
 /**
- * Deal Radar (Kaleb, 2026-07-21: "let's test out something like that") —
+ * Value Pulse (Kaleb, 2026-07-21: "let's test out something like that") —
  * ask-vs-mark discounts with liquidity context beside every one: a discount
  * without an exit is a trap, so sales/30D rides along.
  */

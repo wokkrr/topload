@@ -5,7 +5,7 @@ import { TickerTape } from './ui/TickerTape.jsx';
 import { CardDetail } from './ui/CardDetail.jsx';
 import { ListingDetail } from './ui/ListingDetail.jsx';
 import { GachaDesk } from './ui/tables.jsx';
-import { Terminal } from './ui/Terminal.jsx';
+import { Terminal, CardsPage } from './ui/Terminal.jsx';
 
 /**
  * Real pages, lazy data (Kaleb, 2026-07-21: "would it make sense for the

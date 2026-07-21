@@ -1,5 +1,5 @@
 /**
- * Deal Radar (Kaleb, 2026-07-21: "I'm curious what you are seeing for the
+ * Value Pulse (Kaleb, 2026-07-21: "I'm curious what you are seeing for the
  * deals view, let's test out something like that") — the terminal's sharpest
  * question answered as a feed: WHICH LIVE ASKS SIT UNDER THE ORACLE MARK?
  *
