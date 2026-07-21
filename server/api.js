@@ -151,19 +151,26 @@ app.get('/api/cards', (req, res) => {
   }
   const ipFilter = clauses.length ? `AND ${clauses.join(' AND ')}` : '';
   const sort = {
-    price: 'lm.price_cents DESC',
-    change: 'ABS(COALESCE((lm.price_cents * 1.0 / NULLIF(lm.price_1d, 0) - 1), 0)) DESC',
-    volume: 'lm.sales_7d DESC, lm.price_cents DESC',
-  }[req.query.sort] ?? 'lm.price_cents DESC';
+    price: 'price_cents DESC',
+    change: 'ABS(COALESCE((price_cents * 1.0 / NULLIF(price_1d, 0) - 1), 0)) DESC',
+    volume: 'sales_7d DESC, price_cents DESC',
+  }[req.query.sort] ?? 'price_cents DESC';
+  // ONE row per card (Kaleb, 2026-07-21): the lookup lists CARDS — the top-
+  // value grade represents each; the card page holds the full grade ladder.
+  // grades_tracked lets the UI hint at the depth behind the row.
   const rows = db.prepare(`
-    SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
-           c.image AS card_image, c.image_kind AS card_kind,
-           (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo,
-           lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
-           lm.price_1d, lm.price_30d
-    FROM latest_marks lm
-    JOIN cards c ON c.id = lm.card_id
-    WHERE 1=1 ${ipFilter}
+    SELECT * FROM (
+      SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
+             c.image AS card_image, c.image_kind AS card_kind,
+             (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo,
+             lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
+             lm.price_1d, lm.price_30d,
+             COUNT(*) OVER (PARTITION BY c.id) AS grades_tracked,
+             ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY lm.price_cents DESC) AS rn
+      FROM latest_marks lm
+      JOIN cards c ON c.id = lm.card_id
+      WHERE 1=1 ${ipFilter}
+    ) WHERE rn = 1
     ORDER BY ${sort} LIMIT ${limit}`).all(...args);
   res.json(rows.map(({ card_image, card_kind, listing_photo, ...r }) => ({
     ...r,

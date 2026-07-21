@@ -133,7 +133,9 @@ export function CardsTable({ cards, onSelect }) {
                 (Kaleb, 2026-07-21). A desk-style thumbnail GRID view is the
                 future home for browsing the database visually. */}
             <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}><IpDot ip={c.ip} /><span>{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></span></td>
-            <td style={tdL}>{c.grade}</td>
+            {/* One row per card: top-value grade shown; the count hints at the
+                full ladder waiting on the card page. */}
+            <td style={tdL}>{c.grade}{c.grades_tracked > 1 && <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}` }}> +{c.grades_tracked - 1}</span>}</td>
             <td style={td}>{fmtUsd(c.price_cents)}</td>
             <td style={td}><Delta pct={c.change_1d_pct} /></td>
             <td style={td}><Delta pct={c.change_30d_pct} /></td>
