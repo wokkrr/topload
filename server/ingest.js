@@ -289,6 +289,14 @@ async function runLive(db, today) {
       if (!subset.length || !universeByIp[ip]) continue;
       for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
     }
+    // MNSTR's API exposes no listing dates, so listed_at is OUR first-seen
+    // time — preserve it across snapshot refreshes or every MNSTR listing
+    // re-stamps as "listed today" each ingest and floods the Recent sort
+    // (live bug, Kaleb 2026-07-21). New listings get the real current time.
+    const prevListed = new Map(db.prepare(
+      `SELECT external_id, listed_at FROM gacha_listings WHERE platform = 'mnstr'`
+    ).all().map(r => [r.external_id, r.listed_at]));
+    const nowIso = new Date().toISOString();
     db.exec(`DELETE FROM gacha_listings WHERE platform = 'mnstr'`); // full snapshot refresh
     const insM = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
@@ -297,7 +305,7 @@ async function runLive(db, today) {
     );
     for (const l of listings) {
       insM.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, prevListed.get(l.external_id) ?? nowIso, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
     }
     summary.mnstrListings = listings.length;
     summary.mnstrMatched = matches.size;

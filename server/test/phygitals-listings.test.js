@@ -62,7 +62,7 @@ describe('mapListing', () => {
       grade: 'PSA10',
       price_cents: 4_900_000,
       currency: 'USDC',
-      listed_at: '2026-07-21',
+      listed_at: '2026-07-21T01:34:47.973Z',   // full ISO kept for recency sorting
       cert: '26927218',
       slug: '2016-pokemon-jpn-xy-promo-294-f-dn3l7x',
       language: 'Japanese',

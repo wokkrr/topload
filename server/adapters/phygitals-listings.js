@@ -98,7 +98,7 @@ export function mapListing(l, category, seenAt) {
     grade,
     price_cents: cents,
     currency: 'USDC',
-    listed_at: (l.updatedAt ?? '').slice(0, 10) || (seenAt ?? null),
+    listed_at: l.updatedAt ?? seenAt ?? null,   // full ISO — real cross-marketplace recency
     image: fixImageUrl(l.image),
     nft_address: l.address,
     cert: cert != null && String(cert).trim() !== '' ? String(cert).trim() : null,

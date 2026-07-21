@@ -40,7 +40,7 @@ describe('Courtyard listing mapper', () => {
     expect(r.price_cents).toBe(1881);
     expect(r.currency).toBe('USDC');
     expect(r.external_id).toContain('courtyard:');
-    expect(r.listed_at).toBe('2026-07-20');
+    expect(r.listed_at.startsWith('2026-07-20')).toBe(true); // full ISO kept for recency sorting
     expect(r.fmv_usd).toBe(19);
   });
 

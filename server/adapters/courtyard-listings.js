@@ -67,7 +67,9 @@ export function mapListing(a, seenAt) {
     grade,
     price_cents: Math.round(usd * 100),
     currency: 'USDC',
-    listed_at: (order?.listedAt ?? order?.createdAt ?? '').slice(0, 10) || (seenAt ?? null),
+    // FULL timestamp — cross-marketplace 'Recent' sorts by real listing time,
+    // not date-clumps broken by price (Kaleb, 2026-07-21).
+    listed_at: order?.listedAt ?? order?.createdAt ?? seenAt ?? null,
     image: a.image ?? a.cropped_image ?? null,
     nft_address: tokenId,              // Polygon tokenId — opaque, matches sales registry key style
     proof: a.proof_of_integrity ?? null, // courtyard.io/asset/<proof> = the listing page
