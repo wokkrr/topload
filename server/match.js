@@ -95,6 +95,7 @@ function compileCard(card) {
   // language variant exists (JP listing → EN row beats no attribution — the
   // pre-JA-pass status quo).
   const ja = (card.language ?? 'English') === 'Japanese';
+  const lang = card.language ?? 'English';
   // One Piece-style split/concatenated forms ("Op07 … #109", "#OP02120"), and
   // no-separator promo codes ("SWSH285", "SVP077", "TG01") which titles write
   // as set words + a bare number ("Swsh Black Star Promo … #285").
@@ -124,7 +125,7 @@ function compileCard(card) {
       codeEvidence: yg[1].length >= 3,
     };
   }
-  c = { name, nameRe, numFullStrong, numShort, numShortRe, op: opc, yg: ygc, promoRe, remnant, parallel, ja };
+  c = { name, nameRe, numFullStrong, numShort, numShortRe, op: opc, yg: ygc, promoRe, remnant, parallel, ja, lang };
   COMPILED.set(card, c);
   return c;
 }
@@ -139,7 +140,12 @@ export function matchListing(itemName, cards) {
   if (!title) return null;
   const titleZ = stripZeros(title);
   const titleSquashed = title.replace(/\s/g, '');
-  const titleJa = /\b(japanese|jpn|jp)\b/.test(title);
+  // Title-declared language. Titles say it explicitly ("Pokemon Japanese …",
+  // "Pokemon Korean …"); no declaration = English market by default.
+  const titleLang = /\b(japanese|jpn|jp)\b/.test(title) ? 'Japanese'
+    : /\bkorean?\b/.test(title) ? 'Korean'
+    : /\bchinese\b/.test(title) ? 'Chinese'
+    : 'English';
   const gradeMatch = GRADE_RE.exec(title);
   const gradePos = gradeMatch ? gradeMatch.index : Infinity;
 
@@ -148,6 +154,13 @@ export function matchListing(itemName, cards) {
     const cc = compileCard(card);
     const name = cc.name;
     if (!name) continue;
+
+    // Cross-language HARD exclusion: two DIFFERENT non-English declarations
+    // can never be the same printing — a "Pokemon Japanese …" title must not
+    // land on a Korean-tagged row (live mis-tag: JP Terastal Fest Umbreon
+    // shown as Korean, 2026-07-21). English stays a SOFT mismatch: a JP/KO
+    // listing may still fall back to the EN row when no sibling exists.
+    if (titleLang !== 'English' && cc.lang !== 'English' && titleLang !== cc.lang) continue;
 
     // 1. Name present — whole-word for short names — and BEFORE the grade.
     let nameIdx = -1;
@@ -206,7 +219,7 @@ export function matchListing(itemName, cards) {
       if (setHits === 0 && !codeEvidence) continue;
     }
 
-    const score = numberHit + setHits * 2 + name.length / 100 - (cc.remnant ? 0.25 : 0) - (cc.parallel ? 0.1 : 0) - (titleJa !== cc.ja ? 0.6 : 0);
+    const score = numberHit + setHits * 2 + name.length / 100 - (cc.remnant ? 0.25 : 0) - (cc.parallel ? 0.1 : 0) - (titleLang !== cc.lang ? 0.6 : 0);
     if (score > bestScore) { best = card.id; bestScore = score; }
   }
   return best;

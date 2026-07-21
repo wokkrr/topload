@@ -41,6 +41,20 @@ const HOTLINK_BLOCKED = /onepiece-cardgame\.com/i;
 const proxiedImage = (cardId, url) =>
   url && cardId && HOTLINK_BLOCKED.test(url) ? `/api/img/${encodeURIComponent(cardId)}` : url;
 
+// Image choice per card (Kaleb, 2026-07-21): own/official art (incl. curated
+// variant art) first; then a REAL photo of a matched listing; BORROWED base-
+// printing art only as last resort — a Reverse Holo's foil isn't visible in
+// borrowed art, and an actual slab photo shows the true finish.
+const pickImage = (cardId, cardImage, cardKind, listingPhoto) => {
+  const chosen =
+    cardImage && cardKind !== 'borrowed' ? { image: cardImage, image_kind: cardKind ?? 'official' }
+    : listingPhoto ? { image: listingPhoto, image_kind: 'listing' }
+    : cardImage ? { image: cardImage, image_kind: 'borrowed' }
+    : { image: null, image_kind: null };
+  chosen.image = proxiedImage(cardId, chosen.image);
+  return chosen;
+};
+
 app.get('/api/img/:cardId', async (req, res) => {
   const row = db.prepare(`SELECT image FROM cards WHERE id = ?`).get(req.params.cardId);
   if (!row?.image) return res.status(404).end();
@@ -80,7 +94,8 @@ app.get('/api/movers', (_req, res) => {
   // version scanned every mark on the latest day (~277k rows) per request.
   const rows = db.prepare(`
     SELECT c.ip, c.name, c.set_name, lm.card_id, lm.grade,
-           COALESCE(c.image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1)) AS image,
+           c.image AS card_image, c.image_kind AS card_kind,
+           (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo,
            lm.price_cents AS price_now, lm.price_1d AS price_then,
            lm.confidence, lm.sales_7d,
            ROUND((lm.price_cents * 100.0 / lm.price_1d) - 100, 2) AS change_pct
@@ -94,7 +109,8 @@ app.get('/api/movers', (_req, res) => {
       AND ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) <= 5.0
     ORDER BY ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) DESC
     LIMIT 20`).all();
-  res.json(rows.map(r => ({ ...r, image: proxiedImage(r.card_id, r.image) })));
+  res.json(rows.map(({ card_image, card_kind, listing_photo, ...r }) =>
+    ({ ...r, ...pickImage(r.card_id, card_image, card_kind, listing_photo) })));
 });
 
 /** GET /api/basket?index=PKMN → current membership w/ marks */
@@ -141,18 +157,17 @@ app.get('/api/cards', (req, res) => {
   }[req.query.sort] ?? 'lm.price_cents DESC';
   const rows = db.prepare(`
     SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
-           COALESCE(c.image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1)) AS image,
-           CASE WHEN c.image IS NOT NULL THEN COALESCE(c.image_kind, 'official')
-                WHEN EXISTS (SELECT 1 FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL) THEN 'listing' END AS image_kind,
+           c.image AS card_image, c.image_kind AS card_kind,
+           (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo,
            lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
            lm.price_1d, lm.price_30d
     FROM latest_marks lm
     JOIN cards c ON c.id = lm.card_id
     WHERE 1=1 ${ipFilter}
     ORDER BY ${sort} LIMIT ${limit}`).all(...args);
-  res.json(rows.map(r => ({
+  res.json(rows.map(({ card_image, card_kind, listing_photo, ...r }) => ({
     ...r,
-    image: proxiedImage(r.card_id, r.image),
+    ...pickImage(r.card_id, card_image, card_kind, listing_photo),
     change_1d_pct: r.price_1d ? +((r.price_cents / r.price_1d - 1) * 100).toFixed(2) : null,
     change_30d_pct: r.price_30d ? +((r.price_cents / r.price_30d - 1) * 100).toFixed(2) : null,
   })));
@@ -162,9 +177,8 @@ app.get('/api/cards', (req, res) => {
 app.get('/api/cards/:id', (req, res) => {
   const card = db.prepare(`
     SELECT id, ip, name, set_name, number, variant,
-           COALESCE(image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1)) AS image,
-           CASE WHEN image IS NOT NULL THEN COALESCE(image_kind, 'official')
-                WHEN EXISTS (SELECT 1 FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL) THEN 'listing' END AS image_kind
+           image AS card_image, image_kind AS card_kind,
+           (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo
     FROM cards WHERE id = ?`).get(req.params.id);
   if (!card) return res.status(404).json({ error: 'unknown card' });
   const grades = db.prepare(`
@@ -178,9 +192,10 @@ app.get('/api/cards/:id', (req, res) => {
     LEFT JOIN oracle_prices o1 ON o1.card_id = o.card_id AND o1.grade = o.grade AND o1.as_of = date(latest.d, '-1 day')
     LEFT JOIN oracle_prices o30 ON o30.card_id = o.card_id AND o30.grade = o.grade AND o30.as_of = date(latest.d, '-30 day')
     ORDER BY o.price_cents DESC`).all(req.params.id, req.params.id);
+  const { card_image, card_kind, listing_photo, ...cardOut } = card;
   res.json({
-    ...card,
-    image: proxiedImage(card.id, card.image),
+    ...cardOut,
+    ...pickImage(card.id, card_image, card_kind, listing_photo),
     grades: grades.map(g => ({
       ...g,
       change_1d_pct: g.price_1d ? +((g.price_cents / g.price_1d - 1) * 100).toFixed(2) : null,

@@ -80,20 +80,22 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
       <div style={{ display: 'flex', gap: 28, margin: '14px 0 4px', flexWrap: 'wrap' }}>
         {!embedded && card.image && (
           <span style={{ position: 'relative', alignSelf: 'flex-start', lineHeight: 0 }}
-                title={card.image_kind === 'listing' ? 'Sample slab photo from a marketplace listing — not a specific item for sale' : undefined}>
+                title={card.image_kind === 'listing' ? 'Sample slab photo from a marketplace listing — not a specific item for sale'
+                     : card.image_kind === 'borrowed' ? "Artwork of the base printing — this variant's finish (foil, holo pattern) is not shown"
+                     : undefined}>
             <img src={card.image} alt={card.name}
                  onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
                  style={{
               height: 480, maxWidth: '100%', borderRadius: 10, border: `1px solid ${tokens.color.border}`,
               background: tokens.color.surfaceRaised,
             }} />
-            {card.image_kind === 'listing' && (
+            {(card.image_kind === 'listing' || card.image_kind === 'borrowed') && (
               <span style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
                 font: `600 9px ${tokens.font.body}`, letterSpacing: '0.06em',
                 color: tokens.color.inkSecondary, background: tokens.color.overlay,
                 borderRadius: '0 0 8px 8px', padding: '4px 2px',
-              }}>SAMPLE PHOTO</span>
+              }}>{card.image_kind === 'listing' ? 'SAMPLE PHOTO' : 'BASE PRINTING ART'}</span>
             )}
           </span>
         )}

@@ -245,11 +245,17 @@ function listingIp(l) {
 
 const IP_FILTERS = [['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']];
 
-// Listing language: the matched card's language when attributed (language-
-// variant rows), else a title heuristic — same signal the matcher routes on.
+// Listing language: the title's OWN explicit declaration wins — it's the
+// seller's statement about the physical card (a "Pokemon Japanese …" title
+// mis-attributed to a Korean row must still read Japanese; live bug
+// 2026-07-21). Matched card's language is the fallback signal.
 export function listingLanguage(l) {
+  const t = l.item_name ?? '';
+  if (/\b(japanese|jpn)\b/i.test(t)) return 'Japanese';
+  if (/\bkorean?\b/i.test(t)) return 'Korean';
+  if (/\bchinese\b/i.test(t)) return 'Chinese';
   if (l.card_language) return l.card_language;
-  return /\b(japanese|jpn|jp)\b/i.test(l.item_name ?? '') ? 'Japanese' : 'English';
+  return /\bjp\b/i.test(t) ? 'Japanese' : 'English';
 }
 const LANG_FILTERS = [['', 'All'], ['English', 'English'], ['Japanese', 'Japanese']];
 // BGS = Beckett Grading Services — one chip covers both spellings.
