@@ -194,10 +194,16 @@ app.get('/api/gacha', (req, res) => {
            COALESCE(g.image, c.image) AS image,
            CASE WHEN g.image IS NOT NULL THEN 'actual' WHEN c.image IS NOT NULL THEN 'art' END AS image_kind,
            c.name AS card_name, c.ip, c.language AS card_language,
-           lm.price_cents AS comp_cents, lm.confidence AS comp_confidence, lm.basis AS comp_basis, lm.source AS comp_source
+           lm.price_cents AS comp_cents, lm.confidence AS comp_confidence, lm.basis AS comp_basis, lm.source AS comp_source,
+           COALESCE(json_extract(pcert.raw, '$.pop'), pop.count) AS pop_count,
+           COALESCE(json_extract(pcert.raw, '$.pop_higher'), pop.higher_count) AS pop_higher
     FROM gacha_listings g
     LEFT JOIN cards c ON c.id = g.card_id
     LEFT JOIN latest_marks lm ON lm.card_id = g.card_id AND lm.grade = g.grade
+    LEFT JOIN psa_certs pcert ON pcert.cert = g.cert AND g.grade LIKE 'PSA%'
+    LEFT JOIN (SELECT card_id, grade, count, higher_count, MAX(as_of) AS as_of
+               FROM pop_counts WHERE source = 'psa' GROUP BY card_id, grade) pop
+      ON pop.card_id = g.card_id AND pop.grade = g.grade
     ORDER BY g.listed_at DESC, g.price_cents DESC`).all();
   res.json(rows.map(r => {
     // A comp wildly out of line with the ask (ask < 20% of comp, or > 5x) is

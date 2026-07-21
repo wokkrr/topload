@@ -34,6 +34,7 @@
     "seed:yugioh": "node --max-old-space-size=1536 --env-file-if-exists=.env server/seed-yugioh.js",
     "catalog:refresh": "npm run seed:onepiece -- --upsert-only && npm run seed:pokemon -- --upsert-only && npm run seed:yugioh -- --upsert-only && npm run catalog:langtags && npm run rematch -- --listings-only",
     "mopup:op": "node --env-file-if-exists=.env server/mopup-op-satellites.js",
+    "psa:pop": "node --env-file-if-exists=.env server/indexer-psa-pop.js",
     "catalog:langtags": "node --env-file-if-exists=.env server/seed-language-tags.js",
     "catalog:verify": "node --env-file-if-exists=.env server/catalog-verify.js",
     "api": "node --env-file-if-exists=.env server/api.js",

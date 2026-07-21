@@ -193,6 +193,11 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                 : cert} />
             )}
             {!gm && <Row k="Condition" v="Raw / ungraded" />}
+            {/* PSA-reported population: how many copies exist at this grade,
+                and how many graded higher — scarcity at a glance. */}
+            {l.pop_count != null && (
+              <Row k="PSA population" v={`${Number(l.pop_count).toLocaleString()} at this grade${l.pop_higher != null ? ` · ${Number(l.pop_higher).toLocaleString()} higher` : ''}`} />
+            )}
             <Row k="Category" v={l.category ?? '—'} />
             <Row k="Language" v={listingLanguage(l)} />
             <Row k="Marketplace" v={platform} />
