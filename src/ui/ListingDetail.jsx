@@ -197,12 +197,15 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             <Row k="Language" v={listingLanguage(l)} />
             <Row k="Marketplace" v={platform} />
             <Row k="Listed" v={l.listed_at ? String(l.listed_at).slice(0, 10) : '—'} />
-            <Row k="Currency" v={l.currency ?? '—'} />
+            {/* Crypto-invisible UX (Kaleb, 2026-07-21): stablecoin tickers
+                (USDC/USDm) settle 1:1 in dollars — collectors see USD, full
+                stop. The rail is our infrastructure, not their problem. */}
+            <Row k="Currency" v={/^usd/i.test(l.currency ?? '') ? 'USD' : (l.currency ?? '—')} />
             {l.card_id
               ? <Row k="Tracked card" v={l.card_name ?? l.card_id} />
               : <Row k="Tracked card" v="not matched yet" />}
             <Row k="Photo" v={l.image_kind === 'art' ? 'reference art (not the item)' : l.image ? 'actual item' : '—'} />
-            {l.nft_address && <Row k="Vault token" v={`${l.nft_address.slice(0, 6)}…${l.nft_address.slice(-4)}`} />}
+            {l.nft_address && <Row k="Vault ID" v={`${l.nft_address.slice(0, 6)}…${l.nft_address.slice(-4)}`} />}
           </div>
         </Accordion>
 
