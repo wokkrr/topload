@@ -7,6 +7,10 @@ const card = (over = {}) => ({
   grading: 'PSA 10', gradingCompany: 'psa',
   listPriceUsd: 26840, fmv: 24000,
   image: 'https://cdn.mnstr.xyz/x.jpg', category: 'one_piece',
+  images: [
+    { url: 'https://cdn.mnstr.xyz/b.jpg', position: 'back' },
+    { url: 'https://cdn.mnstr.xyz/f.jpg', position: 'front' },
+  ],
   slug: '2025-one-piece-op13-luffy-118-129648888',
   canBeSold: true, isInStock: true, isNew: false,
   ...over,
@@ -31,6 +35,13 @@ describe('MNSTR listing mapper', () => {
     expect(r.ip).toBe('PKMN');
     expect(r.category).toBe('Pokemon');
     expect(r.grade).toBe('BGS9.5');
+  });
+
+  it('selects front/back images by POSITION, never by index (back listed first live)', () => {
+    const r = mapListing(card());
+    expect(r.image).toBe('https://cdn.mnstr.xyz/f.jpg');
+    expect(r.image_back).toBe('https://cdn.mnstr.xyz/b.jpg');
+    expect(mapListing(card({ images: undefined })).image_back).toBeNull();
   });
 
   it('falls back to gradingCompany when grading lacks the grader (live raw bug, 2026-07-20)', () => {

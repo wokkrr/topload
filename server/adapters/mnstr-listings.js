@@ -72,7 +72,10 @@ export function mapListing(c, seenAt) {
     price_cents: Math.round(usd * 100),
     currency: 'USDm',
     listed_at: seenAt ?? new Date().toISOString().slice(0, 10),
-    image: c.image ?? c.images?.[0]?.url ?? null,
+    // images[] carries position:'front'/'back' — and ORDER IS NOT GUARANTEED
+    // (live sample had back first), so select by position, never by index.
+    image: (c.images ?? []).find(i => i?.position === 'front')?.url ?? c.image ?? c.images?.[0]?.url ?? null,
+    image_back: (c.images ?? []).find(i => i?.position === 'back')?.url ?? null,
     nft_address: serial,                                // vault serial — opaque id
     cert: /^\d{6,12}$/.test(serial) ? serial : null,   // ...which IS the slab cert number
     slug: c.slug ?? null,                               // → mnstr.xyz/cards/<slug>

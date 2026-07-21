@@ -292,11 +292,11 @@ async function runLive(db, today) {
     const insM = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
        (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
       insM.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
     }
     summary.mnstrListings = listings.length;
     summary.mnstrMatched = matches.size;
