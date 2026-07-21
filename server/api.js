@@ -146,11 +146,14 @@ app.get('/api/cards', (req, res) => {
   if (req.query.ip) { clauses.push(`c.ip = ?`); args.push(req.query.ip); }
   if (req.query.grade) { clauses.push(`lm.grade = ?`); args.push(req.query.grade); }
   if (req.query.q) {
-    // Every word must appear somewhere in name/set/number.
+    // Every word must appear somewhere in name/set/number. Synonym pairs let
+    // both spellings find the card ('first edition' ↔ '1st Edition' — Kaleb,
+    // 2026-07-21); extend the map as more collector-dialect pairs surface.
+    const SYNONYMS = { first: '1st', '1st': 'first' };
     for (const word of String(req.query.q).trim().split(/\s+/).slice(0, 6)) {
-      clauses.push(`(c.name LIKE ? OR c.set_name LIKE ? OR c.number LIKE ?)`);
-      const w = `%${word}%`;
-      args.push(w, w, w);
+      const variants = [word, SYNONYMS[word.toLowerCase()]].filter(Boolean);
+      clauses.push(`(${variants.map(() => `c.name LIKE ? OR c.set_name LIKE ? OR c.number LIKE ?`).join(' OR ')})`);
+      for (const v of variants) { const w = `%${v}%`; args.push(w, w, w); }
     }
   }
   const ipFilter = clauses.length ? `AND ${clauses.join(' AND ')}` : '';

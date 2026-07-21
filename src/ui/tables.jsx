@@ -314,7 +314,10 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
       </div>
     );
   }
-  const needle = q.trim().toLowerCase();
+  // 'first' ≡ '1st' both ways — normalize needle AND haystacks so either
+  // spelling finds 1st Edition inventory (Kaleb, 2026-07-21).
+  const normSearch = (s) => (s ?? '').toLowerCase().replace(/\bfirst\b/g, '1st');
+  const needle = normSearch(q.trim());
   const shown = listings
     .filter(l => !hidden.has(l.platform))
     .filter(l => !ipFilter || listingIp(l) === ipFilter)
@@ -324,8 +327,8 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
         : graderFilter === 'raw' ? (l.grade ?? 'raw') === 'raw' && !isSealed(l)
         : (l.grade ?? '').startsWith(graderFilter)))
     .filter(l => !needle
-      || (l.item_name ?? '').toLowerCase().includes(needle)
-      || (l.card_name ?? '').toLowerCase().includes(needle))
+      || normSearch(l.item_name).includes(needle)
+      || normSearch(l.card_name).includes(needle))
     .sort(GACHA_SORTS.find(([id]) => id === sort)[2]);
   return (
     <div>
