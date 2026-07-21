@@ -426,6 +426,9 @@ export function listingUrl(l) {
   if (l.platform === 'mnstr' && l.proof) {   // proof column carries the card slug
     return `https://mnstr.xyz/cards/${l.proof}`;
   }
+  if (l.platform === 'phygitals' && l.proof) { // proof column carries the card slug
+    return `https://www.phygitals.com/card/${l.proof}`;
+  }
   return null;
 }
 

@@ -21,6 +21,7 @@ import { makePriceChartingAdapter } from './adapters/pricecharting.js';
 import { makeCollectorCryptAdapter } from './adapters/collectorcrypt.js';
 import { makeCourtyardListingsAdapter } from './adapters/courtyard-listings.js';
 import { makeMnstrListingsAdapter } from './adapters/mnstr-listings.js';
+import { makePhygitalsListingsAdapter } from './adapters/phygitals-listings.js';
 import { runSolanaIndexer, registerListings } from './indexer-solana.js';
 import { importCsv } from './import-pricecharting-csv.js';
 import { matchListings } from './match.js';
@@ -304,6 +305,52 @@ async function runLive(db, today) {
   } catch (e) {
     rollback();
     console.warn(`[ingest] mnstr listings fetch failed: ${e.message}`);
+  }
+
+  // 3d. Gacha listings: Phygitals — their marketplace API (mapped live
+  //     2026-07-21: PKMN ~8k, OP ~400, YGO ~36). The API returns the current
+  //     listed set → snapshot-replace like MNSTR. English Pokémon rows carry
+  //     the PTCG.io 'Card Id' → exact canonical attach (no fuzzy); Japanese
+  //     and everything else language-route through the matcher. Mints also
+  //     feed nft_registry so the on-chain sales indexer attributes future
+  //     Phygitals sales to cards automatically.
+  try {
+    const phyg = makePhygitalsListingsAdapter();
+    const listings = await phyg.fetchListings({ seenAt: today });
+    const universeByIp = {};
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) {
+      (universeByIp[c.ip] ??= []).push(c);
+    }
+    const cardIds = new Set(db.prepare(`SELECT id FROM cards`).all().map(r => r.id));
+    const matches = new Map();
+    const needFuzzy = [];
+    let exact = 0;
+    for (const l of listings) {
+      if (l.exact_card_id && cardIds.has(l.exact_card_id)) { matches.set(l.external_id, l.exact_card_id); exact++; }
+      else needFuzzy.push(l);
+    }
+    for (const ip of ['PKMN', 'OP', 'YGO']) {
+      const subset = needFuzzy.filter(l => l.ip === ip);
+      if (!subset.length || !universeByIp[ip]) continue;
+      for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
+    }
+    db.exec(`DELETE FROM gacha_listings WHERE platform = 'phygitals'`); // full snapshot refresh
+    const insP = db.prepare(
+      `INSERT OR REPLACE INTO gacha_listings
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const l of listings) {
+      insP.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+    }
+    registerListings(db, listings, matches);
+    summary.phygitalsListings = listings.length;
+    summary.phygitalsMatched = matches.size;
+    console.log(`[ingest] phygitals listings: ${listings.length} (${matches.size} matched — ${exact} exact by Card Id)`);
+  } catch (e) {
+    rollback();
+    console.warn(`[ingest] phygitals listings fetch failed: ${e.message}`);
   }
 
   // 4. Raw solds — on-chain gacha sales (self-collected, first-class oracle input).
