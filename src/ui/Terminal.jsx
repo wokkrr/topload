@@ -157,7 +157,7 @@ function IndexTile({ d, id, active, onClick }) {
           {up ? '+' : ''}{ret}%
         </span>
       ) : (
-        <span style={{ display: 'block', font: `600 18px ${tokens.font.mono}`, margin: '7px 0 1px', color: tokens.color.inkMuted }}>building</span>
+        <span style={{ display: 'block', font: `600 18px ${tokens.font.mono}`, margin: '7px 0 1px', color: tokens.color.inkMuted, textTransform: 'uppercase' }}>building</span>
       )}
     </button>
   );
@@ -289,7 +289,7 @@ function DealsPanel({ onOpenListing, onSelect }) {
             <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', font: `13px ${tokens.font.body}` }}>
               {d.card_name} <span style={{ color: tokens.color.inkMuted }}>· {d.set_name} {d.number}</span>
             </span>
-            <span style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.mono}` }}>
+            <span style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
               {d.grade} · {PLATFORM_LABELS[d.platform] ?? d.platform}
               {d.sales_30d > 0
                 ? ` · ${d.sales_30d} sale${d.sales_30d === 1 ? '' : 's'}/30D`
@@ -301,7 +301,7 @@ function DealsPanel({ onOpenListing, onSelect }) {
               </span>
             </span>
           </span>
-          <span style={{ flex: 'none', textAlign: 'right', font: `12px ${tokens.font.mono}` }}>
+          <span style={{ flex: 'none', textAlign: 'right', font: `12px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
             <span style={{ display: 'block', color: tokens.color.ink }}>{fmtUsd(d.ask_cents)} ask</span>
             <span style={{ color: tokens.color.inkMuted }}>{fmtUsd(d.mark_cents)} mark</span>
           </span>

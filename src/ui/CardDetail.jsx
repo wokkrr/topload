@@ -139,7 +139,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 12, flexWrap: 'wrap', font: `11px ${tokens.font.mono}` }}>
               <span style={{ color: tokens.color.inkMuted, letterSpacing: '0.06em' }}>TCGPLAYER</span>
               {card.tcgplayer.map(t => (
-                <span key={t.subtype} style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 4, padding: '3px 10px', color: tokens.color.inkSecondary }}>
+                <span key={t.subtype} style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 4, padding: '3px 10px', color: tokens.color.inkSecondary, textTransform: 'uppercase' }}>
                   {card.tcgplayer.length > 1 && <span style={{ color: tokens.color.inkMuted }}>{t.subtype} · </span>}
                   market <span style={{ color: tokens.color.ink }}>{fmtUsd(t.market_cents)}</span>
                   {t.low_cents != null && <> · lowest ask <span style={{ color: tokens.color.ink }}>{fmtUsd(t.low_cents)}</span></>}
@@ -169,7 +169,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                         style={{
                           display: 'inline-flex', alignItems: 'baseline', gap: 8,
                           background: 'none', border: `1px solid ${tokens.color.border}`, borderRadius: 4,
-                          padding: '3px 10px', font: `11px ${tokens.font.mono}`,
+                          padding: '3px 10px', font: `11px ${tokens.font.mono}`, textTransform: 'uppercase',
                           color: tokens.color.ink, cursor: onOpenCard ? 'pointer' : 'default',
                         }}>
                   <span>{s.language}</span>

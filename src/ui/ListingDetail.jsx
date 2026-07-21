@@ -138,7 +138,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             {l.category && <MetaChip>{l.category}</MetaChip>}
             <MetaChip>{platform}</MetaChip>
             {l.listed_at && (
-              <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkMuted, marginLeft: 4 }}>
+              <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkMuted, marginLeft: 4, textTransform: 'uppercase' }}>
                 listed {String(l.listed_at).slice(0, 10)}
               </span>
             )}
@@ -148,13 +148,13 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</span>
             {l.delta_pct != null && (
               <span style={{
-                font: `600 13px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 9px',
+                font: `600 13px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 9px', textTransform: 'uppercase',
                 color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down,
                 border: `1px solid ${tokens.color.border}`,
               }}>{fmtPct(l.delta_pct)} vs mark</span>
             )}
             {hasComp && (
-              <span style={{ font: `13px ${tokens.font.mono}`, color: tokens.color.inkSecondary }}>
+              <span style={{ font: `13px ${tokens.font.mono}`, color: tokens.color.inkSecondary, textTransform: 'uppercase' }}>
                 oracle mark {fmtUsd(l.comp_cents)}
               </span>
             )}
@@ -370,7 +370,7 @@ function Row({ k, v }) {
 function MetaChip({ strong = false, children }) {
   return (
     <span style={{
-      font: `11px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 10px',
+      font: `11px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 10px', textTransform: 'uppercase',
       border: `1px solid ${tokens.color.border}`,
       color: strong ? tokens.color.ink : tokens.color.inkSecondary,
       background: strong ? tokens.color.surfaceRaised : 'none',

@@ -61,6 +61,9 @@ export const tokens = {
   font: {
     display: `'Libre Caslon Text', Georgia, serif`,
     // VCR OSD Mono: retro CRT data font (placeholder per Kaleb, self-hosted).
+    // ★ RULE (Kaleb, 2026-07-21): text set in this font must be ALL CAPS —
+    // lowercase glyphs read badly in VCR OSD. Numbers/symbols are fine.
+    // Add textTransform:'uppercase' to any mono element that renders words.
     mono: `'VCR OSD Mono', 'IBM Plex Mono', ui-monospace, monospace`,
     body: `'Inter', system-ui, sans-serif`,
   },
