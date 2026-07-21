@@ -149,7 +149,8 @@ export function PlatformStrip({ platforms, hidden, onToggle }) {
   // toggle strip (Kaleb, 2026-07-20) — sales-only sources (Beezie) feed the
   // tape + oracle silently and return here when their listings land.
   // (Phygitals graduated to the strip 2026-07-21 when its listings shipped.)
-  const shown = (platforms ?? []).filter(p => p.listings);
+  const shown = (platforms ?? []).filter(p => p.listings)
+    .toSorted((a, b) => a.name.localeCompare(b.name));   // alphabetical (Kaleb, 2026-07-21)
   if (!shown.length) return null;
   const interactive = typeof onToggle === 'function';
   return (
