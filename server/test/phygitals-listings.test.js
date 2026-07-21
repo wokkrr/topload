@@ -141,3 +141,15 @@ describe('fixImageUrl', () => {
     expect(fixImageUrl(null)).toBeNull();
   });
 });
+
+describe('listTime', () => {
+  it('prefers the listing EVENT over updatedAt and normalizes epoch forms', async () => {
+    const { listTime } = await import('../adapters/phygitals-listings.js');
+    expect(listTime({ mostRecentListActivity: { time: '2026-07-18T09:00:00.000Z' }, updatedAt: '2026-07-21T01:00:00.000Z' }))
+      .toBe('2026-07-18T09:00:00.000Z');                 // an edit must not restamp recency
+    expect(listTime({ mostRecentListActivity: { time: '1784600271796' } }))
+      .toBe(new Date(1784600271796).toISOString());
+    expect(listTime({ updatedAt: '2026-07-20T10:39:04.821Z' })).toBe('2026-07-20T10:39:04.821Z');
+    expect(listTime({})).toBeNull();
+  });
+});

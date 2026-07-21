@@ -342,6 +342,12 @@ async function runLive(db, today) {
       if (!subset.length || !universeByIp[ip]) continue;
       for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
     }
+    // Anti-restamp: a listing's listed_at is the EARLIEST time we've ever
+    // seen for it — source-side edits can never float old inventory back to
+    // the top of the desk's Recent sort (Kaleb, 2026-07-21).
+    const prevListedP = new Map(db.prepare(
+      `SELECT external_id, listed_at FROM gacha_listings WHERE platform = 'phygitals'`
+    ).all().map(r => [r.external_id, r.listed_at]));
     db.exec(`DELETE FROM gacha_listings WHERE platform = 'phygitals'`); // full snapshot refresh
     const insP = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
@@ -349,8 +355,10 @@ async function runLive(db, today) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
+      const prior = prevListedP.get(l.external_id);
+      const listedAt = prior && l.listed_at ? (prior < l.listed_at ? prior : l.listed_at) : (prior ?? l.listed_at);
       insP.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, l.listed_at, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, listedAt, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
     }
     registerListings(db, listings, matches);
     summary.phygitalsListings = listings.length;

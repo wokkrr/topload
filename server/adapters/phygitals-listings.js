@@ -48,6 +48,21 @@ export function fixImageUrl(url) {
   return m ? `https://img.phygitals.com/${m[1]}-cropped` : (url ?? null);
 }
 
+/**
+ * "Recent" means CREATED, not touched (Kaleb, 2026-07-21): their updatedAt
+ * re-stamps on ANY edit (price change, offer). mostRecentListActivity.time is
+ * the actual listing event — prefer it; normalize epoch-string forms to ISO
+ * so cross-marketplace string sorting stays coherent.
+ */
+export function listTime(l) {
+  const raw = l?.mostRecentListActivity?.time ?? l?.updatedAt ?? null;
+  if (raw == null) return null;
+  const s = String(raw);
+  if (/^\d{12,}$/.test(s)) return new Date(Number(s)).toISOString();      // epoch ms
+  if (/^\d{10}$/.test(s)) return new Date(Number(s) * 1000).toISOString(); // epoch s
+  return s;
+}
+
 /** metadata array → plain object (first value wins per key). */
 function metaOf(l) {
   const m = {};
@@ -98,7 +113,7 @@ export function mapListing(l, category, seenAt) {
     grade,
     price_cents: cents,
     currency: 'USDC',
-    listed_at: l.updatedAt ?? seenAt ?? null,   // full ISO — real cross-marketplace recency
+    listed_at: listTime(l) ?? seenAt ?? null,   // listing EVENT time, full ISO
     image: fixImageUrl(l.image),
     nft_address: l.address,
     cert: cert != null && String(cert).trim() !== '' ? String(cert).trim() : null,
