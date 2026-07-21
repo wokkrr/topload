@@ -169,3 +169,49 @@ describe('language-tag migration (JP Pokémon/YGO via PC satellites)', () => {
     expect(matchListing('2021 Pokemon Japanese Eevee Heroes #086 Aroma Lady PSA 10', uni)).toBe('pkmn-pc1');
   });
 });
+
+import { mopupOpSatellites } from '../mopup-op-satellites.js';
+
+describe('JA-3: OP satellite mop-up (marks/sales/pc → canonical, retire satellite)', () => {
+  const setup = () => {
+    const db = openDb(':memory:');
+    // canonical EN + JA siblings
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, language, external_ids) VALUES
+      ('op-op02-120','OP','Uta','OP02-120','One Piece PARAMOUNT WAR','English','{"punkrecords":"OP02-120"}')`).run();
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, language, external_ids) VALUES
+      ('op-op02-120-ja','OP','Uta','OP02-120','One Piece PARAMOUNT WAR','Japanese','{"punkrecords_ja":"OP02-120"}')`).run();
+    // JP satellite with marks + a sale + a listing pointer
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, language, external_ids) VALUES
+      ('op-pc555','OP','Uta','OP02-120','One Piece Japanese Paramount War','Japanese','{"pricecharting":"555"}')`).run();
+    db.prepare(`INSERT INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES ('pricecharting','op-pc555','PSA10','2026-07-20',48000)`).run();
+    db.prepare(`INSERT INTO sales (card_id, grade, price_cents, currency, sold_at, source, external_id) VALUES ('op-pc555','PSA10',45000,'USD','2026-07-01','mnstr','tx:m1')`).run();
+    db.prepare(`INSERT INTO gacha_listings (platform, external_id, card_id, item_name, category, price_cents, currency, seen_at) VALUES ('mnstr','L9','op-pc555','x','One Piece',50000,'USDm',1721000000)`).run();
+    // unmatched satellite (odd set) — must be KEPT
+    db.prepare(`INSERT INTO cards (id, ip, name, number, set_name, language, external_ids) VALUES
+      ('op-pc777','OP','Mystery Item','','One Piece Japanese Something Odd','Japanese','{"pricecharting":"777"}')`).run();
+    return db;
+  };
+
+  it('dry run reports without writing', () => {
+    const db = setup();
+    const r = mopupOpSatellites(db, { dry: true });
+    expect(r.matched).toBe(1);
+    expect(r.keptUnmatched).toBe(1);
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id='op-pc555'`).get().n).toBe(1); // untouched
+  });
+
+  it('migrates marks/sales/listings/pc-id to the -ja sibling and retires the satellite', () => {
+    const db = setup();
+    const r = mopupOpSatellites(db);
+    expect(r.matched).toBe(1);
+    expect(r.retired).toBe(1);
+    expect(r.keptUnmatched).toBe(1);
+    // language routing sent the JP satellite to the -ja row
+    expect(db.prepare(`SELECT card_id FROM external_marks WHERE source='pricecharting'`).get().card_id).toBe('op-op02-120-ja');
+    expect(db.prepare(`SELECT card_id FROM sales WHERE external_id='tx:m1'`).get().card_id).toBe('op-op02-120-ja');
+    expect(db.prepare(`SELECT card_id FROM gacha_listings WHERE external_id='L9'`).get().card_id).toBe('op-op02-120-ja');
+    expect(JSON.parse(db.prepare(`SELECT external_ids FROM cards WHERE id='op-op02-120-ja'`).get().external_ids).pricecharting).toBe('555');
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id='op-pc555'`).get().n).toBe(0);
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id='op-pc777'`).get().n).toBe(1); // kept
+  });
+});
