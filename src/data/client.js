@@ -16,6 +16,8 @@ export const api = {
   movers: (window = 1) => get(`/api/movers?window=${window}`),
   /** current basket membership with marks */
   basket: (index = 'PKMN') => get(`/api/basket?index=${index}`),
+  /** live asks under the oracle mark (grade-matched, deduped, banded) */
+  deals: (limit = 15) => get(`/api/deals?limit=${limit}`),
   /** gacha listings with grade-matched oracle comps */
   gacha: () => get('/api/gacha'),
   /** aggregator platform coverage map */

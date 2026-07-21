@@ -21,10 +21,14 @@ import { Terminal } from './ui/Terminal.jsx';
  * website. Each section fetches its own data on first visit and caches it in
  * state — opening the Terminal no longer downloads the entire desk.
  */
-const TABS = [['Terminal', '/'], ['Gacha Desk', '/desk']];
+// TERMINAL / CARDS / LISTINGS (Kaleb, 2026-07-21): the lookup table moves to
+// its own CARDS tab — the database gets a home; the Terminal page is the
+// market-strength snapshot + deal radar.
+const TABS = [['Terminal', '/'], ['Cards', '/cards'], ['Listings', '/desk']];
 
 const parseRoute = (path) => {
   if (path === '/desk') return { page: 'desk' };
+  if (path === '/cards') return { page: 'cards' };
   const card = /^\/card\/(.+)$/.exec(path);
   if (card) return { page: 'card', cardId: decodeURIComponent(card[1]) };
   const listing = /^\/listing\/([^/]+)\/(.+)$/.exec(path);
@@ -67,7 +71,7 @@ export default function App() {
     else navigate(fallback);
   };
 
-  const openCard = (id) => { if (route.page !== 'listing') setOrigin(route.page === 'desk' ? 'desk' : 'terminal'); navigate(`/card/${encodeURIComponent(id)}`); };
+  const openCard = (id) => { if (route.page !== 'listing') setOrigin(route.page === 'desk' ? 'desk' : route.page === 'cards' ? 'cards' : 'terminal'); navigate(`/card/${encodeURIComponent(id)}`); };
   const openListing = (l, ctx) => {
     if (route.page === 'desk') setOrigin('desk');
     if (ctx) setNavListings(ctx);
@@ -118,9 +122,9 @@ export default function App() {
         </h1>
         <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto', alignItems: 'center' }}>
           {TABS.map(([label, to]) => {
-            const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/desk');
+            const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/desk') || (route.page === 'cards' && to === '/cards');
             return (
-              <button key={to} onClick={() => { setOrigin(to === '/desk' ? 'desk' : 'terminal'); navigate(to); }} style={{
+              <button key={to} onClick={() => { setOrigin(to === '/desk' ? 'desk' : to === '/cards' ? 'cards' : 'terminal'); navigate(to); }} style={{
                 background: active ? tokens.color.surfaceRaised : 'none',
                 border: 'none', borderBottom: active ? `2px solid ${tokens.color.brass}` : '2px solid transparent',
                 color: active ? tokens.color.ink : tokens.color.inkSecondary,
@@ -142,7 +146,7 @@ export default function App() {
         {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 12 }}>{err}</div>}
 
         {route.page === 'card' && (
-          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/desk' : '/')} onOpenCard={openCard} />
+          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/desk' : origin === 'cards' ? '/cards' : '/')} onOpenCard={openCard} />
         )}
 
         {route.page === 'listing' && (
@@ -167,8 +171,16 @@ export default function App() {
         {route.page === 'terminal' && (
           <Terminal
             indexes={indexes} days={days} setDays={setDays}
-            movers={movers} onSelect={openCard}
+            movers={movers} onSelect={openCard} onOpenListing={openListing}
           />
+        )}
+
+        {/* Cards tab stays MOUNTED (hidden) under detail pages opened from it,
+            so search + filters survive the back-click — same desk pattern. */}
+        {(route.page === 'cards' || (route.page === 'card' && origin === 'cards')) && (
+          <div style={{ display: route.page === 'cards' ? 'block' : 'none' }}>
+            <CardsPage onSelect={openCard} />
+          </div>
         )}
 
         {/* Desk stays MOUNTED (hidden) underneath detail pages opened from it,

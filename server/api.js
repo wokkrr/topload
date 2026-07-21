@@ -13,6 +13,7 @@ import { openDb } from './db.js';
 import { PLATFORMS } from './platforms.js';
 import { refreshLatestMarks, markTopGrades } from './oracle.js';
 import { findLanguageSiblings } from './language-siblings.js';
+import { getDeals } from './deals.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -135,8 +136,26 @@ app.get('/api/movers', (_req, res) => {
       AND ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) <= 5.0
     ORDER BY ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) DESC
     LIMIT 20`).all();
-  res.json(rows.map(({ card_image, card_kind, listing_photo, ...r }) =>
-    ({ ...r, ...pickImage(r.card_id, card_image, card_kind, listing_photo) })));
+  // 14-day mini-series per mover — the sparkline that makes a move legible
+  // at a glance (Kaleb, 2026-07-21: movers should SHOW the climb).
+  const sparkStmt = db.prepare(`
+    SELECT price_cents FROM oracle_prices
+    WHERE card_id = ? AND grade = ? ORDER BY as_of DESC LIMIT 14`);
+  res.json(rows.map(({ card_image, card_kind, listing_photo, ...r }) => ({
+    ...r,
+    ...pickImage(r.card_id, card_image, card_kind, listing_photo),
+    spark: sparkStmt.all(r.card_id, r.grade).map(p => p.price_cents).reverse(),
+  })));
+});
+
+/** GET /api/deals?limit=15 → live asks under the oracle mark (grade-matched, deduped, banded) */
+app.get('/api/deals', (req, res) => {
+  const limit = Math.min(50, parseInt(req.query.limit ?? '15', 10));
+  res.json(getDeals(db, { limit }).map(({ card_id, image, ...r }) => ({
+    ...r, card_id,
+    image: image ?? null,
+    discount_pct: +(r.discount * 100).toFixed(1),
+  })));
 });
 
 /** GET /api/basket?index=PKMN → current membership w/ marks */
