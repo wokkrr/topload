@@ -132,6 +132,28 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
             {range && <Stat label={`${days}D return`} value={fmtPct(range.window)} color={deltaColor(range.window)} />}
           </div>
 
+          {/* ── TCGplayer reference (daily snapshot): their market number +
+              today's cheapest ask. Floors are asks, not sales — display only. ── */}
+          {card.tcgplayer?.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 12, flexWrap: 'wrap', font: `11px ${tokens.font.mono}` }}>
+              <span style={{ color: tokens.color.inkMuted, letterSpacing: '0.06em' }}>TCGPLAYER</span>
+              {card.tcgplayer.map(t => (
+                <span key={t.subtype} style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 4, padding: '3px 10px', color: tokens.color.inkSecondary }}>
+                  {card.tcgplayer.length > 1 && <span style={{ color: tokens.color.inkMuted }}>{t.subtype} · </span>}
+                  market <span style={{ color: tokens.color.ink }}>{fmtUsd(t.market_cents)}</span>
+                  {t.low_cents != null && <> · lowest ask <span style={{ color: tokens.color.ink }}>{fmtUsd(t.low_cents)}</span></>}
+                </span>
+              ))}
+              {card.tcgplayer[0]?.product_url && (
+                <a href={card.tcgplayer[0].product_url} target="_blank" rel="noopener noreferrer" className="tl-buy-link"
+                   style={{ color: tokens.color.inkSecondary, border: `1px solid ${tokens.color.border}`, borderRadius: 4, padding: '3px 10px', textDecoration: 'none' }}>
+                  view ↗
+                </a>
+              )}
+              <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.body}` }}>raw · as of {card.tcgplayer[0]?.as_of}</span>
+            </div>
+          )}
+
           {/* ── Same card, other language printings (EN ↔ JP spread at a glance;
               chips jump to the sibling's research page). ── */}
           {card.other_languages?.length > 0 && (

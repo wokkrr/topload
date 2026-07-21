@@ -129,6 +129,23 @@ CREATE INDEX IF NOT EXISTS idx_latest_price ON latest_marks(price_cents DESC);
 CREATE INDEX IF NOT EXISTS idx_cards_ip_number ON cards(ip, number);
 CREATE INDEX IF NOT EXISTS idx_cards_ip_name   ON cards(ip, name);
 
+-- TCGplayer daily snapshot (via the TCGCSV mirror) — LATEST per card+subtype.
+-- market feeds external_marks (oracle bootstrap); low/direct_low are ask
+-- FLOORS: display-only comps ("cheapest on TCGplayer"), never oracle input.
+CREATE TABLE IF NOT EXISTS tcgplayer_prices (
+  card_id          TEXT NOT NULL,
+  subtype          TEXT NOT NULL,           -- 'Normal' | 'Foil' | …
+  as_of            TEXT NOT NULL,           -- snapshot date (freshness)
+  market_cents     INTEGER,
+  low_cents        INTEGER,
+  mid_cents        INTEGER,
+  high_cents       INTEGER,
+  direct_low_cents INTEGER,
+  product_id       INTEGER NOT NULL,        -- TCGplayer product (affiliate routing later)
+  product_url      TEXT,
+  PRIMARY KEY (card_id, subtype)
+);
+
 -- Rules-based basket membership, recorded per rebalance date.
 CREATE TABLE IF NOT EXISTS basket_members (
   index_id TEXT NOT NULL,                  -- 'PKMN','OP'

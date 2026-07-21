@@ -239,6 +239,11 @@ app.get('/api/cards/:id', (req, res) => {
     ...cardOut,
     ...pickImage(card.id, card_image, card_kind, listing_photo),
     other_languages: findLanguageSiblings(db, card),
+    // TCGplayer daily snapshot: market (their trusted headline number) + ask
+    // floor ("cheapest copy today"). Floors never touch the oracle.
+    tcgplayer: db.prepare(`
+      SELECT subtype, as_of, market_cents, low_cents, direct_low_cents, product_url
+      FROM tcgplayer_prices WHERE card_id = ? ORDER BY subtype`).all(req.params.id),
     grades: grades.map(g => ({
       ...g,
       change_1d_pct: g.price_1d ? +((g.price_cents / g.price_1d - 1) * 100).toFixed(2) : null,
