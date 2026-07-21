@@ -163,24 +163,24 @@ app.get('/api/cards', (req, res) => {
     volume: 'sales_7d DESC, price_cents DESC',
   }[req.query.sort] ?? 'price_cents DESC';
   // ONE row per card (Kaleb, 2026-07-21): the lookup lists CARDS — the top-
-  // value grade represents each; the card page holds the full grade ladder.
-  // PERF: the correlated image subselects must join AFTER rn=1 + LIMIT —
-  // inside the windowed subquery they ran for every one of ~277k mark rows
-  // and the endpoint hung for minutes (live outage, 2026-07-21 morning).
+  // value grade (precomputed is_top; markTopGrades runs in every rebuild)
+  // represents each; the card page holds the full ladder. Request-time window
+  // functions took this to 12s on the droplet — precompute at ingest, always.
+  // Degrade gracefully while flags are absent (mid-migration / mid-rebuild):
+  // duplicate grade rows beat an empty lookup. Grade-filtered queries are
+  // already one-per-card and skip the flag.
+  const topFilter = req.query.grade ? ''
+    : db.prepare(`SELECT 1 FROM latest_marks WHERE is_top = 1 LIMIT 1`).get() ? 'AND lm.is_top = 1' : '';
   const rows = db.prepare(`
     SELECT o.*, c2.image AS card_image, c2.image_kind AS card_kind,
            (SELECT g.image FROM gacha_listings g WHERE g.card_id = o.card_id AND g.image IS NOT NULL LIMIT 1) AS listing_photo
     FROM (
-      SELECT * FROM (
-        SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
-               lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
-               lm.price_1d, lm.price_30d,
-               COUNT(*) OVER (PARTITION BY c.id) AS grades_tracked,
-               ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY lm.price_cents DESC) AS rn
-        FROM latest_marks lm
-        JOIN cards c ON c.id = lm.card_id
-        WHERE 1=1 ${ipFilter}
-      ) WHERE rn = 1
+      SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
+             lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
+             lm.price_1d, lm.price_30d, lm.grades_tracked
+      FROM latest_marks lm
+      JOIN cards c ON c.id = lm.card_id
+      WHERE 1=1 ${topFilter} ${ipFilter}
       ORDER BY ${sort} LIMIT ${limit}
     ) o
     JOIN cards c2 ON c2.id = o.card_id
