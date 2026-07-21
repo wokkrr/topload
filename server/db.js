@@ -19,17 +19,23 @@ export function openDb(path = join(__dirname, '..', 'data', 'topload.db')) {
   // a memory-mapped reader (observed as 'zsh: bus error' during parallel
   // backfills). Plain read syscalls are immune and barely slower here.
   db.exec('PRAGMA mmap_size = 0;');
-  db.exec(readFileSync(join(__dirname, 'schema.sql'), 'utf8'));
-  migrate(db);
+  // Schema + migrations are idempotent and usually no-ops. A LONG writer
+  // (rematch/backfill txns exceed even the 60s busy wait) must not crash a
+  // booting reader — the API crash-looped for 9 restarts against a running
+  // rematch (live outage, 2026-07-21). Skip on lock; the next opener applies.
+  try {
+    db.exec(readFileSync(join(__dirname, 'schema.sql'), 'utf8'));
+    migrate(db);
+  } catch (e) {
+    if (e?.errcode === 5 || /locked/i.test(String(e?.errstr ?? e))) {
+      console.warn('[db] schema/migrations deferred — a writer holds the lock (idempotent; next opener applies)');
+    } else throw e;
+  }
   return db;
 }
 
 /** Additive migrations for DBs created before a column existed. */
 function migrate(db) {
-  // Writers (ingest/backfills) hold long locks on the $6 droplet — a 5s busy
-  // wait turns most 'database is locked' hard failures into brief stalls
-  // (boot crash-loop bit us live, 2026-07-21).
-  db.exec('PRAGMA busy_timeout = 5000');
   ensureColumn(db, 'external_marks', 'sales_volume', 'INTEGER');
   ensureColumn(db, 'oracle_prices', 'source', 'TEXT');
   ensureColumn(db, 'cards', 'image', 'TEXT');
