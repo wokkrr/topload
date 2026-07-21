@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { tokens } from '../tokens.js';
 import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 import { listingUrl, listingLanguage, imgFallback } from './tables.jsx';
@@ -13,6 +13,7 @@ import { CardResearch, headingStyle } from './CardDetail.jsx';
  */
 export function ListingDetail({ listing: l, listings, navListings, onBack, onOpenListing, onSelectCard }) {
   const [side, setSide] = useState('front');
+  const [inspect, setInspect] = useState(false);   // full-screen image inspector
   const url = listingUrl(l);
   const img = side === 'back' && l.image_back ? l.image_back : l.image;
   const hasComp = l.comp_cents && !l.comp_suspect;
@@ -93,8 +94,17 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             overflow: 'hidden',
           }}>
             {img
-              ? <img src={img} alt={l.item_name} onError={imgFallback} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              ? <img src={img} alt={l.item_name} onError={imgFallback}
+                     onClick={() => setInspect(true)}
+                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', cursor: 'zoom-in' }} />
               : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `11px ${tokens.font.body}` }}>no photo</div>}
+            {img && (
+              <span onClick={() => setInspect(true)} style={{
+                position: 'absolute', top: 8, right: 8, cursor: 'zoom-in',
+                font: `10px ${tokens.font.mono}`, color: tokens.color.ink,
+                background: tokens.color.overlay, borderRadius: 4, padding: '3px 8px',
+              }}>⊕ inspect</span>
+            )}
             {img && l.image_kind === 'art' && (
               <span style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
@@ -113,11 +123,6 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                   borderRadius: 4, padding: '3px 14px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
                 }}>{s === 'front' ? 'Front' : 'Back'}</button>
               ))}
-            </div>
-          )}
-          {img && l.image_kind !== 'art' && (
-            <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, textAlign: 'center', marginTop: 6 }}>
-              photo of the actual item, from the marketplace vault
             </div>
           )}
         </div>
@@ -268,7 +273,74 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
           </Panel>
         )}
       </div>
+      {inspect && img && (
+        <ImageInspector src={img} alt={l.item_name} side={side}
+                        hasBack={!!l.image_back} onFlip={() => setSide(s => s === 'front' ? 'back' : 'front')}
+                        onClose={() => setInspect(false)} />
+      )}
     </section>
+  );
+}
+
+/**
+ * Full-screen image inspector (Kaleb, 2026-07-21: "collectors want to see
+ * high quality images of the corners and edges — the slab is the most
+ * important part of this whole terminal"). Click the photo → near-fullscreen
+ * view; click again → 3× zoom that FOLLOWS THE CURSOR, so tracing corners
+ * and edges is just moving the mouse. Esc / backdrop / ✕ closes; front-back
+ * flip stays available inside.
+ */
+function ImageInspector({ src, alt, side, hasBack, onFlip, onClose }) {
+  const [zoomed, setZoomed] = useState(false);
+  const [origin, setOrigin] = useState('50% 50%');
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    // Freeze the page behind the overlay while inspecting.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+  const track = (e) => {
+    if (!zoomed) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setOrigin(`${((e.clientX - r.left) / r.width * 100).toFixed(1)}% ${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
+  };
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(10,10,8,0.9)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, maxWidth: '92vw', maxHeight: '92vh' }}>
+        <img src={src} alt={alt} onError={imgFallback}
+             onClick={(e) => { track(e); setZoomed(z => !z); }}
+             onMouseMove={track}
+             style={{
+               display: 'block', maxWidth: '92vw', maxHeight: '92vh',
+               transform: zoomed ? 'scale(3)' : 'none', transformOrigin: origin,
+               transition: zoomed ? 'none' : 'transform .15s ease',
+               cursor: zoomed ? 'zoom-out' : 'zoom-in',
+             }} />
+      </div>
+      <div style={{ position: 'fixed', top: 18, right: 22, display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
+        {hasBack && (
+          <button onClick={onFlip} style={{
+            background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: 6,
+            padding: '8px 16px', font: `12px ${tokens.font.body}`, cursor: 'pointer',
+          }}>{side === 'front' ? 'View back' : 'View front'}</button>
+        )}
+        <button onClick={onClose} style={{
+          background: 'rgba(255,255,255,0.12)', color: '#fff', border: 'none', borderRadius: 6,
+          padding: '8px 14px', font: `14px ${tokens.font.body}`, cursor: 'pointer',
+        }}>✕</button>
+      </div>
+      <div style={{
+        position: 'fixed', bottom: 18, left: '50%', transform: 'translateX(-50%)',
+        color: 'rgba(255,255,255,0.55)', font: `11px ${tokens.font.body}`, pointerEvents: 'none',
+      }}>
+        {zoomed ? 'move to trace corners and edges · click to zoom out' : 'click the image to zoom · Esc to close'}
+      </div>
+    </div>
   );
 }
 
