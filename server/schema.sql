@@ -142,3 +142,30 @@ CREATE TABLE IF NOT EXISTS index_values (
   raw_level REAL NOT NULL,                 -- pre-normalization level (audit)
   PRIMARY KEY (index_id, as_of)
 );
+
+-- ── Pop counts (roadmap layer 4): grader-reported population per card+grade.
+-- Attached to the spine exactly like prices: source + as_of provenance,
+-- refreshed on rotation (PSA free tier ≈100 calls/day).
+CREATE TABLE IF NOT EXISTS pop_counts (
+  source       TEXT NOT NULL,            -- 'psa' | 'cgc' | 'tag' | 'bgs'
+  card_id      TEXT NOT NULL,
+  grade        TEXT NOT NULL,            -- normalized ('PSA10')
+  count        INTEGER NOT NULL,         -- population at this grade
+  higher_count INTEGER,                  -- population above this grade
+  as_of        TEXT NOT NULL,            -- ISO date of the observation
+  PRIMARY KEY (source, card_id, grade, as_of)
+);
+CREATE INDEX IF NOT EXISTS idx_pop_card ON pop_counts(card_id, grade, as_of);
+
+-- ── PSA cert archive: every cert we look up, kept verbatim. Doubles as the
+-- future cert-based identification layer (a cert lookup returns the card's
+-- full identity — converts number-only unmatchable listings into matched ones).
+CREATE TABLE IF NOT EXISTS psa_certs (
+  cert       TEXT PRIMARY KEY,
+  spec_id    TEXT,
+  card_id    TEXT,                       -- our matched canonical card, when known
+  grade      TEXT,
+  label      TEXT,                       -- human identity line from the cert
+  raw        TEXT,                       -- full API response JSON (provenance)
+  fetched_at TEXT NOT NULL
+);
