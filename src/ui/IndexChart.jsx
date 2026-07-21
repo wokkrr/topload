@@ -174,7 +174,7 @@ function Tooltip({ x, date, rows }) {
       {rows.map((r, i) => (
         <g key={r.label} transform={`translate(10,${30 + i * 18})`}>
           <rect width="8" height="8" y="-8" rx="2" fill={r.color} />
-          <text x="14" fill={tokens.color.ink} style={{ font: `11px ${tokens.font.mono}` }}>{r.label} {r.value}</text>
+          <text x="14" fill={tokens.color.ink} style={{ font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>{r.label} {r.value}</text>
         </g>
       ))}
     </g>
@@ -192,7 +192,7 @@ export function IndexTable({ data, dates }) {
   // crash, 2026-07-21). Look up by DATE; dash where an index has no point.
   const byDate = data.map(d => new Map(d.series.map(pt => [pt.as_of, pt.value])));
   return (
-    <table style={{ borderCollapse: 'collapse', font: `12px ${tokens.font.mono}`, color: tokens.color.ink }}>
+    <table style={{ borderCollapse: 'collapse', font: `12px ${tokens.font.mono}`, color: tokens.color.ink, textTransform: 'uppercase' }}>
       <thead>
         <tr>
           <th style={thStyle}>Date</th>

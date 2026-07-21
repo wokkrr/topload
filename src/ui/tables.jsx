@@ -4,7 +4,7 @@ import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 
 const th = { textAlign: 'right', padding: '6px 12px', borderBottom: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary, fontWeight: 400, font: `11px ${tokens.font.body}`, whiteSpace: 'nowrap' };
 const thL = { ...th, textAlign: 'left' };
-const td = { textAlign: 'right', padding: '5px 12px', borderBottom: `1px solid ${tokens.color.surface}`, font: `12px ${tokens.font.mono}`, whiteSpace: 'nowrap' };
+const td = { textAlign: 'right', padding: '5px 12px', borderBottom: `1px solid ${tokens.color.surface}`, font: `12px ${tokens.font.mono}`, whiteSpace: 'nowrap', textTransform: 'uppercase' };
 const tdL = { ...td, textAlign: 'left', font: `12px ${tokens.font.body}` };
 
 export function Chip({ active, onClick, color, children }) {
@@ -177,7 +177,7 @@ export function CardsTable({ cards, onSelect }) {
             <td style={td}><Delta pct={c.change_1d_pct} /></td>
             <td style={td}><Delta pct={c.change_30d_pct} /></td>
             <td style={td}><Conf c={c.confidence} /></td>
-            <td style={{ ...tdL, color: c.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}` }}>
+            <td style={{ ...tdL, color: c.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
               {c.basis === 'solds' ? 'solds' : `ext·${(c.source ?? '?').slice(0, 4)}`}
             </td>
           </tr>
@@ -212,7 +212,7 @@ export function PlatformStrip({ platforms, hidden, onToggle }) {
                   onClick={interactive ? () => onToggle(p.id) : undefined}
                   title={interactive ? (off ? `Show ${p.name}` : `Hide ${p.name}${p.listings ? ' listings & sales' : p.sales ? ' sales (listings coming)' : ''}`) : undefined}
                   style={{
-                    font: `10px ${tokens.font.mono}`, padding: '3px 9px', borderRadius: 3,
+                    font: `10px ${tokens.font.mono}`, padding: '3px 9px', borderRadius: 3, textTransform: 'uppercase',
                     border: off ? `1px dashed ${tokens.color.border}` : `1px solid ${live ? tokens.color.brass : tokens.color.border}`,
                     color: off ? tokens.color.inkMuted : live ? tokens.color.ink : tokens.color.inkMuted,
                     background: !off && p.listings ? tokens.color.surfaceRaised : 'none',
@@ -237,7 +237,7 @@ export function SalesTape({ sales, onSelect }) {
       <div style={{ display: 'flex', gap: 20, overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: 4, scrollbarWidth: 'thin' }}>
         {sales.filter(s => !s.is_outlier).slice(0, 15).map((s, i) => (
           <span key={i} onClick={() => onSelect?.(s.card_id)}
-                style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, cursor: 'pointer', flexShrink: 0 }}>
+                style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, cursor: 'pointer', flexShrink: 0, textTransform: 'uppercase' }}>
             <IpDot ip={s.ip} />
             <span style={{ color: tokens.color.ink }}>{s.name}</span>
             {' '}{s.grade !== 'raw' ? s.grade : ''} <span style={{ color: tokens.color.ink }}>{fmtUsd(s.price_cents)}</span>
@@ -543,7 +543,7 @@ function GachaGrid({ listings, onSelect, onOpenListing }) {
               }}>NOT ITEM · REFERENCE ART</span>
             )}
             <span style={{
-              position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`,
+              position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`, textTransform: 'uppercase',
               color: tokens.color.ink, background: tokens.color.overlay,
               borderRadius: 3, padding: '2px 6px',
             }}>{((l.grade ?? 'raw') === 'raw' && isSealed(l) ? 'sealed' : l.grade) + (listingLanguage(l) === 'Japanese' ? ' · JP' : '')}</span>

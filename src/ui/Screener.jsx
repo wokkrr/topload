@@ -60,7 +60,7 @@ export function Screener({ onSelect }) {
         </span>
       </div>
 
-      {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 8 }}>{err}</div>}
+      {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 8, textTransform: 'uppercase' }}>{err}</div>}
       {cards && (
         <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 8 }}>
           {cards.length === 100 ? 'top 100 results — refine to narrow' : `${cards.length} result${cards.length === 1 ? '' : 's'}`}

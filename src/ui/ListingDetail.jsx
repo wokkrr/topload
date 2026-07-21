@@ -260,7 +260,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                   <span style={{ font: `12px ${tokens.font.body}`, color: tokens.color.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {s.item_name}
                   </span>
-                  <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, flexShrink: 0 }}>{s.grade}</span>
+                  <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, flexShrink: 0, textTransform: 'uppercase' }}>{s.grade}</span>
                   <span style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.ink, flexShrink: 0 }}>{fmtUsd(s.price_cents)}</span>
                   {s.delta_pct != null && (
                     <span style={{ font: `11px ${tokens.font.mono}`, color: s.delta_pct <= 0 ? tokens.color.up : tokens.color.down, flexShrink: 0, minWidth: 56, textAlign: 'right' }}>
@@ -361,7 +361,7 @@ function Row({ k, v }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '4px 0', font: `12px ${tokens.font.body}`, borderBottom: `1px solid ${tokens.color.surface}` }}>
       <span style={{ color: tokens.color.inkMuted }}>{k}</span>
-      <span style={{ color: tokens.color.ink, font: `12px ${tokens.font.mono}`, textAlign: 'right' }}>{v}</span>
+      <span style={{ color: tokens.color.ink, font: `12px ${tokens.font.mono}`, textAlign: 'right', textTransform: 'uppercase' }}>{v}</span>
     </div>
   );
 }

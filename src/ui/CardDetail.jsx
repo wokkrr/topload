@@ -59,7 +59,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
     api.cardSeries(cardId, grade, days).then(setSeries).catch(e => setErr(String(e)));
   }, [cardId, grade, days]);
 
-  if (err) return <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}` }}>{err}</div>;
+  if (err) return <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, textTransform: 'uppercase' }}>{err}</div>;
   if (!card) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>Loading…</div>;
 
   const cur = card.grades.find(g => g.grade === grade);
@@ -148,7 +148,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
               {card.tcgplayer[0]?.product_url && (
                 <a href={card.tcgplayer[0].product_url} target="_blank" rel="noopener noreferrer" className="tl-buy-link"
                    style={{ color: tokens.color.inkSecondary, border: `1px solid ${tokens.color.border}`, borderRadius: 4, padding: '3px 10px', textDecoration: 'none' }}>
-                  view ↗
+                  VIEW ↗
                 </a>
               )}
               <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.body}` }}>raw · as of {card.tcgplayer[0]?.as_of}</span>
@@ -187,7 +187,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                 background: grade === g.grade ? tokens.color.surfaceRaised : 'none',
                 border: `1px solid ${grade === g.grade ? seriesColor : tokens.color.border}`,
                 color: grade === g.grade ? tokens.color.ink : tokens.color.inkSecondary,
-                borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
+                borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.mono}`, cursor: 'pointer', textTransform: 'uppercase',
               }}>{g.grade}</button>
             ))}
             <span style={{ flex: 1 }} />
@@ -220,7 +220,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
               <td style={{ ...td, color: deltaColor(g.change_30d_pct) }}>{fmtPct(g.change_30d_pct)}</td>
               <td style={td}>{g.sales_7d}</td>
               <td style={td}>{(g.confidence * 100).toFixed(0)}</td>
-              <td style={{ ...tdL, color: g.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}` }}>
+              <td style={{ ...tdL, color: g.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
                 {g.basis === 'solds' ? 'solds' : `ext·${(g.source ?? '?').slice(0, 4)}`}
               </td>
             </tr>
@@ -239,7 +239,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           ) : (
             <div>
               {sales.slice(0, 8).map((s, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', font: `11px ${tokens.font.mono}`, opacity: s.is_outlier ? 0.45 : 1 }}
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', font: `11px ${tokens.font.mono}`, textTransform: 'uppercase', opacity: s.is_outlier ? 0.45 : 1 }}
                      title={s.is_outlier ? 'Flagged as outlier — excluded from oracle marks' : undefined}>
                   <span style={{ color: tokens.color.inkMuted, minWidth: 62 }}>{s.sold_at?.slice(0, 10)}</span>
                   <span style={{ color: tokens.color.inkSecondary, minWidth: 46 }}>{s.grade}</span>
@@ -274,7 +274,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                 background: tokens.color.surfaceRaised,
               }}>
                 <span>{l.label}</span>
-                <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}` }}>{l.note} ↗</span>
+                <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}`, textTransform: 'uppercase' }}>{l.note} ↗</span>
               </a>
             ))}
             <div style={{ ...placeholderStyle, fontSize: 10, marginTop: 2 }}>
@@ -326,7 +326,7 @@ function Row({ k, v }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', font: `12px ${tokens.font.body}` }}>
       <span style={{ color: tokens.color.inkMuted }}>{k}</span>
-      <span style={{ color: tokens.color.ink, font: `12px ${tokens.font.mono}`, textAlign: 'right' }}>{v}</span>
+      <span style={{ color: tokens.color.ink, font: `12px ${tokens.font.mono}`, textAlign: 'right', textTransform: 'uppercase' }}>{v}</span>
     </div>
   );
 }
@@ -450,7 +450,7 @@ function MarkChart({ series, color, dots }) {
       ))}
       {pts.length > 0 && (
         <text x={W - PAD.r} y={PAD.t - 2} textAnchor="end" fill={tokens.color.inkMuted}
-              style={{ font: `9px ${tokens.font.mono}` }}>
+              style={{ font: `9px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
           ● individual sales · — oracle mark
         </text>
       )}
@@ -476,7 +476,7 @@ function HoverBox({ x, p }) {
       <rect width={w} height={h} rx="4" fill={tokens.color.surfaceRaised} stroke={tokens.color.border} />
       <text x="10" y="16" fill={tokens.color.inkSecondary} style={{ font: `10px ${tokens.font.mono}` }}>{p.as_of}</text>
       <text x="10" y="34" fill={tokens.color.ink} style={{ font: `12px ${tokens.font.mono}` }}>{fmtUsd(p.price_cents)}</text>
-      <text x="10" y="50" fill={tokens.color.inkMuted} style={{ font: `10px ${tokens.font.mono}` }}>
+      <text x="10" y="50" fill={tokens.color.inkMuted} style={{ font: `10px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
         conf {(p.confidence * 100).toFixed(0)} · {p.basis === 'external' ? 'external' : `solds · ${p.sales_7d}/wk`}
       </text>
     </g>
@@ -496,5 +496,5 @@ const deltaColor = (p) => p == null ? tokens.color.inkMuted : p >= 0 ? tokens.co
 const backStyle = { background: 'none', border: 'none', color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}`, cursor: 'pointer', padding: 0 };
 const th = { textAlign: 'right', padding: '6px 12px', borderBottom: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary, fontWeight: 400, font: `11px ${tokens.font.body}` };
 const thL = { ...th, textAlign: 'left' };
-const td = { textAlign: 'right', padding: '5px 12px', borderBottom: `1px solid ${tokens.color.surface}`, font: `12px ${tokens.font.mono}` };
+const td = { textAlign: 'right', padding: '5px 12px', borderBottom: `1px solid ${tokens.color.surface}`, font: `12px ${tokens.font.mono}`, textTransform: 'uppercase' };
 const tdL = { ...td, textAlign: 'left', font: `12px ${tokens.font.body}` };

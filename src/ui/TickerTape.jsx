@@ -37,7 +37,7 @@ export function TickerTape({ onSelect }) {
       {items.map(it => (
         <span key={it.key}
               onClick={it.card_id ? () => onSelect(it.card_id) : undefined}
-              style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, cursor: it.card_id ? 'pointer' : 'default', flexShrink: 0 }}>
+              style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, cursor: it.card_id ? 'pointer' : 'default', flexShrink: 0, textTransform: 'uppercase' }}>
           {it.color && <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 2, background: it.color, marginRight: 6, verticalAlign: 'baseline' }} />}
           <span style={{ color: tokens.color.ink }}>{it.label}</span>
           {' '}{it.value}{' '}

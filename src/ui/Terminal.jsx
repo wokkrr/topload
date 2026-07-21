@@ -86,7 +86,7 @@ function MoverRow({ m, maxPct, onSelect }) {
           display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           font: `13px ${tokens.font.body}`,
         }}>{m.name}</span>
-        <span style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.mono}` }}>
+        <span style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
           {m.grade} · {fmtUsd(m.price_then)} → {fmtUsd(m.price_now)}
         </span>
       </span>
