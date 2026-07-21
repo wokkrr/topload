@@ -42,7 +42,8 @@
     "api": "node --env-file-if-exists=.env server/api.js",
     "check:syntax": "for f in server/*.js server/adapters/*.js; do node --check \"$f\" || exit 1; done && echo syntax OK",
     "test": "npm run check:syntax && vitest run server/test",
-    "indexes:refresh": "node --env-file-if-exists=.env server/indexes-refresh.js"
+    "indexes:refresh": "node --env-file-if-exists=.env server/indexes-refresh.js",
+    "backfill:deep": "node --env-file-if-exists=.env server/backfill-deep.js"
   },
   "dependencies": {
     "compression": "^1.8.1",
