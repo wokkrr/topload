@@ -16,7 +16,11 @@ export function IndexChart({ data }) {
   // (no points in the window). One malformed entry must degrade, never blank
   // the page (live crash, 2026-07-20). Uneven series lengths are also real —
   // hover indexes are guarded below.
-  const rows = useMemo(() => (data ?? []).filter(d => Array.isArray(d?.series) && d.series.length > 0), [data]);
+  // Only PUBLISHED indexes draw (basket has enough genuinely-traded members —
+  // a 2-card flat line pretending to be a market told Kaleb "nothing", 2026-07-21).
+  // Unpublished ones are listed honestly below the legend instead.
+  const rows = useMemo(() => (data ?? []).filter(d => Array.isArray(d?.series) && d.series.length > 0 && d.published !== false), [data]);
+  const building = useMemo(() => (data ?? []).filter(d => d.published === false), [data]);
   const model = useMemo(() => {
     if (!rows.length) return null;
     const longest = rows.reduce((a, b) => (b.series.length > a.series.length ? b : a));
@@ -50,11 +54,24 @@ export function IndexChart({ data }) {
             <span key={d.index_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: `12px ${tokens.font.body}`, color: tokens.color.inkSecondary }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: s.data, display: 'inline-block' }} />
               {s.label}
+              {d.members != null && (
+                <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}` }}>
+                  {d.members} cards · {d.window_sales ?? 0} sales{d.window_vol_cents > 0 ? ` · $${Math.round(d.window_vol_cents / 100).toLocaleString()}` : ''}
+                </span>
+              )}
             </span>
           );
         })}
         <button onClick={() => setShowTable(t => !t)} style={btnStyle}>{showTable ? 'Chart' : 'Table'}</button>
       </div>
+      {building.length > 0 && (
+        <div style={{ font: `11px ${tokens.font.body}`, color: tokens.color.inkMuted, margin: '0 0 10px' }}>
+          {building.map(d => {
+            const label = tokens.series[d.index_id]?.label ?? d.index_id;
+            return `${label} index publishes at ${d.min_members ?? 8} actively-traded cards (now ${d.members ?? 0}) — building sales history`;
+          }).join(' · ')}
+        </div>
+      )}
 
       {showTable ? <IndexTable data={rows} dates={dates} /> : (
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}

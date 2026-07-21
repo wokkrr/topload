@@ -73,7 +73,7 @@ export function Terminal({ indexes, days, setDays, movers, onSelect }) {
     <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       <div style={panel}>
-        <SectionHead title="Indexes" hint="liquidity-weighted franchise benchmarks · base 100" />
+        <SectionHead title="Indexes" hint="liquidity-weighted franchise benchmarks · base 100 · built from first-hand recorded sales (history begins Jun 2026)" />
         <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
           {RANGES.map(r => (
             <Chip key={r} active={days === r} onClick={() => setDays(r)}>{r}D</Chip>

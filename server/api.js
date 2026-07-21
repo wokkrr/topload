@@ -76,19 +76,40 @@ app.get('/api/img/:cardId', async (req, res) => {
   createReadStream(file).pipe(res);
 });
 
-/** GET /api/indexes?days=90 → [{index_id, series:[{as_of, value}]}] */
+/** GET /api/indexes?days=90 → [{index_id, series, members, window_sales, window_vol_cents, published}] */
 app.get('/api/indexes', (req, res) => {
   const days = Math.min(365, parseInt(req.query.days ?? '90', 10));
+  // An index is PUBLISHED only when its basket has enough genuinely-traded
+  // constituents — a flat line built on 2 cards pretends to be a market
+  // (Kaleb, 2026-07-21: "doesn't really tell you much of anything").
+  const MIN_MEMBERS = 8;
   const rows = db.prepare(`
     SELECT index_id, as_of, value FROM index_values
     WHERE as_of >= date((SELECT MAX(as_of) FROM index_values), ?)
     ORDER BY index_id, as_of`).all(`-${days} day`);
   const byIndex = {};
   for (const r of rows) (byIndex[r.index_id] ??= []).push({ as_of: r.as_of, value: r.value });
+  const membersStmt = db.prepare(`
+    SELECT COUNT(*) n FROM basket_members
+    WHERE index_id = ? AND as_of = (SELECT MAX(as_of) FROM basket_members WHERE index_id = ?)`);
+  const volStmt = db.prepare(`
+    SELECT COUNT(*) n, COALESCE(SUM(s.price_cents), 0) v
+    FROM sales s JOIN cards c ON c.id = s.card_id
+    WHERE c.ip = ? AND s.is_outlier = 0 AND date(s.sold_at) >= date('now', ?)`);
   // Re-normalize each window to 100 at window start for comparability.
   res.json(Object.entries(byIndex).map(([index_id, series]) => {
     const base = series[0]?.value ?? 100;
-    return { index_id, series: series.map(p => ({ ...p, value: +(100 * p.value / base).toFixed(2) })) };
+    const members = membersStmt.get(index_id, index_id)?.n ?? 0;
+    const vol = volStmt.get(index_id, `-${days} day`);
+    return {
+      index_id,
+      members,
+      window_sales: vol?.n ?? 0,
+      window_vol_cents: vol?.v ?? 0,
+      published: members >= MIN_MEMBERS,
+      min_members: MIN_MEMBERS,
+      series: series.map(p => ({ ...p, value: +(100 * p.value / base).toFixed(2) })),
+    };
   }));
 });
 
