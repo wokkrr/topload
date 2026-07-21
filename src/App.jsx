@@ -116,25 +116,43 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', background: tokens.color.bg, color: tokens.color.ink, fontFamily: tokens.font.body }}>
-      <header style={{ display: 'flex', alignItems: 'baseline', gap: 24, padding: '20px 28px 0' }}>
-        <h1 style={{ font: `22px ${tokens.font.display}`, margin: 0, letterSpacing: '0.5px' }}>
-          Topload <span style={{ color: tokens.color.inkMuted, fontSize: 12, fontFamily: tokens.font.mono }}>card terminal · v2</span>
-        </h1>
-        <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto', alignItems: 'center' }}>
+      {/* ── Header, terminal aesthetic (Kaleb, 2026-07-21: logo + tabs felt
+          off-brand). Brass slab mark + spaced wordmark; tabs speak the same
+          uppercase-mono language as every section head. ── */}
+      <header style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '16px 28px 12px' }}>
+        <a href="/" onClick={e => { e.preventDefault(); setOrigin('terminal'); navigate('/'); }}
+           style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
+          {/* The mark: a toploader sleeve — brass frame, card inside. */}
+          <span aria-hidden style={{
+            width: 26, height: 34, borderRadius: 4, border: `1.5px solid ${tokens.color.brass}`,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+          }}>
+            <span style={{ width: 16, height: 22, borderRadius: 2, background: tokens.color.brass, opacity: 0.85 }} />
+          </span>
+          <span>
+            <span style={{ display: 'block', font: `600 19px ${tokens.font.display}`, letterSpacing: '3px', lineHeight: 1 }}>TOPLOAD</span>
+            <span style={{ display: 'block', font: `9px ${tokens.font.mono}`, letterSpacing: '3.5px', color: tokens.color.inkMuted, marginTop: 3 }}>CARD TERMINAL</span>
+          </span>
+        </a>
+        <nav style={{ display: 'flex', gap: 2, marginLeft: 'auto', alignItems: 'center' }}>
           {TABS.map(([label, to]) => {
             const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/desk') || (route.page === 'cards' && to === '/cards');
             return (
-              <button key={to} onClick={() => { setOrigin(to === '/desk' ? 'desk' : to === '/cards' ? 'cards' : 'terminal'); navigate(to); }} style={{
-                background: active ? tokens.color.surfaceRaised : 'none',
-                border: 'none', borderBottom: active ? `2px solid ${tokens.color.brass}` : '2px solid transparent',
-                color: active ? tokens.color.ink : tokens.color.inkSecondary,
-                padding: '8px 14px', font: `13px ${tokens.font.body}`, cursor: 'pointer', borderRadius: '4px 4px 0 0',
-              }}>{label}</button>
+              <button key={to} onClick={() => { setOrigin(to === '/desk' ? 'desk' : to === '/cards' ? 'cards' : 'terminal'); navigate(to); }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.color = tokens.color.ink; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.color = tokens.color.inkSecondary; }}
+                style={{
+                  background: 'none',
+                  border: 'none', borderBottom: active ? `2px solid ${tokens.color.brass}` : '2px solid transparent',
+                  color: active ? tokens.color.ink : tokens.color.inkSecondary,
+                  padding: '10px 16px', font: `11px ${tokens.font.mono}`, textTransform: 'uppercase',
+                  letterSpacing: '1.5px', cursor: 'pointer', transition: 'color .12s ease',
+                }}>{label}</button>
             );
           })}
           <button onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} style={{
             background: 'none', border: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary,
-            borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, cursor: 'pointer', marginLeft: 16,
+            borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, cursor: 'pointer', marginLeft: 18,
           }}>{theme === 'dark' ? '☀' : '☾'}</button>
         </nav>
       </header>

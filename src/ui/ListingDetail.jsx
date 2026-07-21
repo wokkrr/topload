@@ -103,7 +103,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                 position: 'absolute', top: 8, right: 8, cursor: 'zoom-in',
                 font: `10px ${tokens.font.mono}`, color: tokens.color.ink,
                 background: tokens.color.overlay, borderRadius: 4, padding: '3px 8px',
-              }}>⊕ inspect</span>
+              }}>⊕ INSPECT</span>
             )}
             {img && l.image_kind === 'art' && (
               <span style={{
