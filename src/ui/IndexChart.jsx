@@ -24,19 +24,28 @@ export function IndexChart({ data }) {
   const building = useMemo(() => (data ?? []).filter(d => d.published === false), [data]);
   const model = useMemo(() => {
     if (!rows.length) return null;
-    const longest = rows.reduce((a, b) => (b.series.length > a.series.length ? b : a));
-    const dates = longest.series.map(p => p.as_of);
+    // DATE-aligned axis (live bug 2026-07-21: YGO's shorter history plotted
+    // by array INDEX — its whole line squeezed to the left edge, endpoint dot
+    // parked on top of Pokémon's start while its value label sat orphaned at
+    // the right). The axis is the union of all dates; every series maps its
+    // points to their true date position, so newer indexes start mid-chart
+    // and END at the right edge like everything else.
+    const dates = [...new Set(rows.flatMap(d => d.series.map(p => p.as_of)))].sort();
+    const dateIx = new Map(dates.map((dt, i) => [dt, i]));
+    // Per row: [ {i: axis position, value} ] in date order.
+    const aligned = new Map(rows.map(d => [d.index_id,
+      d.series.filter(p => dateIx.has(p.as_of)).map(p => ({ i: dateIx.get(p.as_of), value: p.value }))]));
     const all = rows.flatMap(d => d.series.map(p => p.value));
     const lo = Math.min(...all), hi = Math.max(...all);
     const pad = (hi - lo) * 0.08 || 1;
     const y = (v) => PAD.t + (H - PAD.t - PAD.b) * (1 - (v - (lo - pad)) / ((hi + pad) - (lo - pad)));
     const x = (i) => PAD.l + (W - PAD.l - PAD.r) * (dates.length < 2 ? 0 : i / (dates.length - 1));
     const gridVals = [lo, (lo + hi) / 2, hi].map(v => +v.toFixed(1));
-    return { dates, x, y, gridVals };
+    return { dates, dateIx, aligned, x, y, gridVals };
   }, [rows]);
 
   if (!model) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>No index data — run `npm run ingest`.</div>;
-  const { dates, x, y, gridVals } = model;
+  const { dates, aligned, x, y, gridVals } = model;
 
   const onMove = (e) => {
     const rect = svgRef.current.getBoundingClientRect();
@@ -90,17 +99,20 @@ export function IndexChart({ data }) {
           {(() => {
             // Endpoint labels get collision-spread so near-equal indexes never
             // print on top of each other (live "funky numbers", 2026-07-21).
+            const lasts = rows.map(d => aligned.get(d.index_id).at(-1));
             const labelYs = spreadLabels(
-              rows.map(d => ({ y: y(d.series[d.series.length - 1].value) })),
+              lasts.map(p => ({ y: p ? y(p.value) : H / 2 })),
               15, [PAD.t + 8, H - PAD.b - 4]);
             return rows.map((d, ri) => {
               const s = tokens.series[d.index_id] ?? { data: tokens.color.ink };
               // Smooth curve + soft gradient fill beneath — presentation only;
               // tooltip still reports the true point values.
-              const pts = d.series.map((p, i) => [x(i), y(p.value)]);
+              const seq = aligned.get(d.index_id);
+              if (!seq.length) return null;
+              const pts = seq.map(p => [x(p.i), y(p.value)]);
               const line = smoothPath(pts);
-              const last = d.series[d.series.length - 1];
-              const lastX = x(d.series.length - 1);
+              const last = lasts[ri];
+              const lastX = x(last.i);
               const gid = `grad-${d.index_id}`;
               return (
                 <g key={d.index_id}>
@@ -125,20 +137,27 @@ export function IndexChart({ data }) {
             });
           })()}
 
-          {hover && (
-            <g pointerEvents="none">
-              <line x1={hover.x} x2={hover.x} y1={PAD.t} y2={H - PAD.b} stroke={tokens.color.inkSecondary} strokeWidth="1" strokeDasharray="3 3" />
-              {rows.filter(d => d.series[hover.i] != null).map(d => (
-                <circle key={d.index_id} cx={hover.x} cy={y(d.series[hover.i].value)} r="4"
-                        fill={(tokens.series[d.index_id] ?? {}).data} stroke={tokens.color.bg} strokeWidth="2" />
-              ))}
-              <Tooltip x={hover.x} date={dates[hover.i]} rows={rows.filter(d => d.series[hover.i] != null).map(d => ({
-                label: tokens.series[d.index_id]?.label ?? d.index_id,
-                color: (tokens.series[d.index_id] ?? {}).data,
-                value: d.series[hover.i].value.toFixed(2),
-              }))} />
-            </g>
-          )}
+          {hover && (() => {
+            // Date-aligned hover: each series answers for the axis DATE, not
+            // its own array position (short series were reporting wrong days).
+            const at = rows
+              .map(d => ({ d, p: aligned.get(d.index_id).find(p => p.i === hover.i) }))
+              .filter(e => e.p != null);
+            return (
+              <g pointerEvents="none">
+                <line x1={hover.x} x2={hover.x} y1={PAD.t} y2={H - PAD.b} stroke={tokens.color.inkSecondary} strokeWidth="1" strokeDasharray="3 3" />
+                {at.map(({ d, p }) => (
+                  <circle key={d.index_id} cx={hover.x} cy={y(p.value)} r="4"
+                          fill={(tokens.series[d.index_id] ?? {}).data} stroke={tokens.color.bg} strokeWidth="2" />
+                ))}
+                <Tooltip x={hover.x} date={dates[hover.i]} rows={at.map(({ d, p }) => ({
+                  label: tokens.series[d.index_id]?.label ?? d.index_id,
+                  color: (tokens.series[d.index_id] ?? {}).data,
+                  value: p.value.toFixed(2),
+                }))} />
+              </g>
+            );
+          })()}
         </svg>
       )}
     </div>

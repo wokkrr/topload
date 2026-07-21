@@ -19,6 +19,12 @@ describe('Terminal renders without throwing across payload shapes', () => {
       { index_id: 'OP', series: mkSeries(12) },
       { index_id: 'YGO', series: mkSeries(1) },
     ], movers }],
+    // Live bug 2026-07-21: a short series whose dates sit at the END of the
+    // axis (late-starting index) must align by date, not array position.
+    ['late-starting short series', { indexes: [
+      { index_id: 'PKMN', series: mkSeries(20) },
+      { index_id: 'YGO', series: mkSeries(20).slice(17) },
+    ], movers }],
     ['index with EMPTY series', { indexes: [{ index_id: 'PKMN', series: [] }], movers }],
     ['index missing series key', { indexes: [{ index_id: 'PKMN' }], movers }],
     ['mover with unknown ip', { indexes: [], movers: [{ card_id: 'x', ip: 'WTF', name: 'Mystery', grade: 'raw', price_now: 100, change_pct: 0 }] }],
