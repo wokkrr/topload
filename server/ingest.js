@@ -474,7 +474,19 @@ export async function ingest({ db = null, dates = null } = {}) {
   const oracle = refreshOracle(database, markDates);
   const indexes = refreshIndexes(database);
 
-  const summary = { ...sourceSummary, ...outliers, ...oracle, ...indexes };
+  // Value Pulse outcome loop: snapshot today's surfaced deals so tomorrow can
+  // judge them — flagged listings that later SELL near mark validate the
+  // radar; ones that linger or get cut say the mark (or liquidity read) was
+  // off. We can't judge deals by eye; the market grades us (Kaleb, 2026-07-21:
+  // "I don't know how we would judge that — maybe you could help figure out a
+  // way"). First-seen row per (day, listing) is kept; re-runs no-op.
+  let pulse = {};
+  try {
+    const { getDeals, logPulse } = await import('./deals.js');
+    pulse = { pulseLogged: logPulse(database, getDeals(database, { limit: 50 }), today) };
+  } catch (e) { console.warn(`[ingest] pulse log skipped: ${e.message}`); }
+
+  const summary = { ...sourceSummary, ...outliers, ...oracle, ...indexes, ...pulse };
   console.log('[ingest]', JSON.stringify(summary));
   return summary;
 }

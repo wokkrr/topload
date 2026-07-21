@@ -129,6 +129,24 @@ CREATE INDEX IF NOT EXISTS idx_latest_price ON latest_marks(price_cents DESC);
 CREATE INDEX IF NOT EXISTS idx_cards_ip_number ON cards(ip, number);
 CREATE INDEX IF NOT EXISTS idx_cards_ip_name   ON cards(ip, name);
 
+-- Value Pulse outcome ledger: every surfaced deal, snapshotted daily, so the
+-- radar can be GRADED by what the market did next (sold near mark = hit;
+-- lingered/cut = the mark or liquidity read was off). Append-only.
+CREATE TABLE IF NOT EXISTS pulse_log (
+  as_of       TEXT NOT NULL,               -- snapshot date
+  platform    TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  card_id     TEXT NOT NULL,
+  grade       TEXT NOT NULL,
+  ask_cents   INTEGER NOT NULL,
+  mark_cents  INTEGER NOT NULL,
+  discount    REAL NOT NULL,
+  basis       TEXT,                        -- mark provenance at flag time
+  confidence  REAL,
+  sales_30d   INTEGER,
+  PRIMARY KEY (as_of, platform, external_id)
+);
+
 -- TCGplayer daily snapshot (via the TCGCSV mirror) — LATEST per card+subtype.
 -- market feeds external_marks (oracle bootstrap); low/direct_low are ask
 -- FLOORS: display-only comps ("cheapest on TCGplayer"), never oracle input.

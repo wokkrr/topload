@@ -34,6 +34,20 @@ describe('getDeals', () => {
   });
 });
 
+describe('logPulse', () => {
+  it('appends surfaced deals once per day per listing; re-runs no-op', async () => {
+    const { logPulse } = await import('../deals.js');
+    const db = makeDb();
+    const deals = getDeals(db);
+    expect(logPulse(db, deals, '2026-07-21')).toBe(2);
+    expect(logPulse(db, deals, '2026-07-21')).toBe(0);   // idempotent
+    expect(logPulse(db, deals, '2026-07-22')).toBe(2);   // new day, new snapshot
+    const rows = db.prepare(`SELECT as_of, external_id, discount, basis FROM pulse_log ORDER BY as_of, discount DESC`).all();
+    expect(rows.length).toBe(4);
+    expect(rows[0]).toMatchObject({ as_of: '2026-07-21', external_id: 'cc3', basis: 'solds' });
+  });
+});
+
 describe('dedupeByMint', () => {
   it('host provenance beats phyg: mirror regardless of platform label', () => {
     const rows = [

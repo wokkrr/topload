@@ -36,6 +36,26 @@ export function dedupeByMint(rows) {
   return rows.filter(r => !drop.has(r));
 }
 
+/**
+ * Append today's surfaced deals to pulse_log — the outcome ledger. Judgment
+ * comes later by disposition: join a past day's log against current listings
+ * and sales (sold near mark? delisted? still sitting? price cut?). First
+ * write per (day, listing) wins; re-runs are no-ops.
+ */
+export function logPulse(db, deals, asOf) {
+  const ins = db.prepare(`
+    INSERT OR IGNORE INTO pulse_log
+    (as_of, platform, external_id, card_id, grade, ask_cents, mark_cents, discount, basis, confidence, sales_30d)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  let n = 0;
+  for (const d of deals) {
+    n += ins.run(asOf, d.platform, d.external_id, d.card_id, d.grade,
+                 d.ask_cents, d.mark_cents, d.discount, d.basis ?? null,
+                 d.confidence ?? null, d.sales_30d ?? null).changes;
+  }
+  return n;
+}
+
 export function getDeals(db, {
   limit = 15, minConfidence = 0.5, minDiscount = 0.05, maxDiscount = 0.80, minAskCents = 500,
 } = {}) {

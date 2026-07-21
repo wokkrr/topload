@@ -126,6 +126,45 @@ function BasketSummary({ basket }) {
   );
 }
 
+/**
+ * One index, one number. Game name + window return, colored; sparkline as
+ * texture, not furniture. Click = the receipts (chart focus + constituents).
+ * Unpublished indexes say so in plain words instead of faking a line.
+ */
+function IndexTile({ d, id, days, active, onClick }) {
+  const s = tokens.series[id] ?? { label: id, data: tokens.color.ink };
+  const series = d?.series ?? [];
+  const ret = series.length >= 2 ? +(series[series.length - 1].value - series[0].value).toFixed(1) : null;
+  const up = (ret ?? 0) >= 0;
+  const publishable = d?.published !== false && ret != null;
+  return (
+    <button onClick={onClick} style={{
+      flex: '0 1 170px', minWidth: 140, textAlign: 'left', cursor: 'pointer',
+      background: active ? tokens.color.surfaceRaised : 'none',
+      border: `1px solid ${active ? s.data : tokens.color.border}`, borderRadius: 8,
+      padding: '10px 12px', color: tokens.color.ink,
+    }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, font: `11px ${tokens.font.body}`, color: tokens.color.inkSecondary }}>
+        <span style={{ width: 8, height: 8, borderRadius: 2, background: s.data, display: 'inline-block' }} />
+        {s.label}
+      </span>
+      {publishable ? (
+        <>
+          <span style={{ display: 'block', font: `600 24px ${tokens.font.mono}`, margin: '4px 0 2px', color: up ? tokens.color.up : tokens.color.down }}>
+            {up ? '+' : ''}{ret}%
+          </span>
+          <span style={{ font: `10px ${tokens.font.mono}`, color: tokens.color.inkMuted }}>{days}D · {d?.members ?? '—'} cards</span>
+        </>
+      ) : (
+        <>
+          <span style={{ display: 'block', font: `600 18px ${tokens.font.mono}`, margin: '6px 0 2px', color: tokens.color.inkMuted }}>building</span>
+          <span style={{ font: `10px ${tokens.font.mono}`, color: tokens.color.inkMuted }}>{d?.members ?? 0}/{d?.min_members ?? 8} cards</span>
+        </>
+      )}
+    </button>
+  );
+}
+
 export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListing }) {
   // 'What IS this index?' answered with the actual cards. Four toggles
   // (Kaleb, 2026-07-21): Chart, then one per game showing THAT index's
@@ -147,27 +186,35 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'stretch' }}>
         <div style={{ flex: '2 1 520px', minWidth: 0 }}>
       <div style={{ ...panel, height: '100%' }}>
-        <SectionHead title="Indexes" hint="liquidity-weighted franchise benchmarks · base 100 · built from first-hand recorded sales (history begins Jun 2026)" />
-        <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
-          {RANGES.map(r => (
-            <Chip key={r} active={days === r} onClick={() => setDays(r)}>{r}D</Chip>
+        <SectionHead title="The Market" hint="how the big three are trading · built from recorded sales" />
+
+        {/* ── Apple pass (Kaleb, 2026-07-21: "small and clunky… simple is
+            always better"): three tiles, one number each. The window return
+            IS the story; everything else lives a click deeper. ── */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          {['PKMN', 'OP', 'YGO'].map(id => (
+            <IndexTile key={id} d={meta(id)} id={id} days={days}
+                       active={view === id} onClick={() => setView(v => v === id ? 'chart' : id)} />
           ))}
           <span style={{ flex: 1 }} />
-          {[['chart', 'Chart'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']].map(([id, label]) => (
-            <Chip key={id} active={view === id} onClick={() => setView(id)}
-                  color={id !== 'chart' ? tokens.series[id]?.data : undefined}>{label}</Chip>
-          ))}
+          <span style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
+            {RANGES.map(r => (
+              <Chip key={r} active={days === r} onClick={() => setDays(r)}>{r}D</Chip>
+            ))}
+          </span>
         </div>
-        {view === 'chart' ? <IndexChart data={indexes} /> : (
-          <div>
+
+        <IndexChart data={view === 'chart' ? indexes : (indexes ?? []).filter(d => d.index_id === view)} />
+
+        {/* Constituents live BEHIND the tile click — receipts on demand. */}
+        {view !== 'chart' && (
+          <div style={{ marginTop: 14 }}>
             <div style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.inkSecondary, margin: '4px 0 8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              {tokens.series[view]?.label ?? view} index — current constituents
-              {meta(view)?.members != null && ` · ${meta(view).members} cards`}
+              The {meta(view)?.members ?? ''} cards behind this number
             </div>
             {meta(view)?.published === false && (
               <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, marginBottom: 8 }}>
-                This index isn't drawn on the chart yet — it publishes at {meta(view)?.min_members ?? 8} actively-traded
-                cards ({meta(view)?.members ?? 0} now). The cards below are its basket so far.
+                This index publishes at {meta(view)?.min_members ?? 8} actively-traded cards ({meta(view)?.members ?? 0} now) — the basket below is filling as history builds.
               </div>
             )}
             {baskets[view]
@@ -245,6 +292,11 @@ function DealsPanel({ onOpenListing, onSelect }) {
               {d.sales_30d > 0
                 ? ` · ${d.sales_30d} sale${d.sales_30d === 1 ? '' : 's'}/30D`
                 : ' · thin trading'}
+              {/* Mark provenance: a discount against REAL solds is a different
+                  animal than one against an external estimate. */}
+              <span style={{ color: d.basis === 'solds' ? tokens.color.up : tokens.color.inkMuted }}>
+                {d.basis === 'solds' ? ' · solds-backed mark' : ' · estimated mark'}
+              </span>
             </span>
           </span>
           <span style={{ flex: 'none', textAlign: 'right', font: `12px ${tokens.font.mono}` }}>
