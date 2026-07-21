@@ -61,7 +61,9 @@ describe('opVariantArt', () => {
   it('assigns curated + unambiguous, resets stale prior assignments, skips the rest', () => {
     const db = makeDb();
     const res = opVariantArt(db, { snapEn: SNAP_EN, snapJa: SNAP_JA, curated: CURATED });
-    expect(res).toMatchObject({ curatedEntries: 1, noCode: 1, assigned: 3 });
+    // assigned = curated Sabo + single-parallel JA Boa; the reset Zoro row has
+    // no snapshot entry so it re-lands in the ambiguous bucket, not assigned.
+    expect(res).toMatchObject({ curatedEntries: 1, noCode: 1, assigned: 2, ambiguous: 2 });
     const img = (id) => db.prepare(`SELECT image, image_kind FROM cards WHERE id = ?`).get(id);
     expect(img('op-pc1')).toEqual({ image: 'https://en.op.example/OP13-120_p3.png', image_kind: 'variant' }); // curated
     expect(img('op-pc2')).toEqual({ image: 'https://ja.op.example/OP01-025_p1.png', image_kind: 'variant' });
