@@ -70,7 +70,11 @@ export function mapListing(a, seenAt) {
     // FULL timestamp — cross-marketplace 'Recent' sorts by real listing time,
     // not date-clumps broken by price (Kaleb, 2026-07-21).
     listed_at: order?.listedAt ?? order?.createdAt ?? seenAt ?? null,
-    image: a.image ?? a.cropped_image ?? null,
+    // asset_pictures = the HQ slab scans (slab_front.jpg / slab_back.jpg) —
+    // what collectors want to see; a.image is the 3D pedestal render, kept as
+    // fallback only (Kaleb, 2026-07-21).
+    image: (a.asset_pictures ?? []).find(u => /slab_front/i.test(u)) ?? a.asset_pictures?.[0] ?? a.image ?? a.cropped_image ?? null,
+    image_back: (a.asset_pictures ?? []).find(u => /slab_back/i.test(u)) ?? a.asset_pictures?.[1] ?? null,
     nft_address: tokenId,              // Polygon tokenId — opaque, matches sales registry key style
     proof: a.proof_of_integrity ?? null, // courtyard.io/asset/<proof> = the listing page
     cert,                              // slab certification number (Serial attr)

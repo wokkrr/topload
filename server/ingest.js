@@ -245,11 +245,11 @@ async function runLive(db, today) {
     const insY = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
        (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
       insY.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.nft_address, l.proof ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.image_back ?? null, l.nft_address, l.proof ?? null, l.cert ?? null, l.seen_at);
     }
     // Prune SOLD: our own Courtyard sales indexer sees every fill — a sale of
     // the same token on/after the listing date means this ask is gone. (Sales
