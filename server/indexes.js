@@ -16,7 +16,11 @@
 const DAY_MS = 86_400_000;
 
 export const INDEX_DEFAULTS = {
-  topN: 25,
+  // 400 (was 25): Card Ladder's franchise indexes aggregate hundreds-to-
+  // thousands of cards (OP 124 / YGO 340 / PKMN 9,497) — a 25-card basket
+  // reads as a watchlist, not a market (Kaleb, 2026-07-21). 400 liquid,
+  // confidence-gated constituents per game ≈ CL breadth with our honesty.
+  topN: 400,
   minConfidence: 0.3,
   // Weekly (was 30): a monthly cadence left baskets frozen on July 4th while
   // the PriceCharting feeds + Phygitals landed — the index ran on a snapshot

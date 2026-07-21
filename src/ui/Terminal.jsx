@@ -11,12 +11,10 @@ import { IndexChart } from './IndexChart.jsx';
  * full-width tables): single column, essentials only (Kaleb: "figure out the
  * most important information to display and go with that to start").
  *
- *   1. Movers   — what's hot: name · grade · mark · Δ1D, top 8, nothing else
+ *   1. Indexes + Movers side by side (Kaleb, 2026-07-21) — benchmarks and
+ *      what's hot share the top row; Card Ladder-scale baskets (400/game)
+ *      with receipts. History deepens daily (PC marks + on-chain backfills).
  *   2. Lookup   — find anything (full screener)
- *   3. Indexes  — franchise benchmarks, demoted to the bottom until the
- *      PC-era price history matures (Kaleb, 2026-07-21: populated ≠ ready;
- *      "we need way more data for it to be worth showing" front-and-center).
- *      Graduates back up when the window tells a real story (~mid-Aug+).
  *
  * Basket constituents intentionally left off this first dashboard — tables
  * and API remain (tables.jsx BasketTable) for the richer dashboard later.
@@ -91,19 +89,9 @@ export function Terminal({ indexes, days, setDays, movers, onSelect }) {
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-      <div style={panel}>
-        <SectionHead title="Movers · 24h" hint="biggest one-day moves among cards with live marks" />
-        {movers?.length
-          ? movers.slice(0, 8).map(m => <MoverRow key={`${m.card_id}|${m.grade}`} m={m} onSelect={onSelect} />)
-          : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '8px 2px' }}>no movers yet — marks refresh with each ingest</div>}
-      </div>
-
-      <div style={panel}>
-        <SectionHead title="Card Lookup" hint="search the full Topload Card Database — every tracked card, priced or not" />
-        <Screener onSelect={onSelect} />
-      </div>
-
-      <div style={panel}>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'stretch' }}>
+        <div style={{ flex: '2 1 520px', minWidth: 0 }}>
+      <div style={{ ...panel, height: '100%' }}>
         <SectionHead title="Indexes" hint="liquidity-weighted franchise benchmarks · base 100 · built from first-hand recorded sales (history begins Jun 2026)" />
         <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
           {RANGES.map(r => (
@@ -134,6 +122,21 @@ export function Terminal({ indexes, days, setDays, movers, onSelect }) {
               : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>Loading…</div>}
           </div>
         )}
+      </div>
+        </div>
+        <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+      <div style={{ ...panel, height: '100%' }}>
+        <SectionHead title="Movers · 24h" hint="biggest one-day moves among cards with live marks" />
+        {movers?.length
+          ? movers.slice(0, 8).map(m => <MoverRow key={`${m.card_id}|${m.grade}`} m={m} onSelect={onSelect} />)
+          : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '8px 2px' }}>no movers yet — marks refresh with each ingest</div>}
+      </div>
+        </div>
+      </div>
+
+      <div style={panel}>
+        <SectionHead title="Card Lookup" hint="search the full Topload Card Database — every tracked card, priced or not" />
+        <Screener onSelect={onSelect} />
       </div>
 
     </section>
