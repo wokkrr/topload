@@ -1,5 +1,5 @@
 import { tokens } from '../tokens.js';
-import { Chip } from './tables.jsx';
+import { Chip, Thumb } from './tables.jsx';
 import { Screener } from './Screener.jsx';
 import { IndexChart } from './IndexChart.jsx';
 
@@ -48,6 +48,7 @@ function MoverRow({ m, onSelect }) {
       display: 'flex', alignItems: 'center', gap: 10, padding: '7px 2px',
       borderTop: `1px solid ${tokens.color.border}`, cursor: 'pointer', minWidth: 0,
     }}>
+      <Thumb src={m.image} size={30} />
       <span style={{
         flex: 'none', width: 8, height: 8, borderRadius: 2,
         background: tokens.series[m.ip]?.data ?? tokens.color.inkMuted,

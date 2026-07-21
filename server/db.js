@@ -33,6 +33,7 @@ function migrate(db) {
   // ENGLISH/romanized name for display + matching; this tags the printing so
   // the UI can show "· Japanese" without the user ever reading kanji.
   ensureColumn(db, 'cards', 'language', "TEXT NOT NULL DEFAULT 'English'");
+  ensureColumn(db, 'cards', 'image_kind', 'TEXT'); // NULL = own art · 'borrowed' = same-artwork sibling's scan
   ensureColumn(db, 'gacha_listings', 'image_back', 'TEXT');
   ensureColumn(db, 'gacha_listings', 'proof', 'TEXT'); // courtyard asset-page hash
   // Grading-slab certification number (verifiable on the grader's site).

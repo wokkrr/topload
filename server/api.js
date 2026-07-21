@@ -47,6 +47,7 @@ app.get('/api/movers', (_req, res) => {
   // version scanned every mark on the latest day (~277k rows) per request.
   const rows = db.prepare(`
     SELECT c.ip, c.name, c.set_name, lm.card_id, lm.grade,
+           COALESCE(c.image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1)) AS image,
            lm.price_cents AS price_now, lm.price_1d AS price_then,
            lm.confidence, lm.sales_7d,
            ROUND((lm.price_cents * 100.0 / lm.price_1d) - 100, 2) AS change_pct
@@ -54,6 +55,10 @@ app.get('/api/movers', (_req, res) => {
     JOIN cards c ON c.id = lm.card_id
     WHERE lm.confidence >= 0.3 AND lm.price_1d > 0
       AND lm.price_cents != lm.price_1d
+      -- Sanity band: a ±500%+ "move" is a data event (mark migration, source
+      -- switch, first real comp), not a market move — seen live 2026-07-21
+      -- when the OP satellite mop-up produced +54,072% "movers".
+      AND ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) <= 5.0
     ORDER BY ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) DESC
     LIMIT 20`).all();
   res.json(rows);
@@ -104,7 +109,7 @@ app.get('/api/cards', (req, res) => {
   const rows = db.prepare(`
     SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
            COALESCE(c.image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1)) AS image,
-           CASE WHEN c.image IS NOT NULL THEN 'official'
+           CASE WHEN c.image IS NOT NULL THEN COALESCE(c.image_kind, 'official')
                 WHEN EXISTS (SELECT 1 FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL) THEN 'listing' END AS image_kind,
            lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
            lm.price_1d, lm.price_30d
@@ -124,7 +129,7 @@ app.get('/api/cards/:id', (req, res) => {
   const card = db.prepare(`
     SELECT id, ip, name, set_name, number, variant,
            COALESCE(image, (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1)) AS image,
-           CASE WHEN image IS NOT NULL THEN 'official'
+           CASE WHEN image IS NOT NULL THEN COALESCE(image_kind, 'official')
                 WHEN EXISTS (SELECT 1 FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL) THEN 'listing' END AS image_kind
     FROM cards WHERE id = ?`).get(req.params.id);
   if (!card) return res.status(404).json({ error: 'unknown card' });
