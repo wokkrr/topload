@@ -91,6 +91,31 @@ describe('matchProducts', () => {
   });
 });
 
+describe('art fallback (importTcgcsv e2e with stub fetch)', () => {
+  it('fills artless cards with the product image on EXACT label match only; never overwrites', async () => {
+    const { openDb } = await import('../db.js');
+    const { importTcgcsv } = await import('../import-tcgcsv.js');
+    const db = openDb(':memory:');
+    const ins = db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, image, image_kind, external_ids) VALUES (?, 'OP', ?, 's', ?, 'English', ?, ?, '{}')`);
+    ins.run('op-a', 'Sabo [Alternate Art]', 'OP05-001', null, null);          // artless, label matches → fill
+    ins.run('op-b', 'Monkey.D.Luffy', 'OP05-119', 'https://own/art.png', null); // has art → untouched
+    ins.run('op-c', 'Nami', 'OP05-002', null, null);                          // artless but product has label → no fill
+    const groups = [{ groupId: 1, name: 'Awakening', abbreviation: 'OP05' }];
+    const products = [
+      { productId: 11, name: 'Sabo (001) (Alternate Art)', url: 'x', extendedData: [{ name: 'Number', value: 'OP05-001' }] },
+      { productId: 12, name: 'Monkey.D.Luffy (119)', url: 'x', extendedData: [{ name: 'Number', value: 'OP05-119' }] },
+      { productId: 13, name: 'Nami (002) (Parallel)', url: 'x', extendedData: [{ name: 'Number', value: 'OP05-002' }] },
+    ];
+    const prices = products.map(p => ({ productId: p.productId, subTypeName: 'Normal', marketPrice: 5 }));
+    const stub = async (url) => ({ ok: true, json: async () => url.includes('/groups') ? groups : url.includes('/products') ? products : prices });
+    await importTcgcsv(db, { ips: ['OP'], asOf: '2026-07-21', delayMs: 0, fetchImpl: stub });
+    const img = (id) => db.prepare(`SELECT image, image_kind FROM cards WHERE id = ?`).get(id);
+    expect(img('op-a')).toEqual({ image: 'https://tcgplayer-cdn.tcgplayer.com/product/11_in_1000x1000.jpg', image_kind: 'tcgplayer' });
+    expect(img('op-b')).toEqual({ image: 'https://own/art.png', image_kind: null });   // never overwrite
+    expect(img('op-c').image).toBeNull();                                              // label mismatch → honest empty
+  });
+});
+
 describe('markPrice', () => {
   it('Normal by default, Foil for foil-labeled cards, fallback when only one subtype', () => {
     const p = { prices: { Normal: { market_cents: 1000 }, Foil: { market_cents: 2500 } } };

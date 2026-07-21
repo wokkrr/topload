@@ -83,6 +83,13 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP'], asOf, dela
      VALUES ('tcgplayer', ?, 'raw', ?, ?, NULL)`);
   const attach = db.prepare(
     `UPDATE cards SET external_ids = json_set(COALESCE(external_ids, '{}'), '$.tcgplayer', ?) WHERE id = ?`);
+  // Art fallback (Kaleb, 2026-07-21: "work down the chase high value cards for
+  // Pokemon and yugioh that don't have card art"): TCGplayer's product image
+  // IS the exact printing — clean scans, correct variant. Fills ONLY artless
+  // cards, and ONLY when the variant label matches EXACTLY (a loosely-matched
+  // mark is fine; a loosely-matched IMAGE is visibly wrong art).
+  const fillArt = db.prepare(
+    `UPDATE cards SET image = ?, image_kind = 'tcgplayer' WHERE id = ? AND image IS NULL`);
 
   const summary = {};
   for (const ip of ips) {
@@ -90,7 +97,7 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP'], asOf, dela
     if (!catId) continue;
     const cards = db.prepare(`SELECT id, name, number, set_name, language FROM cards WHERE ip = ?`).all(ip);
     const groups = (await fetchTcgcsv(`/${catId}/groups`, { fetchImpl })).slice(0, maxGroups);
-    let products = 0, matched = 0, marks = 0, unmatchedSample = [];
+    let products = 0, matched = 0, marks = 0, artFilled = 0, unmatchedSample = [];
     for (const g of groups) {
       let mapped;
       try {
@@ -114,12 +121,15 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP'], asOf, dela
         const mp = markPrice(product, card.name);
         if (mp != null) { insMark.run(card.id, asOf, mp); marks++; }
         attach.run(String(product.product_id), card.id);
+        if (product.image_url && cardLabel(card.name) === product.label) {
+          artFilled += fillArt.run(product.image_url, card.id).changes;
+        }
         matched++;
       }
       db.exec('COMMIT');
       if (delayMs) await new Promise(r => setTimeout(r, delayMs));
     }
-    summary[ip] = { groups: groups.length, products, matched, unmatched: products - matched, marks };
+    summary[ip] = { groups: groups.length, products, matched, unmatched: products - matched, marks, artFilled };
     console.log(`[tcgcsv] ${ip}:`, JSON.stringify(summary[ip]));
     if (unmatchedSample.length) console.log(`[tcgcsv] ${ip} unmatched sample: ${unmatchedSample.join(' · ')}`);
   }

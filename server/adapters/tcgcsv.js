@@ -67,6 +67,9 @@ export function mapGroupProducts(products, prices, group) {
     out.push({
       product_id: p.productId,
       url: p.url ?? null,
+      // Product-id-derived hi-res product image — clean scans of the EXACT
+      // printing (incl. reverse-holo patterns official art can't show).
+      image_url: `https://tcgplayer-cdn.tcgplayer.com/product/${p.productId}_in_1000x1000.jpg`,
       name: baseName(p.name),
       label: productLabel(p.name),                           // '' = base printing
       number,
