@@ -71,6 +71,33 @@ function MoverRow({ m, onSelect }) {
   );
 }
 
+/**
+ * How-this-index-works receipts (Kaleb, 2026-07-21: "we need to see more
+ * information about how they're being factored in"): the weighting formula
+ * in plain words + the concentration stats that formula produces.
+ */
+function BasketSummary({ basket }) {
+  const priced = basket.filter(b => b.price_cents != null);
+  const top10 = basket.slice(0, 10).reduce((a, b) => a + (b.weight || 0), 0);
+  const wkVol = priced.reduce((a, b) => a + (b.price_cents ?? 0) * (b.sales_7d ?? 0), 0);
+  const stat = { font: `12px ${tokens.font.mono}`, color: tokens.color.ink };
+  const label = { font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted, textTransform: 'uppercase', letterSpacing: '0.5px' };
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 6 }}>
+        <span><div style={label}>constituents</div><div style={stat}>{basket.length}</div></span>
+        <span><div style={label}>with live marks</div><div style={stat}>{priced.length}</div></span>
+        <span><div style={label}>top 10 hold</div><div style={stat}>{(top10 * 100).toFixed(1)}%</div></span>
+        <span><div style={label}>basket $vol/wk</div><div style={stat}>{fmtUsd(wkVol)}</div></span>
+      </div>
+      <div style={{ font: `11px ${tokens.font.body}`, color: tokens.color.inkMuted }}>
+        Weight = mark × weekly sales (dollar volume), capped at 10% per card, renormalized to 100%.
+        Membership = the most-traded confidence-gated cards, reselected weekly; weights fixed between rebalances.
+      </div>
+    </div>
+  );
+}
+
 export function Terminal({ indexes, days, setDays, movers, onSelect }) {
   // 'What IS this index?' answered with the actual cards. Four toggles
   // (Kaleb, 2026-07-21): Chart, then one per game showing THAT index's
@@ -117,7 +144,10 @@ export function Terminal({ indexes, days, setDays, movers, onSelect }) {
             )}
             {baskets[view]
               ? (baskets[view].length
-                  ? <BasketTable basket={baskets[view]} onSelect={onSelect} />
+                  ? <>
+                      <BasketSummary basket={baskets[view]} />
+                      <BasketTable basket={baskets[view]} onSelect={onSelect} />
+                    </>
                   : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>No constituents yet — this basket fills as sales history builds.</div>)
               : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '6px 2px' }}>Loading…</div>}
           </div>

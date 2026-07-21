@@ -101,29 +101,50 @@ export function MoversTable({ movers, onSelect }) {
   );
 }
 
+/**
+ * Index constituents. 400-row baskets live inside a fixed-height scroll box
+ * (Kaleb, 2026-07-21: "keep them contained") with a sticky header, and each
+ * row shows HOW it factors in: weight bar (share of index, scaled to the
+ * largest holding) + $Vol/wk (mark × weekly sales — the exact quantity the
+ * weighting is computed from).
+ */
 export function BasketTable({ basket, onSelect }) {
   if (!basket?.length) return <Empty label="basket" />;
+  const maxW = Math.max(...basket.map(b => b.weight || 0), 0.0001);
+  const thS = { ...th, position: 'sticky', top: 0, background: tokens.color.surfaceRaised, zIndex: 1 };
+  const thSL = { ...thS, textAlign: 'left' };
   return (
-    <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
-      <thead><tr>
-        <th style={thL}>Card</th><th style={thL}>Grade</th><th style={th}>Weight</th><th style={th}>Mark</th>
-        <th style={th}>Δ1D</th><th style={th}>Δ30D</th><th style={th}>Sales/7D</th><th style={th}>Conf</th>
-      </tr></thead>
-      <tbody>
-        {basket.map(b => (
-          <tr key={`${b.card_id}|${b.grade}`} onClick={() => onSelect?.(b.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
-            <td style={tdL}>{b.name} <span style={{ color: tokens.color.inkMuted }}>· {b.set_name} {b.number}</span></td>
-            <td style={tdL}>{b.grade}</td>
-            <td style={td}>{(b.weight * 100).toFixed(1)}%</td>
-            <td style={td}>{fmtUsd(b.price_cents)}</td>
-            <td style={td}><Delta pct={b.change_1d_pct} /></td>
-            <td style={td}><Delta pct={b.change_30d_pct} /></td>
-            <td style={td}>{b.sales_7d ?? '—'}</td>
-            <td style={td}><Conf c={b.confidence ?? 0} /></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div style={{ maxHeight: 440, overflowY: 'auto', border: `1px solid ${tokens.color.border}`, borderRadius: 6 }}>
+      <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
+        <thead><tr>
+          <th style={thSL}>#</th><th style={thSL}>Card</th><th style={thSL}>Grade</th><th style={thS}>Weight</th><th style={thS}>Mark</th>
+          <th style={thS}>Sales/7D</th><th style={thS}>$Vol/wk</th><th style={thS}>Δ1D</th><th style={thS}>Δ30D</th><th style={thS}>Conf</th>
+        </tr></thead>
+        <tbody>
+          {basket.map((b, i) => (
+            <tr key={`${b.card_id}|${b.grade}`} onClick={() => onSelect?.(b.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
+              <td style={{ ...tdL, color: tokens.color.inkMuted, font: `11px ${tokens.font.mono}` }}>{i + 1}</td>
+              <td style={tdL}>{b.name} <span style={{ color: tokens.color.inkMuted }}>· {b.set_name} {b.number}</span></td>
+              <td style={tdL}>{b.grade}</td>
+              <td style={{ ...td, minWidth: 110 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 44, height: 5, background: tokens.color.surface, borderRadius: 2, overflow: 'hidden', display: 'inline-block' }}>
+                    <span style={{ display: 'block', height: '100%', width: `${Math.max(2, (b.weight / maxW) * 100)}%`, background: tokens.color.inkMuted, borderRadius: 2 }} />
+                  </span>
+                  {(b.weight * 100).toFixed(2)}%
+                </span>
+              </td>
+              <td style={td}>{fmtUsd(b.price_cents)}</td>
+              <td style={td}>{b.sales_7d ?? '—'}</td>
+              <td style={td}>{b.price_cents != null && b.sales_7d != null ? fmtUsd(b.price_cents * b.sales_7d) : '—'}</td>
+              <td style={td}><Delta pct={b.change_1d_pct} /></td>
+              <td style={td}><Delta pct={b.change_30d_pct} /></td>
+              <td style={td}><Conf c={b.confidence ?? 0} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
