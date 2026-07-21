@@ -81,7 +81,9 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
         {!embedded && card.image && (
           <span style={{ position: 'relative', alignSelf: 'flex-start', lineHeight: 0 }}
                 title={card.image_kind === 'listing' ? 'Sample slab photo from a marketplace listing — not a specific item for sale' : undefined}>
-            <img src={card.image} alt={card.name} style={{
+            <img src={card.image} alt={card.name}
+                 onError={e => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }}
+                 style={{
               height: 480, maxWidth: '100%', borderRadius: 10, border: `1px solid ${tokens.color.border}`,
               background: tokens.color.surfaceRaised,
             }} />

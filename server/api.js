@@ -4,9 +4,11 @@
  */
 import express from 'express';
 import compression from 'compression';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, createReadStream } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { timedFetch } from './net.js';
 import { openDb } from './db.js';
 import { PLATFORMS } from './platforms.js';
 import { refreshLatestMarks } from './oracle.js';
@@ -24,6 +26,37 @@ const app = express();
 // and the app bundle drops 245KB → 73KB. This was the "slow to load all the
 // cards" (Kaleb, 2026-07-20): payloads shipped uncompressed.
 app.use(compression());
+
+// ── Card-art caching proxy ─────────────────────────────────────────────────
+// Bandai's card sites (onepiece-cardgame.com) block browser HOTLINKING —
+// their art fails to render inside our pages (seen live: every OP mover
+// thumbnail broken, 2026-07-21). Referer-based blocks don't stop a direct
+// server-side fetch, so we fetch each image ONCE from the droplet, cache it
+// on disk, and serve it from our own origin — the first slice of the
+// "mirror the art we display" backlog item. Only card ids we actually track
+// are fetchable, and only their stored catalog URL — this is not an open proxy.
+const IMG_CACHE = join(__dirname, '..', 'data', 'imgcache');
+mkdirSync(IMG_CACHE, { recursive: true });
+const HOTLINK_BLOCKED = /onepiece-cardgame\.com/i;
+const proxiedImage = (cardId, url) =>
+  url && cardId && HOTLINK_BLOCKED.test(url) ? `/api/img/${encodeURIComponent(cardId)}` : url;
+
+app.get('/api/img/:cardId', async (req, res) => {
+  const row = db.prepare(`SELECT image FROM cards WHERE id = ?`).get(req.params.cardId);
+  if (!row?.image) return res.status(404).end();
+  const ext = /\.jpe?g($|\?)/i.test(row.image) ? 'jpg' : 'png';
+  const file = join(IMG_CACHE, `${req.params.cardId.replace(/[^a-z0-9_-]/gi, '_')}.${ext}`);
+  if (!existsSync(file)) {
+    try {
+      const r = await timedFetch(row.image, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!r.ok) return res.status(404).end();
+      await writeFile(file, Buffer.from(await r.arrayBuffer()));
+    } catch { return res.status(404).end(); }
+  }
+  res.set('Cache-Control', 'public, max-age=604800');
+  res.type(ext);
+  createReadStream(file).pipe(res);
+});
 
 /** GET /api/indexes?days=90 → [{index_id, series:[{as_of, value}]}] */
 app.get('/api/indexes', (req, res) => {
@@ -61,7 +94,7 @@ app.get('/api/movers', (_req, res) => {
       AND ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) <= 5.0
     ORDER BY ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) DESC
     LIMIT 20`).all();
-  res.json(rows);
+  res.json(rows.map(r => ({ ...r, image: proxiedImage(r.card_id, r.image) })));
 });
 
 /** GET /api/basket?index=PKMN → current membership w/ marks */
@@ -119,6 +152,7 @@ app.get('/api/cards', (req, res) => {
     ORDER BY ${sort} LIMIT ${limit}`).all(...args);
   res.json(rows.map(r => ({
     ...r,
+    image: proxiedImage(r.card_id, r.image),
     change_1d_pct: r.price_1d ? +((r.price_cents / r.price_1d - 1) * 100).toFixed(2) : null,
     change_30d_pct: r.price_30d ? +((r.price_cents / r.price_30d - 1) * 100).toFixed(2) : null,
   })));
@@ -146,6 +180,7 @@ app.get('/api/cards/:id', (req, res) => {
     ORDER BY o.price_cents DESC`).all(req.params.id, req.params.id);
   res.json({
     ...card,
+    image: proxiedImage(card.id, card.image),
     grades: grades.map(g => ({
       ...g,
       change_1d_pct: g.price_1d ? +((g.price_cents / g.price_1d - 1) * 100).toFixed(2) : null,
@@ -218,6 +253,7 @@ app.get('/api/gacha', (req, res) => {
     const suspect = ratio != null && (ratio < 0.2 || ratio > 5);
     return {
       ...r,
+      image: proxiedImage(r.card_id, r.image),
       delta_pct: ratio != null && !suspect ? +((ratio - 1) * 100).toFixed(2) : null,
       comp_suspect: suspect || undefined,
     };

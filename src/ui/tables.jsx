@@ -29,6 +29,10 @@ const Conf = ({ c }) => (
   <span style={{ color: c >= 0.6 ? tokens.color.ink : c >= 0.4 ? tokens.color.inkSecondary : tokens.color.inkMuted }}>{(c * 100).toFixed(0)}</span>
 );
 
+// A failed image load degrades to this transparent pixel — the styled frame
+// stays, the browser's broken-image icon never shows.
+export const BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
 /**
  * Card/listing thumbnail. `badge` marks images that are NOT the actual item
  * (reference art on a listing, or a borrowed slab photo on a card page) —
@@ -46,7 +50,9 @@ export const Thumb = ({ src, size = 34, badge = null }) => {
   return (
     <span style={{ position: 'relative', display: 'inline-block', marginRight: 10, flexShrink: 0, lineHeight: 0 }}
           title={badge ? 'Reference image — not a photo of the actual item' : undefined}>
-      <img src={src} alt="" loading="lazy" style={{
+      <img src={src} alt="" loading="lazy"
+           onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = BLANK_IMG; }}
+           style={{
         height: size, width: w, objectFit: 'contain', borderRadius: 3,
         background: tokens.color.surfaceRaised, border: `1px solid ${tokens.color.border}`,
       }} />
