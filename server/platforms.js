@@ -38,8 +38,8 @@ export const PLATFORMS = [
   },
   {
     id: 'phygitals', name: 'Phygitals', chain: 'Solana', status: 'live',
-    listings: false, sales: true,
-    access: 'Sales indexed on-chain via Core collection anchor. Fanatics-integrated. Listings TBD.',
+    listings: true, sales: true,
+    access: 'Listings via their marketplace API (~8.4k live: PKMN/OP/YGO, mapped 2026-07-21). Sales indexed on-chain via Core collection anchor. Fanatics-integrated.',
     url: 'https://www.phygitals.com',
   },
   // RIP.FUN (Base) removed from the roster 2026-07-19 (Kaleb: low usage vs

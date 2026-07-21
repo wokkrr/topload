@@ -146,8 +146,9 @@ export function CardsTable({ cards, onSelect }) {
  */
 export function PlatformStrip({ platforms, hidden, onToggle }) {
   // Only marketplaces we actually pull LISTINGS from belong on the desk's
-  // toggle strip (Kaleb, 2026-07-20) — sales-only sources (Beezie, Phygitals)
-  // feed the tape + oracle silently and return here when their listings land.
+  // toggle strip (Kaleb, 2026-07-20) — sales-only sources (Beezie) feed the
+  // tape + oracle silently and return here when their listings land.
+  // (Phygitals graduated to the strip 2026-07-21 when its listings shipped.)
   const shown = (platforms ?? []).filter(p => p.listings);
   if (!shown.length) return null;
   const interactive = typeof onToggle === 'function';
