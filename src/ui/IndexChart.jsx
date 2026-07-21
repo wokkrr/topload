@@ -124,9 +124,13 @@ function Tooltip({ x, date, rows }) {
   );
 }
 
-function IndexTable({ data, dates }) {
+export function IndexTable({ data, dates }) {
   const step = Math.max(1, Math.floor(dates.length / 12));
   const rows = dates.filter((_, i) => i % step === 0 || i === dates.length - 1);
+  // Series lengths are UNEVEN (dates come from the longest index; positional
+  // indexing read past the end of a shorter one and blanked the page — live
+  // crash, 2026-07-21). Look up by DATE; dash where an index has no point.
+  const byDate = data.map(d => new Map(d.series.map(pt => [pt.as_of, pt.value])));
   return (
     <table style={{ borderCollapse: 'collapse', font: `12px ${tokens.font.mono}`, color: tokens.color.ink }}>
       <thead>
@@ -136,15 +140,15 @@ function IndexTable({ data, dates }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map(date => {
-          const i = dates.indexOf(date);
-          return (
-            <tr key={date}>
-              <td style={tdStyle}>{date}</td>
-              {data.map(d => <td key={d.index_id} style={{ ...tdStyle, textAlign: 'right' }}>{d.series[i].value.toFixed(2)}</td>)}
-            </tr>
-          );
-        })}
+        {rows.map(date => (
+          <tr key={date}>
+            <td style={tdStyle}>{date}</td>
+            {data.map((d, di) => {
+              const v = byDate[di].get(date);
+              return <td key={d.index_id} style={{ ...tdStyle, textAlign: 'right' }}>{v != null ? v.toFixed(2) : '—'}</td>;
+            })}
+          </tr>
+        ))}
       </tbody>
     </table>
   );

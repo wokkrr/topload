@@ -43,3 +43,19 @@ describe('isSealed', () => {
     expect(isSealed({ grade: 'raw', platform: 'mnstr', item_name: 'Ascended Heroes' })).toBe(true); // ungraded MNSTR = pack
   });
 });
+
+describe('IndexTable', () => {
+  it('renders uneven series without crashing (shorter index shows dashes)', async () => {
+    const { renderToString } = await import('react-dom/server');
+    const React = (await import('react')).default;
+    const { IndexTable } = await import('../../src/ui/IndexChart.jsx');
+    const dates = ['2026-07-01', '2026-07-02', '2026-07-03'];
+    const data = [
+      { index_id: 'PKMN', series: dates.map(d => ({ as_of: d, value: 100 })) },
+      { index_id: 'OP', series: [{ as_of: '2026-07-03', value: 102.5 }] },  // short series — crashed live
+    ];
+    const html = renderToString(React.createElement(IndexTable, { data, dates }));
+    expect(html).toContain('102.50');
+    expect(html).toContain('—');
+  });
+});
