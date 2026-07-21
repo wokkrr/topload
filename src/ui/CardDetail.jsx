@@ -15,12 +15,12 @@ const DETAIL_CSS = `
  * CardResearch, which is also embedded inline by ListingDetail — one research
  * module, two homes.
  */
-export function CardDetail({ cardId, onBack }) {
+export function CardDetail({ cardId, onBack, onOpenCard }) {
   return (
     <section>
       <style>{DETAIL_CSS}</style>
       <button onClick={onBack} className="tl-back" style={backStyle}>← back</button>
-      <CardResearch cardId={cardId} />
+      <CardResearch cardId={cardId} onOpenCard={onOpenCard} />
     </section>
   );
 }
@@ -32,7 +32,7 @@ export function CardDetail({ cardId, onBack }) {
  * (the host page already shows them); `initialGrade` preselects the listing's
  * grade so ask-vs-mark lines up.
  */
-export function CardResearch({ cardId, initialGrade = null, embedded = false }) {
+export function CardResearch({ cardId, initialGrade = null, embedded = false, onOpenCard = null }) {
   const [card, setCard] = useState(null);
   const [grade, setGrade] = useState(null);
   const [days, setDays] = useState(90);
@@ -131,6 +131,32 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false }) 
             {cur && <Stat label="Sales 7D / 30D" value={`${cur.sales_7d} / ${cur.sales_30d}`} />}
             {range && <Stat label={`${days}D return`} value={fmtPct(range.window)} color={deltaColor(range.window)} />}
           </div>
+
+          {/* ── Same card, other language printings (EN ↔ JP spread at a glance;
+              chips jump to the sibling's research page). ── */}
+          {card.other_languages?.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <span style={{ font: `10px ${tokens.font.mono}`, color: tokens.color.inkMuted, letterSpacing: '0.06em' }}>
+                ALSO PRINTED IN
+              </span>
+              {card.other_languages.map(s => (
+                <button key={s.id} onClick={onOpenCard ? () => onOpenCard(s.id) : undefined}
+                        className={onOpenCard ? 'tl-buy-link' : undefined}
+                        title={`${s.name} · ${s.set_name ?? ''} ${s.number ?? ''}`.trim()}
+                        style={{
+                          display: 'inline-flex', alignItems: 'baseline', gap: 8,
+                          background: 'none', border: `1px solid ${tokens.color.border}`, borderRadius: 4,
+                          padding: '3px 10px', font: `11px ${tokens.font.mono}`,
+                          color: tokens.color.ink, cursor: onOpenCard ? 'pointer' : 'default',
+                        }}>
+                  <span>{s.language}</span>
+                  {s.price_cents != null
+                    ? <span style={{ color: tokens.color.inkSecondary }}>{s.grade} {fmtUsd(s.price_cents)}</span>
+                    : <span style={{ color: tokens.color.inkMuted }}>tracked · no mark yet</span>}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 4, margin: '14px 0 16px', flexWrap: 'wrap' }}>
             {card.grades.map(g => (

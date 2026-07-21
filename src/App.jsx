@@ -142,7 +142,7 @@ export default function App() {
         {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 12 }}>{err}</div>}
 
         {route.page === 'card' && (
-          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/desk' : '/')} />
+          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/desk' : '/')} onOpenCard={openCard} />
         )}
 
         {route.page === 'listing' && (

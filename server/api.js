@@ -12,6 +12,7 @@ import { timedFetch } from './net.js';
 import { openDb } from './db.js';
 import { PLATFORMS } from './platforms.js';
 import { refreshLatestMarks, markTopGrades } from './oracle.js';
+import { findLanguageSiblings } from './language-siblings.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -217,7 +218,7 @@ app.get('/api/cards', (req, res) => {
 /** GET /api/cards/:id → card meta + latest mark per grade (with provenance) */
 app.get('/api/cards/:id', (req, res) => {
   const card = db.prepare(`
-    SELECT id, ip, name, set_name, number, variant,
+    SELECT id, ip, name, set_name, number, variant, language,
            image AS card_image, image_kind AS card_kind,
            (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo
     FROM cards WHERE id = ?`).get(req.params.id);
@@ -237,6 +238,7 @@ app.get('/api/cards/:id', (req, res) => {
   res.json({
     ...cardOut,
     ...pickImage(card.id, card_image, card_kind, listing_photo),
+    other_languages: findLanguageSiblings(db, card),
     grades: grades.map(g => ({
       ...g,
       change_1d_pct: g.price_1d ? +((g.price_cents / g.price_1d - 1) * 100).toFixed(2) : null,

@@ -11,7 +11,7 @@ import { CardResearch, headingStyle } from './CardDetail.jsx';
  * Price history & comps (the embedded research module), More details, and
  * Similar listings. Native in-app buying is the pinned execution-layer phase.
  */
-export function ListingDetail({ listing: l, listings, navListings, onBack, onOpenListing }) {
+export function ListingDetail({ listing: l, listings, navListings, onBack, onOpenListing, onSelectCard }) {
   const [side, setSide] = useState('front');
   const url = listingUrl(l);
   const img = side === 'back' && l.image_back ? l.image_back : l.image;
@@ -177,7 +177,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
       <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {l.card_id && (
           <Accordion title="Price history & comps" defaultOpen={false}>
-            <CardResearch cardId={l.card_id} initialGrade={l.grade} embedded />
+            <CardResearch cardId={l.card_id} initialGrade={l.grade} embedded onOpenCard={onSelectCard} />
           </Accordion>
         )}
 

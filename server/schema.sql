@@ -124,6 +124,11 @@ CREATE TABLE IF NOT EXISTS latest_marks (
 -- Screener's default sort (price high→low, LIMIT 100) reads pre-sorted.
 CREATE INDEX IF NOT EXISTS idx_latest_price ON latest_marks(price_cents DESC);
 
+-- Language-sibling lookup on the card page (EN ↔ JP printings of the same
+-- card): candidates by ip+number, name fallback for number-less promo rows.
+CREATE INDEX IF NOT EXISTS idx_cards_ip_number ON cards(ip, number);
+CREATE INDEX IF NOT EXISTS idx_cards_ip_name   ON cards(ip, name);
+
 -- Rules-based basket membership, recorded per rebalance date.
 CREATE TABLE IF NOT EXISTS basket_members (
   index_id TEXT NOT NULL,                  -- 'PKMN','OP'
