@@ -26,6 +26,10 @@ export function openDb(path = join(__dirname, '..', 'data', 'topload.db')) {
 
 /** Additive migrations for DBs created before a column existed. */
 function migrate(db) {
+  // Writers (ingest/backfills) hold long locks on the $6 droplet — a 5s busy
+  // wait turns most 'database is locked' hard failures into brief stalls
+  // (boot crash-loop bit us live, 2026-07-21).
+  db.exec('PRAGMA busy_timeout = 5000');
   ensureColumn(db, 'external_marks', 'sales_volume', 'INTEGER');
   ensureColumn(db, 'oracle_prices', 'source', 'TEXT');
   ensureColumn(db, 'cards', 'image', 'TEXT');
