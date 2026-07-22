@@ -149,3 +149,54 @@ describe('altfmv — platform fair-market values blended as an external source (
     expect(o).toMatchObject({ price_cents: 12000, source: 'pricecharting' });
   });
 });
+
+describe('cross-source consensus damp (2026-07-22: "blending helps determine outliers")', () => {
+  const DAY = '2026-07-22';
+  function mk(db, source, cents, grade = 'PSA10') {
+    db.prepare(`INSERT OR REPLACE INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES (?, 'pk-1', ?, ?, ?)`)
+      .run(source, grade, DAY, cents);
+  }
+  function fresh() {
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, external_ids) VALUES ('pk-1', 'PKMN', 'Umbreon', 's', '1', 'English', '{}')`).run();
+    return db;
+  }
+  const conf = (db, grade = 'PSA10') =>
+    db.prepare(`SELECT price_cents, source, confidence FROM oracle_prices WHERE card_id = 'pk-1' AND grade = ? AND as_of = ?`).get(grade, DAY);
+
+  it('damps confidence when fresh sources disagree >50%, keeps best-priority price', () => {
+    const db = fresh();
+    mk(db, 'pricecharting', 40000);
+    mk(db, 'altfmv', 9000);                              // 155% spread vs midpoint → dispute
+    const res = refreshOracle(db, [DAY]);
+    expect(res.disputed).toBe(1);
+    const o = conf(db);
+    expect(o.price_cents).toBe(40000);                   // price NEVER averaged
+    expect(o.source).toBe('pricecharting');
+    expect(o.confidence).toBeCloseTo(0.7 * 0.6, 3);      // discount × damp
+  });
+
+  it('agreeing sources keep full confidence; single-source marks are never damped', () => {
+    const db = fresh();
+    mk(db, 'pricecharting', 10000);
+    mk(db, 'altfmv', 11000);                             // ~10% spread → consensus
+    mk(db, 'tcgplayer', 5000, 'PSA9');                   // lone source on another grade
+    const res = refreshOracle(db, [DAY]);
+    expect(res.disputed).toBe(0);
+    expect(conf(db).confidence).toBeCloseTo(0.7, 3);
+    expect(conf(db, 'PSA9').confidence).toBeCloseTo(0.5, 3);
+  });
+
+  it('solds marks are untouched by the damp', () => {
+    const db = fresh();
+    // Enough real sales to produce a solds mark + two disagreeing externals.
+    const ins = db.prepare(`INSERT INTO sales (card_id, grade, price_cents, sold_at, source, external_id) VALUES ('pk-1', 'PSA10', ?, ?, 'x', ?)`);
+    for (let i = 0; i < 6; i++) ins.run(10000 + i * 10, `2026-07-${15 + i}`, `s${i}`);
+    mk(db, 'pricecharting', 40000);
+    mk(db, 'altfmv', 9000);
+    refreshOracle(db, [DAY]);
+    const o = conf(db);
+    expect(o.source).toBeNull();                          // solds won the mark
+    expect(o.confidence).toBeGreaterThan(0.42);           // no ×0.6 applied to solds
+  });
+});

@@ -255,15 +255,47 @@ export function refreshOracle(db, dates, opts = {}) {
     FROM best b
     JOIN external_marks em
       ON em.card_id = b.card_id AND em.grade = b.grade AND em.source = b.source AND em.as_of = b.obs_date`);
+  // Cross-source consensus damp (Kaleb, 2026-07-22: "blending helps determine
+  // outliers"): when TWO OR MORE fresh sources cover the same (card, grade)
+  // and their prices disagree by more than 50% of their midpoint, the mark's
+  // confidence is cut — the disagreement itself is the outlier signal. The
+  // PRICE still comes from the best-priority source (never averaged: a blend
+  // of a right number and a wrong number is a wrong number); only certainty
+  // drops. Solds marks are never touched.
+  const consensusStmt = db.prepare(`
+    WITH latest AS (
+      SELECT card_id, grade, source, MAX(as_of) AS obs_date
+      FROM external_marks WHERE as_of <= :asOf
+      GROUP BY card_id, grade, source
+    ),
+    fresh AS (
+      SELECT l.* FROM latest l
+      WHERE julianday(:asOf) - julianday(l.obs_date) <= 7
+    ),
+    spread AS (
+      SELECT f.card_id, f.grade,
+             MIN(em.price_cents) mn, MAX(em.price_cents) mx,
+             COUNT(DISTINCT f.source) srcs
+      FROM fresh f
+      JOIN external_marks em
+        ON em.card_id = f.card_id AND em.grade = f.grade AND em.source = f.source AND em.as_of = f.obs_date
+      GROUP BY f.card_id, f.grade
+      HAVING srcs >= 2 AND (mx - mn) * 2.0 / (mx + mn) > 0.5
+    )
+    UPDATE oracle_prices SET confidence = ROUND(confidence * 0.6, 4)
+    WHERE as_of = :asOf AND basis = 'external'
+      AND (card_id, grade) IN (SELECT card_id, grade FROM spread)`);
+  let disputed = 0;
   for (const asOf of dates) {
     const r = extStmt.run({ asOf });
     externalUsed += Number(r.changes);
     written += Number(r.changes);
+    disputed += Number(consensusStmt.run({ asOf }).changes);
   }
 
   db.exec('COMMIT');
   refreshLatestMarks(db);
-  return { series: soldsSeries.length, marks: written, externalMarks: externalUsed };
+  return { series: soldsSeries.length, marks: written, externalMarks: externalUsed, disputed };
 }
 
 /**
