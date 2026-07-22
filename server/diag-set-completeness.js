@@ -55,7 +55,13 @@ for (const s of sets) {
   const bucket = jp ? 'jp' : 'en';
   const want = norm(s.name);
   const keys = [...ours[bucket].keys()];
-  const key = keys.find(k => k === want) ?? keys.find(k => k.includes(want) || want.includes(k));
+  // Containment needs a LENGTH-RATIO guard (live 2026-07-23): the bare
+  // version let 'promo' swallow every '*-Promos' set (nine sets "1,261 rows
+  // over") and 'base' swallow 'SV01: Scarlet & Violet Base Set' (reported
+  // 171 short; itemized truth was 4). The shorter key must be ≥60% of the
+  // longer, so only genuine subtitle drift matches.
+  const contains = (a, b) => (a.includes(b) || b.includes(a)) && Math.min(a.length, b.length) / Math.max(a.length, b.length) >= 0.6;
+  const key = keys.find(k => k === want) ?? keys.find(k => contains(k, want));
   const have = key ? ours[bucket].get(key).length : 0;
   rows.push({ id: s.id, name: s.name, jp, theirCount: s.count ?? 0, have, key: key ?? null });
 }
