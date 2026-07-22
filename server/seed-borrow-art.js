@@ -27,7 +27,11 @@ import { matchListing } from './match.js';
 
 // Variant tags that reuse the base printing's artwork. Anything ELSE in
 // brackets is presumed different art and skipped.
-const SAFE_VARIANT = /\[(1st edition|reverse holo|no rarity|shadowless|unlimited|non[- ]?holo|holo|error|staff|promo)\]/i;
+// 'gold star' / 'prize pack' (2026-07-22, art census): DESCRIPTIVE brackets —
+// PC writes 'Pikachu [Gold Star] Holon Phantoms 104' but Gold Star IS the
+// card at that number; the canonical #104 carries the same official art.
+// Prize Pack reprints reuse the original printing's artwork unchanged.
+const SAFE_VARIANT = /\[(1st edition|reverse holo|no rarity|shadowless|unlimited|non[- ]?holo|holo|error|staff|promo|gold star|prize pack)\]/i;
 
 export function borrowArt(db, { dry = false } = {}) {
   const donorsByIp = {};
@@ -53,8 +57,15 @@ export function borrowArt(db, { dry = false } = {}) {
     res.eligible++;
     // The satellite's own fields are a listing-shaped title; the matcher's
     // set/number/language evidence rules do the safety work.
-    const title = `${t.name ?? ''} ${t.number ?? ''} ${t.set_name ?? ''}`.trim();
-    const hit = matchListing(title, donorsByIp[t.ip] ?? []);
+    const titles = [`${t.name ?? ''} ${t.number ?? ''} ${t.set_name ?? ''}`.trim()];
+    // Descriptive bracket: canonical Gold Stars are named 'Pikachu ★' (norms
+    // to 'pikachu' — the plain title hits) or 'Pikachu Star' (needs the
+    // bracket rewritten to the name form). Try both; matcher stays the judge.
+    if (/\[gold star\]/i.test(t.name ?? '')) {
+      titles.push(`${t.name.replace(/\s*\[gold star\]/i, ' Star')} ${t.number ?? ''} ${t.set_name ?? ''}`.trim());
+    }
+    let hit = null;
+    for (const title of titles) { hit = matchListing(title, donorsByIp[t.ip] ?? []); if (hit) break; }
     const donor = hit ? donorById.get(hit) : null;
     if (!donor?.image) { res.unmatched++; continue; }
     res.borrowed++;
