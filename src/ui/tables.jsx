@@ -190,10 +190,10 @@ export function CardsTable({ cards, onSelect, sort, onSort }) {
                 (Kaleb, 2026-07-21). A desk-style thumbnail GRID view is the
                 future home for browsing the database visually. */}
             <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}><IpDot ip={c.ip} /><span>{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></span></td>
-            {/* EN is the quiet default; anything else is the detail that
-                explains why two rows can share a name and a price. */}
+            {/* One weight for every language (Kaleb, 2026-07-23: EN reads the
+                same as JP — no second-class markets). */}
             <td style={{ ...td, textAlign: 'left' }} title={c.language ?? 'English'}>
-              <span style={{ color: langCode(c.language) === 'EN' ? tokens.color.inkMuted : tokens.color.ink }}>{langCode(c.language)}</span>
+              <span style={{ color: tokens.color.ink }}>{langCode(c.language)}</span>
             </td>
             {/* One row per card: top-value grade shown; the count hints at the
                 full ladder waiting on the card page. */}
