@@ -28,7 +28,9 @@ const getJson = async (path) => {
 
 const norm = (s) => (s ?? '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
   .replace(/^[a-z0-9.]{1,8}:\s*/, '')                       // 'M5: Abyss Eye' → 'abyss eye'
-  .replace(/[^a-z0-9]+/g, ' ').trim();
+  .replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\band\b/g, ' ')                                 // 'Black and White' ≡ 'Black & White' (live miss, 2026-07-22)
+  .replace(/\s+/g, ' ').trim();
 const ourKey = (s) => norm((s ?? '').replace(/^pokemon (japanese |chinese |korean )?/i, ''));
 
 const db = openDb();
@@ -83,14 +85,20 @@ for (const r of [...short, ...unknown].slice(0, detail)) {
     const pool = r.key ? ours[r.jp ? 'jp' : 'en'].get(r.key) : [];
     const ourNums = new Set((pool ?? []).map(c => String(c.number ?? '').toUpperCase().split('/')[0].replace(/^0+(?=\w)/, '')));
     const missing = [];
-    let tpRescuable = 0;
+    let tpRescuable = 0, products = 0;
     for (const c of cards) {
-      const num = String(c.number ?? c.card_number ?? '').toUpperCase().split('/')[0].replace(/^0+(?=\w)/, '');
+      const rawNum = String(c.number ?? c.card_number ?? '').trim();
+      // number 'N/A'/empty = sealed product or accessory — their checklists
+      // include boxes/ETBs/code cards; our spine is a SINGLES database.
+      // Graded separately, never counted as a missing card (live 2026-07-22:
+      // virtually every 'missing' entry was a booster box).
+      if (!rawNum || /^n\/?a$/i.test(rawNum)) { products++; continue; }
+      const num = rawNum.toUpperCase().split('/')[0].replace(/^0+(?=\w)/, '');
       const tp = String(c.image_tcgplayer_id ?? c.tcgplayer_id ?? c.tcgplayerId ?? '');
       const known = (num && ourNums.has(num)) || (tp && tpAttached.has(tp));
-      if (!known) { missing.push(`${c.name ?? '?'} #${c.number ?? '?'}`); if (tp) tpRescuable++; }
+      if (!known) { missing.push(`${c.name ?? '?'} #${rawNum}`); if (tp) tpRescuable++; }
     }
-    console.log(`  ${r.name} (${r.jp ? 'JP' : 'EN'}): ${missing.length}/${cards.length} missing · ${tpRescuable} carry a tcgplayer id (mechanical join) · e.g. ${missing.slice(0, 5).join(' · ')}`);
+    console.log(`  ${r.name} (${r.jp ? 'JP' : 'EN'}): ${missing.length} SINGLES missing of ${cards.length - products} (+${products} sealed/products, out of scope) · ${tpRescuable} w/ tcgplayer id · e.g. ${missing.slice(0, 5).join(' · ') || '(none — fully covered)'}`);
   } catch (e) { console.log(`  ${r.name}: /cards/${r.id} → ${e.message}`); }
 }
 console.log('\n[completeness] read-only. The importer that follows: seed missing checklist entries as identity rows (tcgplayer-id keyed where present).');
