@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { tokens } from '../tokens.js';
-import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
+import { api, fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 
 const th = { textAlign: 'right', padding: '6px 12px', borderBottom: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary, fontWeight: 400, font: `11px ${tokens.font.body}`, whiteSpace: 'nowrap' };
 const thL = { ...th, textAlign: 'left' };

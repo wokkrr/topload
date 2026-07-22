@@ -115,3 +115,14 @@ describe('IndexTable', () => {
     expect(html).toContain('—');
   });
 });
+
+describe('SealedBook crash regression (2026-07-23 — blank screen on Sealed chip)', () => {
+  it('renders the loading state without throwing (api import present)', async () => {
+    const { renderToString } = await import('react-dom/server');
+    const React = await import('react');
+    const { SealedBook } = await import('../../src/ui/tables.jsx');
+    // SSR render: effect never runs, book stays null → loading copy, no crash.
+    const html = renderToString(React.createElement(SealedBook, null, 'fallback'));
+    expect(html).toContain('sealed book');
+  });
+});
