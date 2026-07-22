@@ -50,12 +50,25 @@ console.log(`  api-ish paths: ${apis.slice(0, 8).join(' · ') || '(none in marku
 const cardish = [...page.matchAll(/[^\n]{0,50}(?:"card_?(?:name|number)"|"number":"|"cards":\[)[^\n]{0,160}/gi)].slice(0, 4);
 for (const c of cardish) console.log(`  cardish: ${c[0].trim().slice(0, 190)}`);
 
-// 3. If a JSON API is guessable, try the obvious shapes.
-await new Promise(r => setTimeout(r, 600));
-for (const guess of ['/api/setlists/base-set-pokemon', '/setlists/base-set-pokemon.json']) {
+// 3. The shell is a 3.6KB SPA (live 2026-07-22) — the data endpoint lives in
+//    the JS bundle. Fetch the scripts the shell references and grep them for
+//    endpoint strings.
+const scripts = [...page.matchAll(/<script[^>]+src="([^"]+)"/g)].map(m => m[1]);
+console.log(`\n[collectrip] shell scripts: ${scripts.join(' · ') || '(none)'}`);
+for (const src of scripts.slice(0, 3)) {
+  await new Promise(r => setTimeout(r, 600));
   try {
-    const t = await get(guess);
-    console.log(`\n[collectrip] ${guess} → ${t.length} bytes: ${t.slice(0, 200).replace(/\s+/g, ' ')}`);
-  } catch (e) { console.log(`\n[collectrip] ${guess} → ${e.message}`); }
+    const js = await get(src.startsWith('http') ? src.replace(HOST, '') : src);
+    console.log(`\n[collectrip] bundle ${src} (${js.length} bytes) — endpoint candidates:`);
+    const eps = [...new Set([
+      ...[...js.matchAll(/["'`](\/[a-z0-9_/-]{2,60}(?:api|cards|sets|setlist)[a-z0-9_/${}.-]{0,60})["'`]/gi)].map(m => m[1]),
+      ...[...js.matchAll(/["'`](https?:\/\/[^"'`]{8,110})["'`]/g)].map(m => m[1]).filter(u => /api|supabase|firebase|firestore|graphql|cdn|\.json/i.test(u)),
+    ])];
+    for (const e of eps.slice(0, 20)) console.log(`  ${e}`);
+    // fetch()/axios call sites with a little context
+    for (const m of [...js.matchAll(/[^\n]{0,40}fetch\([^\n]{0,120}/g)].slice(0, 6)) {
+      console.log(`  fetch: ${m[0].replace(/\s+/g, ' ').slice(0, 150)}`);
+    }
+  } catch (e) { console.log(`  bundle fetch failed: ${e.message}`); }
 }
 console.log('\n[collectrip] probe done — read-only.');
