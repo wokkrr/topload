@@ -23,7 +23,11 @@
 import { timedFetch } from '../net.js';
 
 export const BASE = 'https://tcgcsv.com/tcgplayer';
-export const CATEGORY_IDS = { YGO: 2, PKMN: 3, OP: 68 };   // Pokemon Japan (85): phase 2
+// PKMN_JA = TCGplayer's separate "Pokemon Japan" catalog (category 85) —
+// Japanese printings with their own product images and JP-market prices.
+// Promoted 2026-07-22: the art census put Japanese PKMN at the top of the
+// artless-by-value worklist and TCGdex turned out to carry no JA data.
+export const CATEGORY_IDS = { YGO: 2, PKMN: 3, OP: 68, PKMN_JA: 85 };
 
 export const toCents = (d) => (typeof d === 'number' && Number.isFinite(d) && d > 0) ? Math.round(d * 100) : null;
 

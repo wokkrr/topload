@@ -18,6 +18,32 @@ import { CATEGORY_IDS, fetchTcgcsv, mapGroupProducts, normName } from './adapter
 const cardLabel = (name) => (/\[([^\]]+)\]/.exec(name ?? '')?.[1] ?? '').toLowerCase().trim();
 const isSatellite = (id) => /-pc\d+$/.test(id);
 
+// Import targets: which TCGplayer category feeds which slice of the spine.
+// PKMN_JA (category 85) is Japanese printings ONLY — a Japanese product must
+// never attach marks/art to an English row and vice versa (different market,
+// visibly different card), so each PKMN target gets a language-scoped universe.
+export const TARGETS = {
+  YGO: { ip: 'YGO' },
+  PKMN: { ip: 'PKMN', langs: ['English', null] },
+  OP: { ip: 'OP' },
+  PKMN_JA: { ip: 'PKMN', langs: ['Japanese'] },
+};
+
+/**
+ * Card-side set name, normalized for the set gate. PriceCharting console
+ * names carry a franchise prefix and hard truncation ("Pokemon Japanese
+ * Mysterious Mo…") while TCGplayer group names carry code prefixes ("ME04:
+ * Chaos Rising") — stripping the franchise prefix lets containment bridge
+ * both (live 2026-07-22: the unstripped compare left entire new sets and all
+ * of Pokemon Japan unmatched). Falls back to the unstripped form when the
+ * stripped remainder is too short to be evidence.
+ */
+export function cardSetKey(setName) {
+  const n = normName(setName);
+  const stripped = n.replace(/^pokemon (japanese |chinese |korean )?/, '');
+  return stripped.length >= 3 ? stripped : n;
+}
+
 /** 'LOB-EN001' ↔ 'LOB-001' (YGO regional infix), '095/203' → '95' (PKMN collector no). */
 export function numberKey(ip, number) {
   const n = String(number ?? '').trim().toUpperCase();
@@ -46,8 +72,8 @@ export function matchProducts(mapped, cards, ip) {
       const pn = normName(p.name), gs = normName(p.group_name);
       cands = cands.filter(c => normName(c.name) === pn);
       cands = cands.filter(c => {
-        const cs = normName(c.set_name);
-        return cs === gs || cs.includes(gs) || gs.includes(cs);
+        const cs = cardSetKey(c.set_name);
+        return cs && (cs === gs || cs.includes(gs) || gs.includes(cs));
       });
     }
     const en = cands.filter(c => (c.language ?? 'English') === 'English');
@@ -73,7 +99,7 @@ export function markPrice(product, cardName) {
   return row?.market_cents ?? null;
 }
 
-export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP'], asOf, delayMs = 120, maxGroups = Infinity, fetchImpl } = {}) {
+export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'], asOf, delayMs = 120, maxGroups = Infinity, fetchImpl } = {}) {
   const insPrice = db.prepare(
     `INSERT OR REPLACE INTO tcgplayer_prices
      (card_id, subtype, as_of, market_cents, low_cents, mid_cents, high_cents, direct_low_cents, product_id, product_url)
@@ -92,10 +118,16 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP'], asOf, dela
     `UPDATE cards SET image = ?, image_kind = 'tcgplayer' WHERE id = ? AND image IS NULL`);
 
   const summary = {};
-  for (const ip of ips) {
-    const catId = CATEGORY_IDS[ip];
-    if (!catId) continue;
-    const cards = db.prepare(`SELECT id, name, number, set_name, language FROM cards WHERE ip = ?`).all(ip);
+  for (const key of ips) {
+    const catId = CATEGORY_IDS[key];
+    const target = TARGETS[key];
+    if (!catId || !target) continue;
+    const ip = target.ip;
+    let cards = db.prepare(`SELECT id, name, number, set_name, language FROM cards WHERE ip = ?`).all(ip);
+    if (target.langs) {
+      const want = new Set(target.langs.map(l => l ?? 'English'));
+      cards = cards.filter(c => want.has(c.language ?? 'English'));
+    }
     const groups = (await fetchTcgcsv(`/${catId}/groups`, { fetchImpl })).slice(0, maxGroups);
     let products = 0, matched = 0, marks = 0, artFilled = 0, unmatchedSample = [];
     for (const g of groups) {
@@ -129,9 +161,9 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP'], asOf, dela
       db.exec('COMMIT');
       if (delayMs) await new Promise(r => setTimeout(r, delayMs));
     }
-    summary[ip] = { groups: groups.length, products, matched, unmatched: products - matched, marks, artFilled };
-    console.log(`[tcgcsv] ${ip}:`, JSON.stringify(summary[ip]));
-    if (unmatchedSample.length) console.log(`[tcgcsv] ${ip} unmatched sample: ${unmatchedSample.join(' · ')}`);
+    summary[key] = { groups: groups.length, products, matched, unmatched: products - matched, marks, artFilled };
+    console.log(`[tcgcsv] ${key}:`, JSON.stringify(summary[key]));
+    if (unmatchedSample.length) console.log(`[tcgcsv] ${key} unmatched sample: ${unmatchedSample.join(' · ')}`);
   }
   return summary;
 }

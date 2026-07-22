@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { toCents, productLabel, baseName, mapGroupProducts } from '../adapters/tcgcsv.js';
-import { numberKey, matchProducts, markPrice } from '../import-tcgcsv.js';
+import { toCents, productLabel, baseName, mapGroupProducts, CATEGORY_IDS } from '../adapters/tcgcsv.js';
+import { numberKey, matchProducts, markPrice, cardSetKey, TARGETS } from '../import-tcgcsv.js';
 
 // Live shapes captured from tcgcsv.com 2026-07-21 (OP cat 68, group 23213).
 const GROUP = { groupId: 23213, name: 'Awakening of the New Era', abbreviation: 'OP05' };
@@ -120,6 +120,50 @@ describe('art fallback (importTcgcsv e2e with stub fetch)', () => {
     expect(img('op-a')).toEqual({ image: 'https://tcgplayer-cdn.tcgplayer.com/product/11_in_1000x1000.jpg', image_kind: 'tcgplayer' });
     expect(img('op-b')).toEqual({ image: 'https://own/art.png', image_kind: null });   // never overwrite
     expect(img('op-c').image).toBeNull();                                              // label mismatch → honest empty
+  });
+});
+
+describe('cardSetKey — PC console names bridge to TCGplayer group names (2026-07-22)', () => {
+  it('strips the franchise prefix so truncated PC names hit via containment', () => {
+    expect(cardSetKey('Pokemon Chaos Rising')).toBe('chaos rising');
+    expect(cardSetKey('Pokemon Japanese Mysterious Mo')).toBe('mysterious mo');   // PC truncation survives
+    expect(cardSetKey('Holon Phantoms')).toBe('holon phantoms');                  // canonical names untouched
+    expect(cardSetKey('Pokemon Japanese VS')).toBe('pokemon japanese vs');        // too short → unstripped fallback
+  });
+  it('bridges new-set English satellites and Pokemon Japan groups', () => {
+    const prod = (group) => [{
+      product_id: 1, url: 'x', name: 'Lurantis ex', label: '', number: '004/084',
+      group_name: group, group_abbr: '', prices: { Normal: { market_cents: 5000 } },
+    }];
+    const cards = [{ id: 'pk-pc1', name: 'Lurantis ex', number: '4', set_name: 'Pokemon Chaos Rising', language: 'English' }];
+    expect(matchProducts(prod('ME04: Chaos Rising'), cards, 'PKMN').hits.map(h => h.card.id)).toEqual(['pk-pc1']);
+    const ja = [{ id: 'pk-pc2', name: 'Lurantis ex', number: '4', set_name: 'Pokemon Japanese Shiny Treasure', language: 'Japanese' }];
+    expect(matchProducts(prod('SV4a: Shiny Treasure ex'), ja, 'PKMN').hits.map(h => h.card.id)).toEqual(['pk-pc2']);
+  });
+});
+
+describe('PKMN_JA target — Japanese-only universe (category 85)', () => {
+  it('is registered with a language-scoped universe', () => {
+    expect(CATEGORY_IDS.PKMN_JA).toBe(85);
+    expect(TARGETS.PKMN_JA).toEqual({ ip: 'PKMN', langs: ['Japanese'] });
+    expect(TARGETS.PKMN.langs).toContain('English');                 // cat 3 can never touch JP rows
+  });
+  it('e2e: a Japan-category product fills the Japanese row, never its English twin', async () => {
+    const { openDb } = await import('../db.js');
+    const { importTcgcsv } = await import('../import-tcgcsv.js');
+    const db = openDb(':memory:');
+    const ins = db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, image, external_ids) VALUES (?, 'PKMN', ?, ?, ?, ?, NULL, '{}')`);
+    ins.run('pk-en', 'Umbreon ex', 'Prismatic Evolutions', '161', 'English');
+    ins.run('pk-ja', 'Umbreon ex', 'Pokemon Japanese Terastal Fest', '161', 'Japanese');
+    const groups = [{ groupId: 9, name: 'SV8a: Terastal Fest ex', abbreviation: 'SV8a' }];
+    const products = [{ productId: 77, name: 'Umbreon ex - 161/187', url: 'x', extendedData: [{ name: 'Number', value: '161/187' }] }];
+    const prices = [{ productId: 77, subTypeName: 'Normal', marketPrice: 800 }];
+    const stub = async (url) => ({ ok: true, json: async () => url.includes('/groups') ? groups : url.includes('/products') ? products : prices });
+    const res = await importTcgcsv(db, { ips: ['PKMN_JA'], asOf: '2026-07-22', delayMs: 0, fetchImpl: stub });
+    expect(res.PKMN_JA.matched).toBe(1);
+    const img = (id) => db.prepare(`SELECT image, image_kind FROM cards WHERE id = ?`).get(id);
+    expect(img('pk-ja')).toEqual({ image: 'https://tcgplayer-cdn.tcgplayer.com/product/77_in_1000x1000.jpg', image_kind: 'tcgplayer' });
+    expect(img('pk-en').image).toBeNull();                            // EN twin untouched by the JP catalog
   });
 });
 
