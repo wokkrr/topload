@@ -87,14 +87,16 @@ describe('CardsTable (2026-07-21/22 column rework)', () => {
   });
 });
 
-describe('Binder (v1 walking skeleton)', () => {
-  it('renders SSR-safe with no localStorage (empty state + stat header)', async () => {
+describe('Binder (v2 — panels, chart, grid/list)', () => {
+  it('renders SSR-safe with no localStorage (empty state + stat header + view toggles)', async () => {
     const React = (await import('react')).default;
     const { Binder } = await import('../../src/ui/Binder.jsx');
     const html = renderToString(React.createElement(Binder, { onSelect: () => {} }));
+    expect(html).toContain('The Binder');
     expect(html).toContain('Binder value');
     expect(html).toContain('Your Binder is empty');
     expect(html).toContain('Add Card');
+    expect(html).toContain('Holdings');
   });
 });
 

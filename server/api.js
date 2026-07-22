@@ -15,6 +15,7 @@ import { refreshLatestMarks, markTopGrades } from './oracle.js';
 import { findLanguageSiblings } from './language-siblings.js';
 import { getDeals } from './deals.js';
 import { getMovers } from './movers.js';
+import { buildBinderSeries } from './binder.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -158,6 +159,13 @@ app.post('/api/binder/marks', express.json({ limit: '128kb' }), (req, res) => {
       basis: m?.basis ?? null, confidence: m?.confidence ?? null, sales_7d: m?.sales_7d ?? null,
     };
   }));
+});
+
+/** POST /api/binder/series — portfolio value history (see server/binder.js). */
+app.post('/api/binder/series', express.json({ limit: '128kb' }), (req, res) => {
+  const positions = Array.isArray(req.body?.positions) ? req.body.positions : [];
+  const days = Math.min(365, Math.max(7, parseInt(req.body?.days ?? '90', 10) || 90));
+  res.json(buildBinderSeries(db, positions, { days }));
 });
 
 /** GET /api/deals?limit=15 → live asks under the oracle mark (grade-matched, deduped, banded) */

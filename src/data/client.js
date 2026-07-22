@@ -50,6 +50,8 @@ export const api = {
   recentSales: () => get('/api/sales/recent'),
   /** Binder: bulk live values for locally-stored positions */
   binderMarks: (positions) => post('/api/binder/marks', { positions }),
+  /** Binder: portfolio value history (sum of positions' oracle series) */
+  binderSeries: (positions, days = 90) => post('/api/binder/series', { positions, days }),
 };
 
 /** Marketplace display names — no chain/crypto jargon on user surfaces. */
