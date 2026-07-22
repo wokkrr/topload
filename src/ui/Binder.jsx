@@ -22,7 +22,14 @@ const loadPositions = () => {
   try { return JSON.parse(localStorage.getItem(STORE_KEY) ?? '[]'); } catch { return []; }
 };
 const savePositions = (ps) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(ps)); } catch { /* SSR/private mode */ } };
-const loadView = () => { try { return localStorage.getItem(VIEW_KEY) ?? 'grid'; } catch { return 'grid'; } };
+// Default = SHOWCASE (Kaleb, 2026-07-22: art first and foremost). A stored
+// 'binder' pref (the retired wall view) migrates to showcase.
+const loadView = () => {
+  try {
+    const v = localStorage.getItem(VIEW_KEY) ?? 'showcase';
+    return v === 'binder' ? 'showcase' : v;
+  } catch { return 'showcase'; }
+};
 
 const panel = {
   border: `1px solid ${tokens.color.border}`, borderRadius: 0,
@@ -249,12 +256,12 @@ export function Binder({ onSelect }) {
 
       {/* ── Holdings: the binder itself ── */}
       <div style={panel}>
-        <SectionHead title="Holdings" hint={view === 'grid' ? 'the gallery — click a card to inspect it' : view === 'binder' ? 'just the cards — your collection, wall to wall' : 'the ledger — every position, marked'}
+        <SectionHead title="Holdings" hint={view === 'showcase' ? 'your collection — art first' : view === 'grid' ? 'thumbnails — click a card to inspect it' : 'the ledger — every position, marked'}
           right={<>
             <Chip active={adding} onClick={() => setAdding(a => !a)}>{adding ? 'Close' : '+ Add Card'}</Chip>
             <span style={{ width: 1, height: 18, background: tokens.color.border, margin: '0 4px' }} />
-            <Chip active={view === 'grid'} onClick={() => pickView('grid')}><span title="Gallery" style={{ fontSize: 14, lineHeight: 1 }}>⊞</span></Chip>
-            <Chip active={view === 'binder'} onClick={() => pickView('binder')}><span title="Cards only" style={{ fontSize: 14, lineHeight: 1 }}>▦</span></Chip>
+            <Chip active={view === 'showcase'} onClick={() => pickView('showcase')}><span title="Showcase — art first" style={{ fontSize: 14, lineHeight: 1 }}>☐</span></Chip>
+            <Chip active={view === 'grid'} onClick={() => pickView('grid')}><span title="Thumbnails" style={{ fontSize: 14, lineHeight: 1 }}>⊞</span></Chip>
             <Chip active={view === 'list'} onClick={() => pickView('list')}><span title="Ledger" style={{ fontSize: 14, lineHeight: 1 }}>☰</span></Chip>
           </>} />
 
@@ -290,11 +297,11 @@ export function Binder({ onSelect }) {
           </div>
         )}
 
+        {positions.length > 0 && view === 'showcase' && (
+          <BinderShowcase flat={flat} marks={marks} onSelect={setInspect} lastAdded={lastAdded} />
+        )}
         {positions.length > 0 && view === 'grid' && (
           <BinderGrid pages={pages} marks={marks} onSelect={setInspect} lastAdded={lastAdded} />
-        )}
-        {positions.length > 0 && view === 'binder' && (
-          <BinderSleeves flat={flat} marks={marks} onSelect={setInspect} />
         )}
         {positions.length > 0 && view === 'list' && (
           <BinderTable positions={[...shown].sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0))} marks={marks} onSelect={setInspect} />
@@ -550,6 +557,8 @@ function BinderChart({ series, costCents, benchmark }) {
 const GRID_CSS = `
 .tl-binder-card { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; position: relative; }
 .tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.inkMuted}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+.tl-showcase-card { transition: transform .12s ease; }
+.tl-showcase-card:hover { transform: translateY(-3px); }
 @keyframes tl-added-pulse { 0% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 100% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
 .tl-just-added { border-color: ${tokens.color.brass}; animation: tl-added-pulse 1.4s ease-out; }
 `;
@@ -634,38 +643,52 @@ function PageGrid({ ps, marks, onSelect, lastAdded }) {
 }
 
 /**
- * CARDS-ONLY view (Kaleb, 2026-07-22 v2 — the nine-pocket skeuomorph was
- * "way too on the nose"; the IDEA stays): a dense, chrome-free wall of just
- * the cards, in binder order, on the terminal's own surface. The single
- * annotation is a thin franchise-tinted frame (+ a small ★ on favorites).
- * No prices, no names, no panels-within-panels. Iterate from here.
+ * SHOWCASE — the DEFAULT view (Kaleb, 2026-07-22 v3: "the beautiful
+ * collector art first binder view… really just larger card art, rows of 3-6
+ * cards… maybe slight indication of tcg/name/value but really it's art first
+ * and foremost"). Big art, no box around the card — the printed card carries
+ * its own frame; a soft shadow lifts it off the surface like the pop-out.
+ * One quiet caption line: franchise dot · name · value. Binder order
+ * (favorites first), no section headers — pure flow.
  */
-function BinderSleeves({ flat, marks, onSelect }) {
+function BinderShowcase({ flat, marks, onSelect, lastAdded }) {
   if (!flat.length) return null;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(225px, 1fr))', gap: '26px 22px', paddingTop: 4 }}>
+      <style>{GRID_CSS}</style>
       {flat.map(p => {
         const m = marks[posKey(p)];
         const ip = m?.ip ?? p.ip;
-        const edge = tokens.series[ip]?.data ?? tokens.color.border;
+        const dot = tokens.series[ip]?.data;
         return (
-          <div key={posKey(p)} onClick={() => onSelect?.(p)} title={m?.name ?? p.name}
-               onMouseEnter={e => e.currentTarget.style.borderColor = edge}
-               onMouseLeave={e => e.currentTarget.style.borderColor = `${edge}66`}
-               style={{
-                 aspectRatio: '3/4', borderRadius: 6, cursor: 'pointer', position: 'relative',
-                 background: tokens.color.surfaceRaised,
-                 border: `1.5px solid ${edge}66`,
-                 transition: 'border-color .12s ease',
-                 overflow: 'hidden',
-               }}>
+          <div key={posKey(p)} onClick={() => onSelect?.(p)}
+               className={`tl-showcase-card${lastAdded === posKey(p) ? ' tl-just-added' : ''}`}
+               style={{ cursor: 'pointer', position: 'relative' }}>
             {m?.image
               ? <img src={m.image} alt="" loading="lazy" onError={imgFallback}
-                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', padding: 5, boxSizing: 'border-box' }} />
-              : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `9px ${tokens.font.body}`, textAlign: 'center', padding: 6 }}>{(m?.name ?? p.name ?? '').slice(0, 26)}</div>}
+                     style={{
+                       width: '100%', aspectRatio: '3/4', objectFit: 'contain', display: 'block',
+                       filter: 'drop-shadow(0 6px 16px rgba(30,22,10,0.22))',
+                     }} />
+              : <div style={{
+                  width: '100%', aspectRatio: '3/4', borderRadius: 10, boxSizing: 'border-box',
+                  border: `1.5px dashed ${tokens.color.border}`, background: tokens.color.surfaceRaised,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, textAlign: 'center', padding: 12,
+                }}>{m?.name ?? p.name ?? ''}</div>}
             {p.fav && (
-              <span style={{ position: 'absolute', top: 4, right: 6, color: tokens.color.brass, fontSize: 10 }}>★</span>
+              <span style={{ position: 'absolute', top: 6, right: 8, color: tokens.color.brass, fontSize: 13, textShadow: '0 1px 3px rgba(0,0,0,0.35)' }}>★</span>
             )}
+            {/* the one quiet line — art stays the headline */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8, padding: '0 2px' }}>
+              {dot && <span style={{ width: 6, height: 6, borderRadius: 2, background: dot, alignSelf: 'center', flexShrink: 0 }} />}
+              <span style={{ font: `11px ${tokens.font.body}`, color: tokens.color.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {m?.name ?? p.name}{p.grade !== 'raw' ? ` · ${p.grade}` : ''}{p.qty > 1 ? ` ×${p.qty}` : ''}
+              </span>
+              <span style={{ marginLeft: 'auto', font: `11px ${tokens.font.mono}`, color: tokens.color.ink, flexShrink: 0 }}>
+                {m?.price_cents != null ? fmtUsd(m.price_cents * p.qty) : ''}
+              </span>
+            </div>
           </div>
         );
       })}
