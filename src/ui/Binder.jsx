@@ -55,6 +55,10 @@ export function Binder({ onSelect }) {
   const [days, setDays] = useState(30);
   const [view, setView] = useState(loadView);
   const [adding, setAdding] = useState(false);
+  // Card pop-out (Kaleb, 2026-07-22, inspired by pokemon.com's gallery):
+  // clicking a card lifts it out of the page with YOUR numbers beside it;
+  // the full research page is one more click, not the default jump.
+  const [inspect, setInspect] = useState(null);
   useEffect(() => { savePositions(positions); }, [positions]);
   const pickView = (v) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ } };
 
@@ -151,10 +155,19 @@ export function Binder({ onSelect }) {
         )}
 
         {positions.length > 0 && view === 'grid' && (
-          <BinderGrid positions={positions} marks={marks} onSelect={onSelect} onRemove={removePos} />
+          <BinderGrid positions={positions} marks={marks} onSelect={setInspect} onRemove={removePos} />
         )}
         {positions.length > 0 && view === 'list' && (
-          <BinderTable positions={positions} marks={marks} onSelect={onSelect} onRemove={removePos} />
+          <BinderTable positions={positions} marks={marks} onSelect={setInspect} onRemove={removePos} />
+        )}
+
+        {inspect && (
+          <BinderCardModal
+            p={inspect} m={marks[posKey(inspect)]}
+            onClose={() => setInspect(null)}
+            onFull={() => { const id = inspect.card_id; setInspect(null); onSelect?.(id); }}
+            onRemove={() => { removePos(inspect); setInspect(null); }}
+          />
         )}
 
         {positions.length > 0 && totals.priced < positions.length && (
@@ -165,6 +178,86 @@ export function Binder({ onSelect }) {
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * The card pop-out (Kaleb, 2026-07-22, pokemon.com-gallery inspired): the
+ * card lifts out of the binder over a dimmed page, YOUR numbers beside it.
+ * Esc/backdrop closes; FULL RESEARCH is the deliberate second click.
+ */
+const MODAL_CSS = `
+@keyframes tl-pop { from { transform: scale(.94) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+.tl-binder-pop { animation: tl-pop .22s ease-out; }
+`;
+
+function BinderCardModal({ p, m, onClose, onFull, onRemove }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const val = m?.price_cents != null ? m.price_cents * p.qty : null;
+  const pnl = val != null && p.cost_cents != null ? val - p.cost_cents * p.qty : null;
+  const pnlPct = pnl != null && p.cost_cents > 0 ? (pnl / (p.cost_cents * p.qty)) * 100 : null;
+  const d1 = m?.price_cents != null && m?.price_1d ? ((m.price_cents / m.price_1d) - 1) * 100 : null;
+  const row = { display: 'flex', justifyContent: 'space-between', gap: 18, padding: '7px 0', borderBottom: `1px solid ${tokens.color.border}` };
+  const k = { font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted, textTransform: 'uppercase', letterSpacing: '0.06em', alignSelf: 'center' };
+  const v = { font: `13px ${tokens.font.mono}`, color: tokens.color.ink, textTransform: 'uppercase' };
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(20,16,10,0.62)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, backdropFilter: 'blur(2px)',
+    }}>
+      <style>{MODAL_CSS}</style>
+      <div className="tl-binder-pop" onClick={e => e.stopPropagation()} style={{
+        display: 'flex', gap: 26, maxWidth: 860, width: '100%', maxHeight: '86vh',
+        background: tokens.color.surface, border: `1px solid ${tokens.color.brass}`,
+        borderRadius: 10, padding: 22, boxSizing: 'border-box', boxShadow: '0 18px 60px rgba(0,0,0,0.35)',
+      }}>
+        {/* The card itself, as big as the room allows. */}
+        <div style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8 }}>
+          {m?.image
+            ? <img src={m.image} alt="" onError={imgFallback}
+                   style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', display: 'block', padding: 12, boxSizing: 'border-box' }} />
+            : <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, padding: 40 }}>no image yet</div>}
+        </div>
+
+        {/* Your numbers. */}
+        <div style={{ flex: '1 1 54%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+            <div style={{ font: `19px ${tokens.font.display}`, color: tokens.color.ink }}>{m?.name ?? p.name}</div>
+            <span onClick={onClose} title="Close (Esc)" style={{ cursor: 'pointer', color: tokens.color.inkMuted, font: `13px ${tokens.font.mono}` }}>✕</span>
+          </div>
+          <div style={{ font: `11px ${tokens.font.body}`, color: tokens.color.inkMuted, marginBottom: 14 }}>
+            {m?.set_name ?? p.set_name} {m?.number ?? p.number}{langCode(m?.language ?? p.language) !== 'EN' ? ` · ${langCode(m?.language ?? p.language)}` : ''}
+          </div>
+
+          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-end', marginBottom: 14 }}>
+            <Stat label="Position value" big v={fmtUsd(val)} />
+            {pnlPct != null && <Stat label="P&L" v={`${fmtUsd(pnl)} · ${fmtPct(pnlPct)}`} color={pnlColor(pnl)} />}
+          </div>
+
+          <div style={row}><span style={k}>Grade · Qty</span><span style={v}>{p.grade}{p.qty > 1 ? ` × ${p.qty}` : ''}</span></div>
+          <div style={row}><span style={k}>Paid (each)</span><span style={v}>{fmtUsd(p.cost_cents)}</span></div>
+          <div style={row} title={m?.basis ? (m.basis === 'solds' ? 'Value from real sales' : 'Estimated value') : undefined}>
+            <span style={k}>Oracle (each)</span><span style={v}>{fmtUsd(m?.price_cents)}{m?.basis ? ` · ${m.basis === 'solds' ? 'real sales' : 'estimate'}` : ''}</span>
+          </div>
+          <div style={row}><span style={k}>Today</span><span style={{ ...v, color: pnlColor(d1) }}>{fmtPct(d1)}</span></div>
+          <div style={row}><span style={k}>Added</span><span style={v}>{p.added_at ?? '—'}</span></div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 18, flexWrap: 'wrap' }}>
+            <Chip active onClick={onFull}>Full Research →</Chip>
+            <Chip onClick={onClose}>Close</Chip>
+            <span style={{ marginLeft: 'auto' }}>
+              <Chip onClick={onRemove}>Remove</Chip>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -290,7 +383,7 @@ function PageGrid({ ps, marks, onSelect, onRemove }) {
         const val = m?.price_cents != null ? m.price_cents * p.qty : null;
         const pnlPct = val != null && p.cost_cents > 0 ? ((val / (p.cost_cents * p.qty)) - 1) * 100 : null;
         return (
-          <div key={posKey(p)} className="tl-binder-card" onClick={() => onSelect?.(p.card_id)}
+          <div key={posKey(p)} className="tl-binder-card" onClick={() => onSelect?.(p)}
                title={m?.name ?? p.name}
                style={{
                  border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
@@ -353,7 +446,7 @@ function BinderTable({ positions, marks, onSelect, onRemove }) {
           const pnlPct = pnl != null && p.cost_cents > 0 ? (pnl / (p.cost_cents * p.qty)) * 100 : null;
           const d1 = m?.price_cents != null && m?.price_1d ? ((m.price_cents / m.price_1d) - 1) * 100 : null;
           return (
-            <tr key={posKey(p)} style={{ cursor: 'pointer' }} onClick={() => onSelect?.(p.card_id)}>
+            <tr key={posKey(p)} style={{ cursor: 'pointer' }} onClick={() => onSelect?.(p)}>
               <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}>
                 <Thumb src={m?.image} size={34} />
                 <span>{m?.name ?? p.name} <span style={{ color: tokens.color.inkMuted }}>· {m?.set_name ?? p.set_name} {m?.number ?? p.number}</span></span>
