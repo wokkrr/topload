@@ -59,23 +59,21 @@ function Spark({ points, up }) {
 }
 
 /**
- * One mover — made VISUAL (Kaleb, 2026-07-21: "show how much a certain card
- * has climbed"): magnitude bar under the row scaled to the day's biggest
- * move, 14-day sparkline, bold Δ. maxPct comes from the parent so bars are
- * comparable across the list.
+ * One mover — visual, but no magnitude wash. The row-width bar scaled to the
+ * day's biggest move failed exactly when the list was busiest: clustered
+ * moves pegged every bar at ~100% and the panel became a green wall (Kaleb,
+ * 2026-07-22). Rank + sparkline + the bold Δ carry the signal; a thin left
+ * accent gives direction at a glance.
  */
-function MoverRow({ m, maxPct, onSelect }) {
+function MoverRow({ m, onSelect }) {
   const up = (m.change_pct ?? 0) >= 0;
-  const mag = maxPct ? Math.min(1, Math.abs(m.change_pct ?? 0) / maxPct) : 0;
+  const accent = m.change_pct == null ? tokens.color.border : up ? tokens.color.up : tokens.color.down;
   return (
     <div onClick={() => onSelect?.(m.card_id)} style={{
-      position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px',
-      borderTop: `1px solid ${tokens.color.border}`, cursor: 'pointer', minWidth: 0, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px 8px 9px',
+      borderTop: `1px solid ${tokens.color.border}`, boxShadow: `inset 3px 0 0 ${accent}`,
+      cursor: 'pointer', minWidth: 0, overflow: 'hidden',
     }}>
-      <span style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: `${mag * 100}%`,
-        background: up ? tokens.color.up : tokens.color.down, opacity: 0.08, pointerEvents: 'none',
-      }} />
       <Thumb src={m.image} size={34} />
       <span style={{
         flex: 'none', width: 8, height: 8, borderRadius: 2,
@@ -235,11 +233,7 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
       <div style={{ ...panel, height: '100%' }}>
         <SectionHead title="Movers · 24h" hint="biggest one-day moves among cards with live marks" />
         {movers?.length
-          ? (() => {
-              const top = movers.slice(0, 8);
-              const maxPct = Math.max(...top.map(m => Math.abs(m.change_pct ?? 0)), 0.01);
-              return top.map(m => <MoverRow key={`${m.card_id}|${m.grade}`} m={m} maxPct={maxPct} onSelect={onSelect} />);
-            })()
+          ? movers.slice(0, 8).map(m => <MoverRow key={`${m.card_id}|${m.grade}`} m={m} onSelect={onSelect} />)
           : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '8px 2px' }}>no movers yet — marks refresh with each ingest</div>}
       </div>
         </div>
@@ -269,20 +263,21 @@ function DealsPanel({ onOpenListing, onSelect }) {
       No qualifying deals right now — the radar only fires on grade-matched marks with real confidence, so quiet is honest.
     </div>;
   }
-  const maxDisc = Math.max(...deals.map(d => d.discount), 0.01);
   return (
     <div>
+      {/* No magnitude wash (same fix as Movers, Kaleb 2026-07-22): clustered
+          discounts pegged every row-bar at ~full width. Rank + the bold −%
+          carry it; solds-backed rows get the green accent, estimates stay
+          neutral — the accent now encodes mark QUALITY, not size. */}
       {deals.map((d, i) => (
         <div key={`${d.platform}|${d.external_id}`}
              onClick={() => onOpenListing ? onOpenListing({ platform: d.platform, external_id: d.external_id }) : onSelect?.(d.card_id)}
              style={{
-               position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '8px 6px',
-               borderTop: `1px solid ${tokens.color.border}`, cursor: 'pointer', minWidth: 0, overflow: 'hidden',
+               display: 'flex', alignItems: 'center', gap: 12, padding: '8px 6px 8px 9px',
+               borderTop: `1px solid ${tokens.color.border}`,
+               boxShadow: `inset 3px 0 0 ${d.basis === 'solds' ? tokens.color.up : tokens.color.border}`,
+               cursor: 'pointer', minWidth: 0, overflow: 'hidden',
              }}>
-          <span style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(d.discount / maxDisc) * 100}%`,
-            background: tokens.color.up, opacity: 0.07, pointerEvents: 'none',
-          }} />
           <span style={{ flex: 'none', width: 18, textAlign: 'right', color: tokens.color.inkMuted, font: `11px ${tokens.font.mono}` }}>{i + 1}</span>
           <Thumb src={d.image} size={34} />
           <span style={{ flex: '1 1 auto', minWidth: 0 }}>
