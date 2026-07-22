@@ -57,11 +57,17 @@ const tiltMove = (e) => {
   if (REDUCED_MOTION) return;
   const el = e.currentTarget;
   const r = el.getBoundingClientRect();
-  const px = (e.clientX - r.left) / r.width - 0.5;
-  const py = (e.clientY - r.top) / r.height - 0.5;
-  el.style.transform = `perspective(700px) rotateX(${(-py * 6).toFixed(2)}deg) rotateY(${(px * 7).toFixed(2)}deg) translateY(-2px)`;
+  const px = (e.clientX - r.left) / r.width;
+  const py = (e.clientY - r.top) / r.height;
+  el.style.transform = `perspective(700px) rotateX(${(-(py - 0.5) * 6).toFixed(2)}deg) rotateY(${((px - 0.5) * 7).toFixed(2)}deg) translateY(-2px)`;
+  const g = el.querySelector('.tl-shine');
+  if (g) g.style.background = `radial-gradient(circle at ${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%, rgba(255,255,255,0.15), rgba(212,175,55,0.05) 38%, transparent 62%)`;
 };
-const tiltLeave = (e) => { e.currentTarget.style.transform = ''; };
+const tiltLeave = (e) => {
+  e.currentTarget.style.transform = '';
+  const g = e.currentTarget.querySelector('.tl-shine');
+  if (g) g.style.background = 'none';
+};
 // Pop-out gloss (Kaleb, 2026-07-22): a soft light source that follows the
 // cursor across the big card — the desk-lamp reflection — plus a gentler
 // tilt than the grid tiles (it's a bigger object in the hand).
@@ -71,9 +77,11 @@ const glossMove = (e) => {
   const r = el.getBoundingClientRect();
   const px = (e.clientX - r.left) / r.width;
   const py = (e.clientY - r.top) / r.height;
-  el.style.transform = `perspective(900px) rotateX(${(-(py - 0.5) * 4).toFixed(2)}deg) rotateY(${((px - 0.5) * 5).toFixed(2)}deg)`;
+  el.style.transform = `perspective(900px) rotateX(${(-(py - 0.5) * 7).toFixed(2)}deg) rotateY(${((px - 0.5) * 8).toFixed(2)}deg)`;
   const g = el.querySelector('.tl-gloss');
-  if (g) g.style.background = `radial-gradient(circle at ${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%, rgba(255,255,255,0.15), rgba(255,255,255,0.04) 34%, transparent 58%)`;
+  if (g) g.style.background =
+    `radial-gradient(circle at ${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%, rgba(255,255,255,0.20), rgba(255,255,255,0.05) 32%, transparent 56%), ` +
+    `linear-gradient(${(95 + (px - 0.5) * 40).toFixed(1)}deg, transparent ${(30 + px * 14).toFixed(1)}%, rgba(212,175,55,0.10) ${(44 + px * 14).toFixed(1)}%, transparent ${(58 + px * 14).toFixed(1)}%)`;
 };
 const glossLeave = (e) => {
   e.currentTarget.style.transform = '';
@@ -454,13 +462,7 @@ function BinderChart({ series, costCents }) {
 const GRID_CSS = `
 .tl-binder-card { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; position: relative; }
 .tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.brass}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
-.tl-binder-card .tl-shine { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.tl-binder-card .tl-shine::after {
-  content: ''; position: absolute; inset: -20%;
-  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.17) 47%, rgba(212,175,55,0.09) 53%, transparent 62%);
-  transform: translateX(-130%); transition: transform .95s ease-in-out;
-}
-.tl-binder-card:hover .tl-shine::after { transform: translateX(130%); }
+.tl-binder-card .tl-shine { position: absolute; inset: 0; pointer-events: none; }
 @keyframes tl-added-pulse { 0% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 100% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
 .tl-just-added { border-color: ${tokens.color.brass}; animation: tl-added-pulse 1.4s ease-out; }
 `;
