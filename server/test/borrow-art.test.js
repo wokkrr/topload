@@ -21,6 +21,10 @@ function makeDb() {
   // Descriptive bracket: Gold Star IS the card at that number (2026-07-22)
   ins.run('pkmn-hp-104', 'PKMN', 'Pikachu Star', 'Holon Phantoms', '104', 'English', 'https://img/hp-104.png', null);
   ins.run('pkmn-pc5', 'PKMN', 'Pikachu [Gold Star]', 'Pokemon Holon Phantoms', '104', 'English', null, null);
+  // Quality tiering: a PC product photo gets UPGRADED to the sibling's
+  // official scan; a tcgplayer scan does not (exact-printing wins).
+  ins.run('pkmn-pc6', 'PKMN', 'Charizard [Shadowless]', 'Pokemon Base Set', '4', 'English', 'https://pc-photo/x.jpg', 'pricecharting');
+  ins.run('pkmn-pc7', 'PKMN', 'Charizard [Unlimited]', 'Pokemon Base Set', '4', 'English', 'https://tcg/scan.jpg', 'tcgplayer');
   return db;
 }
 
@@ -28,13 +32,15 @@ describe('borrowArt', () => {
   it('borrows same-artwork variants, skips different-art variants, never crosses language', () => {
     const db = makeDb();
     const res = borrowArt(db);
-    expect(res).toMatchObject({ borrowed: 3, skippedVariant: 1 });
+    expect(res).toMatchObject({ borrowed: 4, skippedVariant: 1 });
     expect(res.unmatched).toBeGreaterThanOrEqual(1);     // the JP Pikachu
 
     const img = (id) => db.prepare(`SELECT image, image_kind FROM cards WHERE id = ?`).get(id);
     expect(img('pkmn-pc1')).toEqual({ image: 'https://img/base1-4.png', image_kind: 'borrowed' });
     expect(img('op-pc1')).toEqual({ image: 'https://img/op01-001.png', image_kind: 'borrowed' });
     expect(img('pkmn-pc5')).toEqual({ image: 'https://img/hp-104.png', image_kind: 'borrowed' });   // [Gold Star] ← canonical Star
+    expect(img('pkmn-pc6')).toEqual({ image: 'https://img/base1-4.png', image_kind: 'borrowed' });  // PC photo → upgraded to official scan
+    expect(img('pkmn-pc7')).toEqual({ image: 'https://tcg/scan.jpg', image_kind: 'tcgplayer' });    // tcgplayer scan untouched
     expect(img('pkmn-pc2').image).toBeNull();            // alt art stays honest-empty
     expect(img('pkmn-pc3').image).toBeNull();            // EN art never labeled as JP printing
   });
@@ -42,7 +48,7 @@ describe('borrowArt', () => {
   it('dry run reports without writing', () => {
     const db = makeDb();
     const res = borrowArt(db, { dry: true });
-    expect(res.borrowed).toBe(3);
+    expect(res.borrowed).toBe(4);
     expect(db.prepare(`SELECT image FROM cards WHERE id = 'pkmn-pc1'`).get().image).toBeNull();
   });
 

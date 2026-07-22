@@ -89,7 +89,9 @@ export function makeCollectorCryptAdapter({
   };
 }
 
-const COMPANY_ALIASES = { BECKETT: 'BGS' };
+// CGCTRADINGCARDS: a platform spelled the company 'CGC Trading Cards' and the
+// stripper kept the whole string — live grade census, 2026-07-22.
+const COMPANY_ALIASES = { BECKETT: 'BGS', CGCTRADINGCARDS: 'CGC', CGCCARDS: 'CGC' };
 
 /** 'PSA' + 10 → 'PSA10'; 'Beckett' + 9.5 → 'BGS9.5'; missing → 'raw'. */
 export function normalizeGrade(company, gradeNum) {

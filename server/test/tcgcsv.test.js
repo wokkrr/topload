@@ -178,3 +178,25 @@ describe('markPrice', () => {
     expect(markPrice({ prices: { Foil: { market_cents: 900 } } }, 'Pikachu')).toBe(900);
   });
 });
+
+describe('art quality tiering (2026-07-22 — "match higher quality card art")', () => {
+  it('a tcgplayer scan replaces a pricecharting photo, never official/borrowed art', async () => {
+    const { openDb } = await import('../db.js');
+    const { importTcgcsv } = await import('../import-tcgcsv.js');
+    const db = openDb(':memory:');
+    const ins = db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, image, image_kind, external_ids) VALUES (?, 'OP', ?, 's', ?, 'English', ?, ?, '{}')`);
+    ins.run('op-a', 'Sabo', 'OP05-001', 'https://pc-photo/a.jpg', 'pricecharting');   // upgraded
+    ins.run('op-b', 'Monkey.D.Luffy', 'OP05-119', 'https://official/b.png', null);   // untouched
+    const groups = [{ groupId: 1, name: 'Awakening', abbreviation: 'OP05' }];
+    const products = [
+      { productId: 21, name: 'Sabo (001)', url: 'x', extendedData: [{ name: 'Number', value: 'OP05-001' }] },
+      { productId: 22, name: 'Monkey.D.Luffy (119)', url: 'x', extendedData: [{ name: 'Number', value: 'OP05-119' }] },
+    ];
+    const prices = products.map(p => ({ productId: p.productId, subTypeName: 'Normal', marketPrice: 5 }));
+    const stub = async (url) => ({ ok: true, json: async () => url.includes('/groups') ? groups : url.includes('/products') ? products : prices });
+    await importTcgcsv(db, { ips: ['OP'], asOf: '2026-07-22', delayMs: 0, fetchImpl: stub });
+    const img = (id) => db.prepare(`SELECT image, image_kind FROM cards WHERE id = ?`).get(id);
+    expect(img('op-a')).toEqual({ image: 'https://tcgplayer-cdn.tcgplayer.com/product/21_in_1000x1000.jpg', image_kind: 'tcgplayer' });
+    expect(img('op-b')).toEqual({ image: 'https://official/b.png', image_kind: null });
+  });
+});

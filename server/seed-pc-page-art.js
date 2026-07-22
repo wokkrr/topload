@@ -16,6 +16,12 @@
  * page per product, honors a robots.txt Disallow on /game/ by refusing to
  * run (reported, not silently skipped).
  *
+ * QUALITY TIER: BOTTOM (their images are product photos, quality varies —
+ * Kaleb 2026-07-22: "some of the card art is very poor low quality"). This
+ * layer only ever fills NULL; tcgplayer scans and borrowed official art
+ * REPLACE 'pricecharting' images as their coverage grows — a PC photo is a
+ * placeholder that heals into a scan, never a permanent fixture.
+ *
  *   node server/seed-pc-page-art.js --probe          # 3 known ids: URL form + og:image shape + robots verdict
  *   node server/seed-pc-page-art.js --dry --limit=20 # resolve URLs, report, no fetch-writes
  *   node server/seed-pc-page-art.js --ip=PKMN --limit=500

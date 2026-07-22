@@ -111,11 +111,17 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'],
     `UPDATE cards SET external_ids = json_set(COALESCE(external_ids, '{}'), '$.tcgplayer', ?) WHERE id = ?`);
   // Art fallback (Kaleb, 2026-07-21: "work down the chase high value cards for
   // Pokemon and yugioh that don't have card art"): TCGplayer's product image
-  // IS the exact printing — clean scans, correct variant. Fills ONLY artless
-  // cards, and ONLY when the variant label matches EXACTLY (a loosely-matched
-  // mark is fine; a loosely-matched IMAGE is visibly wrong art).
+  // IS the exact printing — clean scans, correct variant. Fills artless cards,
+  // and ONLY when the variant label matches EXACTLY (a loosely-matched mark is
+  // fine; a loosely-matched IMAGE is visibly wrong art).
+  // QUALITY TIERING (Kaleb, 2026-07-22: "some of the card art is very poor low
+  // quality… match higher quality card art"): a clean TCGplayer scan may also
+  // REPLACE a 'pricecharting' product photo (the lowest tier — often a phone
+  // shot); it never touches official/variant/borrowed art. The stack heals
+  // upward as coverage grows.
   const fillArt = db.prepare(
-    `UPDATE cards SET image = ?, image_kind = 'tcgplayer' WHERE id = ? AND image IS NULL`);
+    `UPDATE cards SET image = ?, image_kind = 'tcgplayer'
+     WHERE id = ? AND (image IS NULL OR image_kind = 'pricecharting')`);
   // Relevant-data enrichment (Kaleb, 2026-07-22): the set's release date rides
   // every tcgcsv group (publishedOn) — never stored until now. COALESCE: first
   // writer wins, better sources (per-product PC dates) are not overwritten.

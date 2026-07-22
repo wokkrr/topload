@@ -43,12 +43,17 @@ export function borrowArt(db, { dry = false } = {}) {
     (donorsByIp[c.ip] ??= []).push(c);
     donorById.set(c.id, c);
   }
+  // Quality tiering (Kaleb, 2026-07-22): a borrowed OFFICIAL scan also
+  // upgrades a 'pricecharting' product photo (lowest tier). It never replaces
+  // a tcgplayer scan — that one shows the EXACT printing.
   const targets = db.prepare(
     `SELECT id, ip, name, number, set_name, language FROM cards
-     WHERE image IS NULL AND id LIKE '%-pc%'`
+     WHERE (image IS NULL OR image_kind = 'pricecharting') AND id LIKE '%-pc%'`
   ).all();
 
-  const upd = db.prepare(`UPDATE cards SET image = ?, image_kind = 'borrowed' WHERE id = ?`);
+  const upd = db.prepare(
+    `UPDATE cards SET image = ?, image_kind = 'borrowed'
+     WHERE id = ? AND (image IS NULL OR image_kind = 'pricecharting')`);
   const res = { targets: targets.length, eligible: 0, borrowed: 0, skippedVariant: 0, unmatched: 0, samples: [] };
 
   for (const t of targets) {
