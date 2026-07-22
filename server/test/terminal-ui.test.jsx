@@ -50,6 +50,36 @@ describe('isSealed', () => {
   });
 });
 
+describe('CardsTable (2026-07-21 column rework)', () => {
+  it('shows Lang + Oracle + Sales/7D + spelled-out Source; drops Δ30D/Conf/Basis columns', async () => {
+    const React = (await import('react')).default;
+    const { CardsTable, langCode } = await import('../../src/ui/tables.jsx');
+    const cards = [
+      { card_id: 'a', ip: 'PKMN', name: 'Umbreon VMAX', set_name: 'Evolving Skies', number: '215',
+        language: 'English', grade: 'BGS10', grades_tracked: 4, price_cents: 4595500,
+        change_1d_pct: 0, sales_7d: 3, confidence: 0.7, basis: 'external', source: 'pricecharting' },
+      { card_id: 'b', ip: 'PKMN', name: 'Umbreon VMAX', set_name: 'Evolving Skies JA', number: '215',
+        language: 'Japanese', grade: 'BGS10', grades_tracked: 2, price_cents: 4595500,
+        change_1d_pct: null, sales_7d: null, confidence: 0.85, basis: 'solds', source: null },
+    ];
+    const html = renderToString(React.createElement(CardsTable, { cards, onSelect: () => {} }));
+    expect(html).toContain('Oracle');            // Mark renamed
+    expect(html).toContain('>EN<');              // language column, both codes
+    expect(html).toContain('>JP<');
+    expect(html).toContain('PriceCharting');     // source spelled out…
+    expect(html).toContain('solds');             // …solds stays solds
+    expect(html).not.toContain('EXT·');          // cryptic basis gone
+    expect(html).not.toContain('Δ30D');          // dead columns dropped
+  });
+  it('langCode maps known languages and degrades sanely', async () => {
+    const { langCode } = await import('../../src/ui/tables.jsx');
+    expect(langCode('English')).toBe('EN');
+    expect(langCode('Japanese')).toBe('JP');
+    expect(langCode(null)).toBe('EN');           // catalog default
+    expect(langCode('Klingon')).toBe('KL');      // unknown → first two letters
+  });
+});
+
 describe('IndexTable', () => {
   it('renders uneven series without crashing (shorter index shows dashes)', async () => {
     const { renderToString } = await import('react-dom/server');

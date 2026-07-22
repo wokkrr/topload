@@ -208,7 +208,9 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
 
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%', marginTop: 24 }}>
         <thead><tr>
-          <th style={thL}>Grade</th><th style={th}>Mark</th><th style={th}>Δ1D</th><th style={th}>Δ30D</th>
+          {/* 'Oracle' = the mark, renamed terminal-wide (Kaleb, 2026-07-21).
+              Δ30D/Conf/Basis stay HERE — the card page is the deep dive. */}
+          <th style={thL}>Grade</th><th style={th} title="The Topload price oracle — one fair-value mark per card + grade, blended from recorded sales and external market data">Oracle</th><th style={th}>Δ1D</th><th style={th}>Δ30D</th>
           <th style={th}>Sales/7D</th><th style={th}>Conf</th><th style={thL}>Basis</th>
         </tr></thead>
         <tbody>

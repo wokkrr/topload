@@ -216,7 +216,7 @@ app.get('/api/cards', (req, res) => {
     SELECT o.*, c2.image AS card_image, c2.image_kind AS card_kind,
            (SELECT g.image FROM gacha_listings g WHERE g.card_id = o.card_id AND g.image IS NOT NULL LIMIT 1) AS listing_photo
     FROM (
-      SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number,
+      SELECT c.ip, c.id AS card_id, c.name, c.set_name, c.number, c.language,
              lm.grade, lm.price_cents, lm.confidence, lm.basis, lm.source, lm.sales_7d,
              lm.price_1d, lm.price_30d, lm.grades_tracked
       FROM latest_marks lm

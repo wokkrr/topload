@@ -33,6 +33,26 @@ const Conf = ({ c }) => (
   <span style={{ color: c >= 0.6 ? tokens.color.ink : c >= 0.4 ? tokens.color.inkSecondary : tokens.color.inkMuted }}>{(c * 100).toFixed(0)}</span>
 );
 
+// 'Mark' renamed 'Oracle' across every table (Kaleb, 2026-07-21: "you choose
+// what best describes it") — it's the price the oracle publishes, and the term
+// already lives in the product copy ("price oracle mark", "solds-backed mark").
+const ORACLE_HINT = 'The Topload price oracle — one fair-value mark per card + grade, blended from recorded sales and external market data';
+
+const LANG_CODES = { English: 'EN', Japanese: 'JP', Korean: 'KR', Chinese: 'CN', German: 'DE', French: 'FR', Italian: 'IT', Spanish: 'ES', Portuguese: 'PT' };
+export const langCode = (l) => LANG_CODES[l] ?? (l ? l.slice(0, 2).toUpperCase() : 'EN');
+
+// Where an external mark comes from, spelled out — 'EXT·PRIC' told nobody
+// anything (Kaleb, 2026-07-21). Confidence rides in the tooltip.
+const SOURCE_LABELS = { pricecharting: 'PriceCharting', tcgplayer: 'TCGplayer' };
+const MarkSource = ({ basis, source, confidence }) => {
+  const conf = confidence != null ? ` · confidence ${(confidence * 100).toFixed(0)}/100` : '';
+  return basis === 'solds'
+    ? <span style={{ color: tokens.color.up }} title={`Mark backed by recorded sales${conf}`}>solds</span>
+    : <span style={{ color: tokens.color.inkSecondary }} title={`Estimated from ${SOURCE_LABELS[source] ?? source ?? 'external'} market data — no recorded sales yet${conf}`}>
+        {SOURCE_LABELS[source] ?? source ?? '—'}
+      </span>;
+};
+
 // A failed image load degrades to this transparent pixel — the styled frame
 // stays, the browser's broken-image icon never shows.
 export const BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -86,7 +106,7 @@ export function MoversTable({ movers, onSelect }) {
   return (
     <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
       <thead><tr>
-        <th style={thL}>Card</th><th style={thL}>Grade</th><th style={th}>Mark</th>
+        <th style={thL}>Card</th><th style={thL}>Grade</th><th style={th} title={ORACLE_HINT}>Oracle</th>
         <th style={th}>Δ1D</th><th style={th}>Sales/7D</th><th style={th}>Conf</th>
       </tr></thead>
       <tbody>
@@ -124,7 +144,7 @@ export function BasketTable({ basket, onSelect, maxHeight = 440 }) {
     <div style={{ ...(maxHeight ? { maxHeight, overflowY: 'auto' } : {}), border: `1px solid ${tokens.color.border}`, borderRadius: 6 }}>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
         <thead><tr>
-          <th style={thSL}>#</th><th style={thSL}>Card</th><th style={thSL}>Grade</th><th style={thS}>Weight</th><th style={thS}>Mark</th>
+          <th style={thSL}>#</th><th style={thSL}>Card</th><th style={thSL}>Grade</th><th style={thS}>Weight</th><th style={thS} title={ORACLE_HINT}>Oracle</th>
           <th style={thS}>Sales/7D</th><th style={thS}>$Vol/wk</th><th style={thS}>Δ1D</th><th style={thS}>Δ30D</th><th style={thS}>Conf</th>
         </tr></thead>
         <tbody>
@@ -155,13 +175,23 @@ export function BasketTable({ basket, onSelect, maxHeight = 440 }) {
   );
 }
 
+/**
+ * Card Database lookup. Column rework (Kaleb, 2026-07-21): Δ30D/Conf/Basis
+ * were dead weight while history builds (all '—', all '70', all 'EXT·PRIC') —
+ * replaced with columns that answer real questions today: LANG (an EN and a
+ * JP copy of the same card are different assets at the same price — the
+ * screenshot's "duplicate" rows), Sales/7D (is there an exit?), and a
+ * spelled-out mark Source with confidence in the tooltip.
+ */
 export function CardsTable({ cards, onSelect }) {
   if (!cards?.length) return <Empty label="card" />;
   return (
     <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
       <thead><tr>
-        <th style={thL}>Card</th><th style={thL}>Grade</th><th style={th}>Mark</th>
-        <th style={th}>Δ1D</th><th style={th}>Δ30D</th><th style={th}>Conf</th><th style={thL}>Basis</th>
+        <th style={thL}>Card</th><th style={thL}>Lang</th><th style={thL}>Grade</th>
+        <th style={th} title={ORACLE_HINT}>Oracle</th>
+        <th style={th}>Δ1D</th><th style={th} title="Recorded sales in the last 7 days — liquidity at a glance">Sales/7D</th>
+        <th style={thL} title="Where the oracle mark comes from">Source</th>
       </tr></thead>
       <tbody>
         {cards.map(c => (
@@ -170,15 +200,19 @@ export function CardsTable({ cards, onSelect }) {
                 (Kaleb, 2026-07-21). A desk-style thumbnail GRID view is the
                 future home for browsing the database visually. */}
             <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}><IpDot ip={c.ip} /><span>{c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number}</span></span></td>
+            {/* EN is the quiet default; anything else is the detail that
+                explains why two rows can share a name and a price. */}
+            <td style={{ ...td, textAlign: 'left' }} title={c.language ?? 'English'}>
+              <span style={{ color: langCode(c.language) === 'EN' ? tokens.color.inkMuted : tokens.color.ink }}>{langCode(c.language)}</span>
+            </td>
             {/* One row per card: top-value grade shown; the count hints at the
                 full ladder waiting on the card page. */}
             <td style={tdL}>{c.grade}{c.grades_tracked > 1 && <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}` }}> +{c.grades_tracked - 1}</span>}</td>
             <td style={td}>{fmtUsd(c.price_cents)}</td>
             <td style={td}><Delta pct={c.change_1d_pct} /></td>
-            <td style={td}><Delta pct={c.change_30d_pct} /></td>
-            <td style={td}><Conf c={c.confidence} /></td>
-            <td style={{ ...tdL, color: c.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
-              {c.basis === 'solds' ? 'solds' : `ext·${(c.source ?? '?').slice(0, 4)}`}
+            <td style={td}>{c.sales_7d ?? '—'}</td>
+            <td style={{ ...tdL, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
+              <MarkSource basis={c.basis} source={c.source} confidence={c.confidence} />
             </td>
           </tr>
         ))}
