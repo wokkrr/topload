@@ -71,6 +71,9 @@ export function splitProductName(productName) {
   return { name: s, number: null };
 }
 
+/** '[Regional Championships Staff]' etc. → normalized variant label; '' = base. */
+export const labelOf = (s) => (/\[([^\]]+)\]/.exec(s ?? '')?.[1] ?? '').toLowerCase().trim();
+
 export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 200 }) {
   const rows = parseCsv(text);
   const existing = db.prepare(
@@ -104,9 +107,15 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
     const { name, number } = splitProductName(row['product-name']);
     const setName = (row['console-name'] ?? '').trim();
 
-    // Merge with an existing (e.g. pokemontcg-seeded) card when possible.
+    // Merge with an existing (e.g. pokemontcg-seeded) card when possible —
+    // but ONLY when the variant label agrees (Kaleb, 2026-07-22: canonical
+    // Dawn #87 was wearing the [Regional Championships Staff] promo's $585
+    // mark — a bracketed PC product must never claim an unbracketed base
+    // card; those promos are DISTINCT printings and stay satellites).
     let cardId = null;
-    const hit = matchListing(`${row['product-name']} ${setName}`, existing.filter(c => !matchedExisting.has(c.id)));
+    const label = labelOf(row['product-name']);
+    const hit = matchListing(`${row['product-name']} ${setName}`,
+      existing.filter(c => !matchedExisting.has(c.id) && labelOf(c.name) === label));
     if (hit) { cardId = hit; matchedExisting.add(hit); attachPc.run(String(row.id), hit); merged++; }
     else {
       cardId = `${ip.toLowerCase()}-pc${row.id}`;
