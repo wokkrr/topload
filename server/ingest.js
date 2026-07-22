@@ -221,6 +221,27 @@ async function runLive(db, today) {
     }
   }
 
+  // 2d. PC page-art nightly (2026-07-22: the layer proved out — ~800 vintage
+  //     fills incl. Illustrator Pikachu on its first working pass). A modest
+  //     value-sorted slice per night keeps grinding the artless tail without
+  //     one-shots. Robots-respecting + 12-page self-abort inside; runs after
+  //     the CSV import so freshly-created satellites are name-mappable.
+  //     PC_PAGE_ART_NIGHTLY=0 turns it off; _LIMIT tunes the nightly cap.
+  if (!freshSkip && process.env.PC_PAGE_ART_NIGHTLY !== '0') {
+    try {
+      const { fillPageArt } = await import('./seed-pc-page-art.js');
+      summary.pageArt = await fillPageArt(db, {
+        ips: (process.env.PC_PAGE_ART_IPS ?? 'PKMN,OP').split(','),
+        limit: Number(process.env.PC_PAGE_ART_LIMIT ?? 250),
+        delayMs: Number(process.env.PC_PAGE_ART_DELAY_MS ?? 1500),
+      });
+      console.log(`[ingest] pc page-art: ${JSON.stringify(summary.pageArt)}`);
+    } catch (e) {
+      rollback();
+      console.warn(`[ingest] pc page-art failed: ${e.message}`);
+    }
+  }
+
   // 3. Gacha listings: Collector Crypt current listings (asking prices → aggregator only).
   try {
     const cc = makeCollectorCryptAdapter();
