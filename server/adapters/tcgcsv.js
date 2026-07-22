@@ -33,8 +33,18 @@ export function productLabel(name) {
   return parens.filter(p => !/^\d+[a-z]?$/i.test(p)).join(' ').toLowerCase().trim();
 }
 
-/** Product display name without any parentheticals: 'Sabo (001) (Alternate Art)' → 'Sabo'. */
-export const baseName = (name) => (name ?? '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+/**
+ * Product display name without any parentheticals: 'Sabo (001) (Alternate
+ * Art)' → 'Sabo'. Also strips a trailing '- 003/084'-style collector-number
+ * suffix (TCGplayer's Mega-era Pokémon naming, live 2026-07-22 — it broke
+ * name matching for entire new sets like ME05 Pitch Black). ONLY a pure
+ * number pattern is stripped — 'Magician of Dark Chaos - Black Chaos' keeps
+ * its dash.
+ */
+export const baseName = (name) => (name ?? '')
+  .replace(/\s*\([^)]*\)\s*/g, ' ')
+  .replace(/\s+-\s+[A-Z]{0,4}\d{1,3}[a-z]?\s*\/\s*[A-Z]{0,4}\d{1,3}\s*$/i, ' ')
+  .replace(/\s+/g, ' ').trim();
 
 export const normName = (s) => (s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 

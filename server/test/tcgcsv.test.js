@@ -30,6 +30,13 @@ describe('tcgcsv mapping', () => {
     expect(productLabel('Nami (Manga) (105a)')).toBe('manga');
     expect(baseName('Sabo (001) (Alternate Art)')).toBe('Sabo');
   });
+  it("baseName strips Mega-era ' - 003/084' suffixes but keeps real dashes (2026-07-22)", () => {
+    expect(baseName('Fomantis - 003/084')).toBe('Fomantis');
+    expect(baseName('Lurantis ex - 004/084')).toBe('Lurantis ex');
+    expect(baseName('Rayquaza VMAX - TG20/TG30')).toBe('Rayquaza VMAX');
+    expect(baseName('Magician of Dark Chaos - Black Chaos')).toBe('Magician of Dark Chaos - Black Chaos');
+    expect(baseName('Luffy & Ace ST30-001')).toBe('Luffy & Ace ST30-001');   // codes untouched
+  });
   it('mapGroupProducts keeps numbered+priced cards, drops sealed', () => {
     const rows = mapGroupProducts(PRODUCTS, PRICES, GROUP);
     expect(rows.map(r => r.number)).toEqual(['OP05-001', 'OP05-119']);
