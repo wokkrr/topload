@@ -55,12 +55,18 @@ for (const { id, label } of [
   try {
     const html = await get(`/sets/${id}`);
     const imgs = [...html.matchAll(/\/rails\/active_storage\/[^"'\s]+/g)].map(m => m[0]);
-    const files = [...html.matchAll(/([a-z0-9-]+_[a-z0-9-]+_[a-z0-9]{8})\.(?:png|jpe?g|webp)/gi)].map(m => m[1]);
-    const cardLinks = [...html.matchAll(/href="\/cards\/(\d+)"/g)].map(m => m[1]);
     console.log(`\n== /sets/${id} (${label}) ==`);
-    console.log(`  active_storage URLs: ${imgs.length} · filename-pattern hits: ${files.length} · card links: ${new Set(cardLinks).size}`);
-    for (const u of imgs.slice(0, 2)) console.log(`  img: ${u.slice(0, 110)}…`);
-    for (const f of files.slice(0, 6)) console.log(`  file: ${f}`);
+    console.log(`  h1: ${(/<h1[^>]*>([^<]{0,90})/.exec(html)?.[1] ?? '?').trim()}`);
+    console.log(`  active_storage URLs: ${imgs.length}`);
+    // FULL image tags — the card↔image identity lives in alt/aria, not hrefs
+    // (v1 probe found zero card links on vintage pages).
+    const tags = [...html.matchAll(/<img[^>]{0,500}active_storage[^>]{0,500}>/g)].map(m => m[0]);
+    for (const t of tags.slice(0, 3)) console.log(`  tag: ${t.slice(0, 320)}`);
+    // Any inline JSON payload (Rails/Turbo apps often embed card data).
+    const json = [...html.matchAll(/[^\n]{0,40}(?:data-[a-z-]*cards|"cards"|card_number|"number")[^\n]{0,120}/gi)].slice(0, 3);
+    for (const j of json) console.log(`  json-ish: ${j[0].trim().slice(0, 150)}`);
+    // The tail of two full image URLs (filenames were truncated in v1).
+    for (const u of imgs.slice(0, 2)) console.log(`  url-tail: …${u.slice(-90)}`);
   } catch (e) { console.log(`\n== /sets/${id} (${label}) == ${e.message}`); }
 }
 
