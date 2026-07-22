@@ -221,6 +221,22 @@ async function runLive(db, today) {
     }
   }
 
+  // 2c². Borrow-art nightly (2026-07-22): the daily CSV import mints new
+  //      variant satellites (post-repair, thousands at once) — the borrow
+  //      pass gives them their sibling's official scan the same night, and
+  //      upgrades any 'pricecharting' photos it can beat (quality tiering).
+  //      Idempotent; matcher is compile-cached. BORROW_ART_NIGHTLY=0 off.
+  if (!freshSkip && process.env.BORROW_ART_NIGHTLY !== '0') {
+    try {
+      const { borrowArt } = await import('./seed-borrow-art.js');
+      summary.borrowArt = borrowArt(db);
+      console.log(`[ingest] borrow-art: ${JSON.stringify({ ...summary.borrowArt, samples: undefined })}`);
+    } catch (e) {
+      rollback();
+      console.warn(`[ingest] borrow-art failed: ${e.message}`);
+    }
+  }
+
   // 2d. PC page-art nightly (2026-07-22: the layer proved out — ~800 vintage
   //     fills incl. Illustrator Pikachu on its first working pass). A modest
   //     value-sorted slice per night keeps grinding the artless tail without
