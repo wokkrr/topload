@@ -130,7 +130,20 @@ export function Binder({ onSelect }) {
         {adding && <AddCard onAdd={addPosition} />}
 
         {!positions.length && !adding && (
-          <div style={{ padding: '48px 24px', textAlign: 'center', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.8 }}>
+          <div onClick={() => setAdding(true)}
+               style={{ padding: '40px 24px 48px', textAlign: 'center', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.8, cursor: 'pointer' }}>
+            {/* Empty sleeves waiting for their first card — the whole state is the add button. */}
+            <div style={{ display: 'flex', gap: 18, justifyContent: 'center', marginBottom: 22 }}>
+              {[0, 1, 2].map(i => (
+                <span key={i} style={{
+                  width: 96, height: 128, borderRadius: 8,
+                  border: `1.5px dashed ${tokens.color.border}`,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  color: i === 1 ? tokens.color.brass : tokens.color.border,
+                  font: `300 ${i === 1 ? 30 : 20}px ${tokens.font.body}`,
+                }}>{i === 1 ? '+' : ''}</span>
+              ))}
+            </div>
             <div style={{ font: `20px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 6 }}>Your Binder is empty</div>
             Add the cards you own and watch them marked to the live Oracle —
             entry price in, honest value out. Positions stay in this browser.
@@ -212,19 +225,67 @@ function BinderChart({ series, costCents }) {
   );
 }
 
-/** The binder itself — slabs in sleeves. Same hover-lift language as the desk grid. */
+/** The binder itself — slabs in sleeves. Same hover-lift language as the
+ *  desk grid, plus the collector's touch: a holo shimmer sweeping the card
+ *  on hover (the exact glint of tilting a foil, kept subtle). */
 const GRID_CSS = `
 .tl-binder-card { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; position: relative; }
-.tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.inkMuted}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+.tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.brass}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
 .tl-binder-card .tl-remove { opacity: 0; transition: opacity .12s ease; }
 .tl-binder-card:hover .tl-remove { opacity: 1; }
+.tl-binder-card .tl-shine { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.tl-binder-card .tl-shine::after {
+  content: ''; position: absolute; inset: -20%;
+  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.30) 47%, rgba(212,175,55,0.16) 53%, transparent 62%);
+  transform: translateX(-130%); transition: transform .55s ease;
+}
+.tl-binder-card:hover .tl-shine::after { transform: translateX(130%); }
 `;
 
+/**
+ * Binder PAGES (Kaleb, 2026-07-22: "a really nice beautiful binder of cards
+ * people would enjoy looking at and organizing") — cards group by set like
+ * a real binder's pages, richest page first, each with its own subtotal.
+ */
 function BinderGrid({ positions, marks, onSelect, onRemove }) {
+  const pages = useMemo(() => {
+    const bySet = new Map();
+    for (const p of positions) {
+      const m = marks[posKey(p)];
+      const set = (m?.set_name ?? p.set_name) || 'Other';
+      (bySet.get(set) ?? bySet.set(set, []).get(set)).push(p);
+    }
+    const value = (ps) => ps.reduce((a, p) => a + (marks[posKey(p)]?.price_cents ?? 0) * p.qty, 0);
+    return [...bySet.entries()]
+      .map(([set, ps]) => ({ set, ps, subtotal: value(ps) }))
+      .sort((a, b) => b.subtotal - a.subtotal);
+  }, [positions, marks]);
+
+  return (
+    <div>
+      <style>{GRID_CSS}</style>
+      {pages.map(({ set, ps, subtotal }) => (
+        <div key={set} style={{ marginBottom: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, margin: '2px 0 10px', borderBottom: `1px solid ${tokens.color.border}`, paddingBottom: 6 }}>
+            <span style={{ font: `11px ${tokens.font.mono}`, textTransform: 'uppercase', letterSpacing: '1px', color: tokens.color.ink }}>{set}</span>
+            <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>
+              {ps.reduce((a, p) => a + p.qty, 0)} card{ps.reduce((a, p) => a + p.qty, 0) === 1 ? '' : 's'}
+            </span>
+            <span style={{ marginLeft: 'auto', font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, textTransform: 'uppercase' }}>
+              {subtotal > 0 ? fmtUsd(subtotal) : ''}
+            </span>
+          </div>
+          <PageGrid ps={ps} marks={marks} onSelect={onSelect} onRemove={onRemove} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PageGrid({ ps, marks, onSelect, onRemove }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 22 }}>
-      <style>{GRID_CSS}</style>
-      {positions.map(p => {
+      {ps.map(p => {
         const m = marks[posKey(p)];
         const val = m?.price_cents != null ? m.price_cents * p.qty : null;
         const pnlPct = val != null && p.cost_cents > 0 ? ((val / (p.cost_cents * p.qty)) - 1) * 100 : null;
@@ -244,6 +305,7 @@ function BinderGrid({ positions, marks, onSelect, onRemove }) {
                 position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`, textTransform: 'uppercase',
                 color: tokens.color.ink, background: tokens.color.overlay, borderRadius: 3, padding: '2px 6px',
               }}>{p.grade}{p.qty > 1 ? ` ×${p.qty}` : ''}{langCode(m?.language ?? p.language) !== 'EN' ? ` · ${langCode(m?.language ?? p.language)}` : ''}</span>
+              <span className="tl-shine" aria-hidden />
               <span className="tl-remove" onClick={(e) => { e.stopPropagation(); onRemove(p); }}
                     title="Remove from Binder"
                     style={{
