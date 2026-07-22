@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { tokens } from '../tokens.js';
 import { api, fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
 
