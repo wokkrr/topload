@@ -19,9 +19,9 @@ export const PLATFORMS = [
     url: 'https://collectorcrypt.com',
   },
   {
-    id: 'beezie', name: 'Beezie', chain: 'Flow + Solana', status: 'live',
-    listings: false, sales: true,
-    access: 'On-chain sales indexed (Base). Listings ingestion TBD.',
+    id: 'beezie', name: 'Beezie', chain: 'Base + Flow', status: 'live',
+    listings: true, sales: true,
+    access: 'Listings via their dropItems API, both chains (mapped 2026-07-22; ~880 live). Sales indexed on-chain (Base; Flow sales indexer = Aug, Alchemy CU). Solana deployment announced Q2 2026 — watch.',
     url: 'https://beezie.com',
   },
   {

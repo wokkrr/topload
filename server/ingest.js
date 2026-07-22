@@ -22,6 +22,7 @@ import { makeCollectorCryptAdapter } from './adapters/collectorcrypt.js';
 import { makeCourtyardListingsAdapter } from './adapters/courtyard-listings.js';
 import { makeMnstrListingsAdapter } from './adapters/mnstr-listings.js';
 import { makePhygitalsListingsAdapter } from './adapters/phygitals-listings.js';
+import { makeBeezieListingsAdapter } from './adapters/beezie-listings.js';
 import { runSolanaIndexer, registerListings } from './indexer-solana.js';
 import { importCsv } from './import-pricecharting-csv.js';
 import { matchListings } from './match.js';
@@ -379,6 +380,47 @@ async function runLive(db, today) {
   } catch (e) {
     rollback();
     console.warn(`[ingest] phygitals listings fetch failed: ${e.message}`);
+  }
+
+  // 3e. Gacha listings: Beezie — their dropItems API on BOTH chain
+  //     deployments (Base = the big side, Flow = legacy; mapped live
+  //     2026-07-22 — the earlier "no clean path" verdict was wrong, same
+  //     lesson as Phygitals). Snapshot-replace keyed on the beezie: prefix.
+  try {
+    const bz = makeBeezieListingsAdapter();
+    const listings = await bz.fetchListings({ seenAt: today });
+    const universeByIp = {};
+    for (const c of db.prepare(`SELECT id, ip, name, number, set_name, language FROM cards`).all()) {
+      (universeByIp[c.ip] ??= []).push(c);
+    }
+    const matches = new Map();
+    for (const ip of ['PKMN', 'OP']) {
+      const subset = listings.filter(l => l.ip === ip);
+      if (!subset.length || !universeByIp[ip]) continue;
+      for (const [k, v] of matchListings(subset, universeByIp[ip])) matches.set(k, v);
+    }
+    // Anti-restamp pin, same rule as every other snapshot platform.
+    const prevListedB = new Map(db.prepare(
+      `SELECT external_id, listed_at FROM gacha_listings WHERE external_id LIKE 'beezie:%'`
+    ).all().map(r => [r.external_id, r.listed_at]));
+    db.exec(`DELETE FROM gacha_listings WHERE external_id LIKE 'beezie:%'`); // full snapshot refresh
+    const insB = db.prepare(
+      `INSERT OR REPLACE INTO gacha_listings
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const l of listings) {
+      const prior = prevListedB.get(l.external_id);
+      const listedAt = prior && l.listed_at ? (prior < l.listed_at ? prior : l.listed_at) : (prior ?? l.listed_at);
+      insB.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
+               l.grade, l.price_cents, l.currency, listedAt, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+    }
+    summary.beezieListings = listings.length;
+    summary.beezieMatched = matches.size;
+    console.log(`[ingest] beezie listings: ${listings.length} (${matches.size} matched)`);
+  } catch (e) {
+    rollback();
+    console.warn(`[ingest] beezie listings fetch failed: ${e.message}`);
   }
 
   // 4. Raw solds — on-chain gacha sales (self-collected, first-class oracle input).

@@ -504,6 +504,11 @@ export function listingUrl(l) {
   if (l.platform === 'phygitals' && l.proof) { // proof column carries the card slug
     return `https://www.phygitals.com/card/${l.proof}`;
   }
+  if (l.platform === 'beezie' && l.proof) {    // proof = '<chain>:<page-slug>'
+    const i = l.proof.indexOf(':');
+    const chain = l.proof.slice(0, i), slug = l.proof.slice(i + 1);
+    return `${chain === 'flow' ? 'https://flow.beezie.com' : 'https://beezie.com'}/marketplace/collectible/${slug}`;
+  }
   return null;
 }
 
