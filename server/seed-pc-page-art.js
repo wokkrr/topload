@@ -99,6 +99,12 @@ export async function fillPageArt(db, { ips = ['PKMN', 'OP'], limit = 500, delay
         }
       }
     } catch { res.httpErr++; }
+    // Unattended-safety: if the first dozen pages yield nothing, the URL form
+    // or og:image shape is off — stop rather than burn the whole cap on 404s.
+    if (!dry && res.scanned >= 12 && res.filled === 0) {
+      res.aborted = 'first 12 pages produced no art — URL/og shape needs the probe checked';
+      break;
+    }
     await new Promise(r2 => setTimeout(r2, delayMs));
   }
   return res;
