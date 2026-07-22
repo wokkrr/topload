@@ -101,9 +101,21 @@ export function normalizeGrade(company, gradeNum) {
   return `${co}${n % 1 === 0 ? n : n.toFixed(1)}`;
 }
 
-/** Parse 'PSA 10' / 'BGS 9.5' / 'CGC 10' out of a listing title; else 'raw'. */
+/**
+ * Parse 'PSA 10' / 'BGS 9.5' / 'CGC Gem Mint 10' / 'TAG 8.5' out of a listing
+ * title; else 'raw'. Hardened 2026-07-22 (Kaleb: "so many data points for each
+ * grade and each grading company… easy to incorrectly match"):
+ * - TAG/ACE/AGS added (TAG is Beezie's house grader; titles are the fallback
+ *   when the structured grader attribute is missing).
+ * - Descriptor words between company and number ('Gem Mint', 'Pristine',
+ *   'Black Label', 'Mint') no longer break the parse — those titles were
+ *   silently landing in the 'raw' series, splitting the card's comps.
+ * - Grades must be ≤ 10: 'PSA 2019 …' can never mint a phantom grade.
+ */
 export function gradeFromTitle(title) {
-  const m = /\b(PSA|BGS|CGC|SGC|BECKETT)\s*([0-9]{1,2}(?:\.5)?)\b/i.exec(title ?? '');
+  const m = /\b(PSA|BGS|CGC|SGC|BECKETT|TAG|ACE|AGS)\s*(?:GEM\s*(?:MINT|MT)|PRISTINE|BLACK\s*LABEL|MINT)?\s*([0-9]{1,2}(?:\.[05])?)\b/i.exec(title ?? '');
   if (!m) return 'raw';
-  return normalizeGrade(m[1], parseFloat(m[2]));
+  const n = parseFloat(m[2]);
+  if (!(n > 0 && n <= 10)) return 'raw';
+  return normalizeGrade(m[1], n);
 }

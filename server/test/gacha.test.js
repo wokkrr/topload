@@ -44,6 +44,12 @@ describe('collectorcrypt adapter (fixtures)', () => {
     expect(gradeFromTitle('2022 #001 Monkey D. Luffy PSA 10 One Piece Starter Deck')).toBe('PSA10');
     expect(gradeFromTitle('Zoro MANGA ART SEC BGS 9.5 Wings of the Captain')).toBe('BGS9.5');
     expect(gradeFromTitle('Charizard Base Set near mint')).toBe('raw');
+    // Hardened 2026-07-22: descriptor words, TAG/ACE, and phantom-grade guard.
+    expect(gradeFromTitle('Umbreon VMAX CGC Gem Mint 10 Evolving Skies')).toBe('CGC10');
+    expect(gradeFromTitle('Lugia BGS Pristine 10 Neo Genesis')).toBe('BGS10');
+    expect(gradeFromTitle('2002 Neo Destiny Unown Z TAG 8.5')).toBe('TAG8.5');
+    expect(gradeFromTitle('Sabo ACE 9 One Piece')).toBe('ACE9');
+    expect(gradeFromTitle('PSA 2019 Pokemon Promo')).toBe('raw');       // year, not a grade
   });
 
   it('title-grade fallback applies when structured fields are missing', async () => {
