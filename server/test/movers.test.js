@@ -16,18 +16,20 @@ function seed(db) {
                          VALUES (?, ?, ?, ?, 1, 4, 0.7, ?, ?)`);
   const THEN = '2026-07-14', NOW = '2026-07-22';   // 8 days apart — nearest-≥7d lookback finds THEN
 
-  // Card A: two grades moved (PSA10 +50%, BGS10 +20%), same source both ends → dedupe to PSA10.
+  // Card A: two solds-backed grades moved (PSA10 +50%, BGS10 +20%) → dedupe to PSA10.
   card.run('a', 'Snorlax LV.X');
-  op.run('a', 'PSA10', THEN, 10000, 'external', 'pricecharting');
-  op.run('a', 'PSA10', NOW, 15000, 'external', 'pricecharting');
-  op.run('a', 'BGS10', THEN, 10000, 'external', 'pricecharting');
-  op.run('a', 'BGS10', NOW, 12000, 'external', 'pricecharting');
+  op.run('a', 'PSA10', THEN, 10000, 'solds', null);
+  op.run('a', 'PSA10', NOW, 15000, 'solds', null);
+  op.run('a', 'BGS10', THEN, 10000, 'solds', null);
+  op.run('a', 'BGS10', NOW, 12000, 'solds', null);
 
-  // Card B: +400% "move" but the source changed across the window —
-  // a data event (new source landing), not a market move → excluded.
+  // Card B: −94%-style "move" on a provenance-CONSISTENT external mark — a
+  // rematch re-pointing the card to a better catalog product looks exactly
+  // like this (same source string, one giant step; live 2026-07-22). The
+  // solds-only gate excludes it: estimates can't be movers.
   card.run('b', 'Charizard');
-  op.run('b', 'PSA10', THEN, 10000, 'external', 'pricecharting');
-  op.run('b', 'PSA10', NOW, 50000, 'external', 'tcgplayer');
+  op.run('b', 'PSA10', THEN, 34700, 'external', 'pricecharting');
+  op.run('b', 'PSA10', NOW, 2200, 'external', 'pricecharting');
 
   // Card C: modest +10%, provenance-consistent solds → included, ranks below A.
   card.run('c', 'Pikachu');
@@ -46,8 +48,8 @@ function seed(db) {
   op.run('e', 'PSA10', NOW, 20000, 'solds', null);
 }
 
-describe('getMovers (7D window)', () => {
-  it('dedupes per card, drops cross-stream deltas and too-young cards', () => {
+describe('getMovers (7D window, solds only)', () => {
+  it('dedupes per card; excludes estimates, cross-stream deltas, too-young cards', () => {
     const db = openDb(':memory:');
     seed(db);
     refreshLatestMarks(db);

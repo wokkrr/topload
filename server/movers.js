@@ -3,17 +3,22 @@
  * quiet for a card market — cards trade weekly, not tick-by-tick; the 7D
  * window matches the asset's natural velocity). Two honesty gates:
  *
- *   1. PROVENANCE-CONSISTENT DELTAS: a move only qualifies if the 7-days-ago
- *      mark came from the SAME basis+source as today's (prov_7d, precomputed
- *      in refreshLatestMarks). When a new data source lands or a card
- *      graduates external→solds, the delta is a DATA EVENT, not a market
- *      move — the +483% Snorlax wall, live 2026-07-22.
- *   2. ONE ROW PER CARD: the same card in three slabs is one story, not
+ *   1. SOLDS ONLY (Kaleb, 2026-07-22, after the −93% step-function wall):
+ *      an ESTIMATE cannot be a mover — if nothing traded, the market didn't
+ *      move, our estimate did. Same-source external marks still cliff when a
+ *      rematch re-points a card to a better catalog product (source string
+ *      unchanged → invisible to any provenance check). Solds-backed marks
+ *      are computed from actual recorded sales, so their movement IS market
+ *      movement. The list gets shorter and grows with sales coverage —
+ *      honest and thin beats full and wrong.
+ *   2. PROVENANCE-CONSISTENT DELTAS: the 7-days-ago mark must also be solds
+ *      (prov_7d, precomputed in refreshLatestMarks) — a card that graduated
+ *      external→solds mid-window is a data event, not a move.
+ *   3. ONE ROW PER CARD: the same card in three slabs is one story, not
  *      three slots — the top-moving grade represents it.
  *
- * The ±500% sanity band stays as the outer rail for same-source repricings.
- * All lookbacks precomputed (request-time window scans took /api/movers to
- * 5.9s on the droplet once before — never again).
+ * The ±500% sanity band stays as the outer rail. All lookbacks precomputed
+ * (request-time window scans took /api/movers to 5.9s once — never again).
  */
 export function getMovers(db, { limit = 20 } = {}) {
   return db.prepare(`
@@ -33,6 +38,7 @@ export function getMovers(db, { limit = 20 } = {}) {
       WHERE lm.confidence >= 0.3 AND lm.price_7d > 0
         AND lm.price_cents != lm.price_7d
         AND ABS((lm.price_cents * 1.0 / lm.price_7d) - 1) <= 5.0
+        AND lm.basis = 'solds'
         AND lm.prov_7d = lm.basis || '|' || COALESCE(lm.source, '')
     )
     SELECT * FROM candidates WHERE rn = 1
