@@ -53,7 +53,6 @@ export function mopupSatellites(db, { ip, dry = false } = {}) {
   const res = { ip, satellites: sats.length, matched: 0, keptVariant: 0, keptUnmatched: 0,
                 marksMoved: 0, marksDroppedDup: 0, tcgPricesMoved: 0, salesMoved: 0,
                 listingsRepointed: 0, registryRepointed: 0, retired: 0, samples: [] };
-  if (!dry) db.exec('BEGIN');
 
   const moveMarks = db.prepare(`UPDATE OR IGNORE external_marks SET card_id = ? WHERE card_id = ?`);
   const dropLeftoverMarks = db.prepare(`DELETE FROM external_marks WHERE card_id = ?`);
@@ -75,6 +74,10 @@ export function mopupSatellites(db, { ip, dry = false } = {}) {
     db.prepare(`DELETE FROM basket_members WHERE card_id = ?`),
   ];
 
+  // PHASE 1 — match (CPU-heavy, NO transaction: holding the write lock
+  // through minutes of matching starved a concurrent writer to death with
+  // 'database is locked', live 2026-07-22).
+  const absorb = [];
   for (const sat of sats) {
     if (/\[|\]/.test(sat.name ?? '')) { res.keptVariant++; continue; }
     const k = numberKey(ip, sat.number);
@@ -93,21 +96,26 @@ export function mopupSatellites(db, { ip, dry = false } = {}) {
     if (!hit) { res.keptUnmatched++; continue; }
     res.matched++;
     if (res.samples.length < 10) res.samples.push(`${sat.id} → ${hit}  (${title.slice(0, 64)})`);
-    if (dry) continue;
-
-    res.marksMoved += Number(moveMarks.run(hit, sat.id).changes);
-    res.marksDroppedDup += Number(dropLeftoverMarks.run(sat.id).changes);
-    res.tcgPricesMoved += Number(moveTcg.run(hit, sat.id).changes);
-    dropLeftoverTcg.run(sat.id);
-    res.salesMoved += Number(moveSales.run(hit, sat.id).changes);
-    res.listingsRepointed += Number(moveListings.run(hit, sat.id).changes);
-    res.registryRepointed += Number(moveRegistry.run(hit, sat.id).changes);
-    attachExt.run(sat.external_ids ?? '{}', sat.external_ids ?? '{}', sat.external_ids ?? '{}', hit);
-    for (const d of dropDerived) d.run(sat.id);
-    res.retired += Number(dropSat.run(sat.id).changes);
+    absorb.push({ sat, hit });
   }
 
-  if (!dry) db.exec('COMMIT');
+  // PHASE 2 — apply (fast writes, one short transaction).
+  if (!dry && absorb.length) {
+    db.exec('BEGIN');
+    for (const { sat, hit } of absorb) {
+      res.marksMoved += Number(moveMarks.run(hit, sat.id).changes);
+      res.marksDroppedDup += Number(dropLeftoverMarks.run(sat.id).changes);
+      res.tcgPricesMoved += Number(moveTcg.run(hit, sat.id).changes);
+      dropLeftoverTcg.run(sat.id);
+      res.salesMoved += Number(moveSales.run(hit, sat.id).changes);
+      res.listingsRepointed += Number(moveListings.run(hit, sat.id).changes);
+      res.registryRepointed += Number(moveRegistry.run(hit, sat.id).changes);
+      attachExt.run(sat.external_ids ?? '{}', sat.external_ids ?? '{}', sat.external_ids ?? '{}', hit);
+      for (const d of dropDerived) d.run(sat.id);
+      res.retired += Number(dropSat.run(sat.id).changes);
+    }
+    db.exec('COMMIT');
+  }
   return res;
 }
 
