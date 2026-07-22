@@ -45,6 +45,23 @@ const td = { textAlign: 'right', padding: '6px 12px', borderBottom: `1px solid $
 const tdL = { ...td, textAlign: 'left', font: `12px ${tokens.font.body}`, textTransform: 'none' };
 
 const GRADES = ['raw', 'PSA10', 'PSA9', 'PSA8', 'BGS10', 'BGS9.5', 'CGC10', 'CGC9.5', 'TAG10', 'SGC10'];
+
+// Cursor tilt (Kaleb, 2026-07-22, pokemon.com-gallery feel): the card leans
+// a few degrees toward the cursor — "a slight response that you are
+// hovering". Direct style writes (no re-renders); reduced-motion users get
+// the plain hover.
+const REDUCED_MOTION = typeof window !== 'undefined'
+  && typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const tiltMove = (e) => {
+  if (REDUCED_MOTION) return;
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width - 0.5;
+  const py = (e.clientY - r.top) / r.height - 0.5;
+  el.style.transform = `perspective(700px) rotateX(${(-py * 6).toFixed(2)}deg) rotateY(${(px * 7).toFixed(2)}deg) translateY(-2px)`;
+};
+const tiltLeave = (e) => { e.currentTarget.style.transform = ''; };
 const pnlColor = (v) => v == null ? tokens.color.inkMuted : v >= 0 ? tokens.color.up : tokens.color.down;
 const posKey = (p) => `${p.card_id}|${p.grade}`;
 
@@ -288,7 +305,8 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
         borderRadius: 10, padding: 22, boxSizing: 'border-box', boxShadow: '0 18px 60px rgba(0,0,0,0.35)',
       }}>
         {/* The card itself, as big as the room allows. */}
-        <div style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8 }}>
+        <div onMouseMove={tiltMove} onMouseLeave={tiltLeave}
+             style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8, transition: 'transform .18s ease' }}>
           {m?.image
             ? <img src={m.image} alt="" onError={imgFallback}
                    style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', display: 'block', padding: 12, boxSizing: 'border-box' }} />
@@ -464,6 +482,7 @@ function PageGrid({ ps, marks, onSelect, lastAdded }) {
         const pnlPct = val != null && p.cost_cents > 0 ? ((val / (p.cost_cents * p.qty)) - 1) * 100 : null;
         return (
           <div key={posKey(p)} className={`tl-binder-card${posKey(p) === lastAdded ? ' tl-just-added' : ''}`} onClick={() => onSelect?.(p)}
+             onMouseMove={tiltMove} onMouseLeave={tiltLeave}
                title={m?.name ?? p.name}
                style={{
                  border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
