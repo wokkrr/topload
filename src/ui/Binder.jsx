@@ -46,48 +46,6 @@ const tdL = { ...td, textAlign: 'left', font: `12px ${tokens.font.body}`, textTr
 
 const GRADES = ['raw', 'PSA10', 'PSA9', 'PSA8', 'BGS10', 'BGS9.5', 'CGC10', 'CGC9.5', 'TAG10', 'SGC10'];
 
-// Cursor tilt (Kaleb, 2026-07-22, pokemon.com-gallery feel): the card leans
-// a few degrees toward the cursor — "a slight response that you are
-// hovering". Direct style writes (no re-renders); reduced-motion users get
-// the plain hover.
-const REDUCED_MOTION = typeof window !== 'undefined'
-  && typeof window.matchMedia === 'function'
-  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const tiltMove = (e) => {
-  if (REDUCED_MOTION) return;
-  const el = e.currentTarget;
-  const r = el.getBoundingClientRect();
-  const px = (e.clientX - r.left) / r.width;
-  const py = (e.clientY - r.top) / r.height;
-  el.style.transform = `perspective(700px) rotateX(${(-(py - 0.5) * 6).toFixed(2)}deg) rotateY(${((px - 0.5) * 7).toFixed(2)}deg) translateY(-2px)`;
-  const g = el.querySelector('.tl-shine');
-  if (g) g.style.background = `radial-gradient(circle at ${((1 - px) * 100).toFixed(1)}% ${((1 - py) * 100).toFixed(1)}%, rgba(255,255,255,0.11), rgba(212,175,55,0.04) 42%, transparent 70%)`;
-};
-const tiltLeave = (e) => {
-  e.currentTarget.style.transform = '';
-  const g = e.currentTarget.querySelector('.tl-shine');
-  if (g) g.style.background = 'none';
-};
-// Pop-out gloss (Kaleb, 2026-07-22): a soft light source that follows the
-// cursor across the big card — the desk-lamp reflection — plus a gentler
-// tilt than the grid tiles (it's a bigger object in the hand).
-const glossMove = (e) => {
-  if (REDUCED_MOTION) return;
-  const el = e.currentTarget;
-  const r = el.getBoundingClientRect();
-  const px = (e.clientX - r.left) / r.width;
-  const py = (e.clientY - r.top) / r.height;
-  el.style.transform = `perspective(900px) rotateX(${(-(py - 0.5) * 7).toFixed(2)}deg) rotateY(${((px - 0.5) * 8).toFixed(2)}deg)`;
-  const g = el.querySelector('.tl-gloss');
-  if (g) g.style.background =
-    `radial-gradient(circle at ${((1 - px) * 100).toFixed(1)}% ${((1 - py) * 100).toFixed(1)}%, rgba(255,255,255,0.13), rgba(255,255,255,0.04) 38%, transparent 66%), ` +
-    `linear-gradient(${(95 - (px - 0.5) * 40).toFixed(1)}deg, transparent ${(30 + (1 - px) * 14).toFixed(1)}%, rgba(212,175,55,0.07) ${(44 + (1 - px) * 14).toFixed(1)}%, transparent ${(58 + (1 - px) * 14).toFixed(1)}%)`;
-};
-const glossLeave = (e) => {
-  e.currentTarget.style.transform = '';
-  const g = e.currentTarget.querySelector('.tl-gloss');
-  if (g) g.style.background = 'none';
-};
 const pnlColor = (v) => v == null ? tokens.color.inkMuted : v >= 0 ? tokens.color.up : tokens.color.down;
 const posKey = (p) => `${p.card_id}|${p.grade}`;
 
@@ -331,14 +289,12 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
         borderRadius: 10, padding: 22, boxSizing: 'border-box', boxShadow: '0 18px 60px rgba(0,0,0,0.35)',
       }}>
         {/* The card itself, as big as the room allows. */}
-        <div onMouseMove={glossMove} onMouseLeave={glossLeave}
-             style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8, transition: 'transform .45s cubic-bezier(0.68, -0.55, 0.265, 1.35)', position: 'relative' }}>
+        <div style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8 }}>
           {m?.image
             ? <img src={m.image} alt="" onError={imgFallback}
                    style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', display: 'block', padding: 12, boxSizing: 'border-box',
                             filter: 'drop-shadow(0 12px 26px rgba(30,22,10,0.30))' }} />
             : <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, padding: 40 }}>no image yet</div>}
-          <span className="tl-gloss" aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 8, pointerEvents: 'none' }} />
         </div>
 
         {/* Your numbers. */}
@@ -460,9 +416,8 @@ function BinderChart({ series, costCents }) {
  *  desk grid, plus the collector's touch: a holo shimmer sweeping the card
  *  on hover (the exact glint of tilting a foil, kept subtle). */
 const GRID_CSS = `
-.tl-binder-card { transition: transform .38s cubic-bezier(0.68, -0.55, 0.265, 1.35), box-shadow .15s ease, border-color .15s ease; position: relative; }
-.tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.brass}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
-.tl-binder-card .tl-shine { position: absolute; inset: 0; pointer-events: none; }
+.tl-binder-card { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; position: relative; }
+.tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.inkMuted}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
 @keyframes tl-added-pulse { 0% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 100% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
 .tl-just-added { border-color: ${tokens.color.brass}; animation: tl-added-pulse 1.4s ease-out; }
 `;
@@ -504,7 +459,6 @@ function PageGrid({ ps, marks, onSelect, lastAdded }) {
         const pnlPct = val != null && p.cost_cents > 0 ? ((val / (p.cost_cents * p.qty)) - 1) * 100 : null;
         return (
           <div key={posKey(p)} className={`tl-binder-card${posKey(p) === lastAdded ? ' tl-just-added' : ''}`} onClick={() => onSelect?.(p)}
-             onMouseMove={tiltMove} onMouseLeave={tiltLeave}
                title={m?.name ?? p.name}
                style={{
                  border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
@@ -519,7 +473,6 @@ function PageGrid({ ps, marks, onSelect, lastAdded }) {
                 position: 'absolute', top: 6, left: 6, font: `10px ${tokens.font.mono}`, textTransform: 'uppercase',
                 color: tokens.color.ink, background: tokens.color.overlay, borderRadius: 3, padding: '2px 6px',
               }}>{p.grade}{p.qty > 1 ? ` ×${p.qty}` : ''}{langCode(m?.language ?? p.language) !== 'EN' ? ` · ${langCode(m?.language ?? p.language)}` : ''}</span>
-              <span className="tl-shine" aria-hidden />
               {p.fav && (
                 <span style={{
                   position: 'absolute', top: 6, right: 6, font: `12px ${tokens.font.mono}`,
