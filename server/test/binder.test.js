@@ -41,3 +41,28 @@ describe('buildBinderSeries', () => {
     expect(s[0].value_cents).toBe(8000);               // 70 carried in + 10
   });
 });
+
+describe('buildBinderMovers (2026-07-22 — "what moved" behind the chart)', () => {
+  it('start = pre-window baseline else first in-window; end = last mark; unpriced omitted', async () => {
+    const { buildBinderMovers } = await import('../binder.js');
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, external_ids) VALUES ('a','PKMN','A','s','1','English','{}'), ('b','PKMN','B','s','2','English','{}'), ('c','PKMN','C','s','3','English','{}')`).run();
+    const op = db.prepare(`INSERT INTO oracle_prices (card_id, grade, as_of, price_cents, sales_7d, sales_30d, confidence, basis) VALUES (?, 'PSA10', ?, ?, 1, 1, 0.7, 'solds')`);
+    // a: baseline long before the 90d window + moves inside it
+    op.run('a', '2025-06-01', 10000);
+    op.run('a', '2026-07-19', 12000);
+    op.run('a', '2026-07-21', 15000);
+    // b: first mark inside the window only
+    op.run('b', '2026-07-20', 5000);
+    op.run('b', '2026-07-21', 4000);
+    const res = buildBinderMovers(db, [
+      { card_id: 'a', grade: 'PSA10', qty: 2 },
+      { card_id: 'b', grade: 'PSA10', qty: 1 },
+      { card_id: 'c', grade: 'PSA10', qty: 1 },     // never priced → omitted
+    ], { days: 90 });
+    expect(res).toEqual([
+      { card_id: 'a', grade: 'PSA10', qty: 2, start_cents: 10000, end_cents: 15000 },
+      { card_id: 'b', grade: 'PSA10', qty: 1, start_cents: 5000, end_cents: 4000 },
+    ]);
+  });
+});

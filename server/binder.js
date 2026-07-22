@@ -42,3 +42,37 @@ export function buildBinderSeries(db, positions, { days = 90 } = {}) {
     return { as_of: d, value_cents: value, priced };
   });
 }
+
+/**
+ * Per-position movement over the window — the "what moved" behind the chart
+ * (Kaleb, 2026-07-22: make the value chart "more interesting"). Same window
+ * semantics as the series: start = value entering the window (pre-window
+ * baseline, else first in-window mark), end = last known mark. Positions the
+ * oracle can't price on both ends are omitted — a mover needs two real
+ * observations, not a guess.
+ */
+export function buildBinderMovers(db, positions, { days = 90 } = {}) {
+  const q = db.prepare(
+    `SELECT as_of, price_cents FROM oracle_prices
+     WHERE card_id = ? AND grade = ? AND as_of >= date('now', ?)
+     ORDER BY as_of`);
+  const baseline = db.prepare(
+    `SELECT price_cents FROM oracle_prices
+     WHERE card_id = ? AND grade = ? AND as_of < date('now', ?)
+     ORDER BY as_of DESC LIMIT 1`);
+
+  const out = [];
+  for (const p of positions.slice(0, 200)) {
+    if (!p?.card_id) continue;
+    const rows = q.all(String(p.card_id), String(p.grade ?? 'raw'), `-${days} day`);
+    const base = baseline.get(String(p.card_id), String(p.grade ?? 'raw'), `-${days} day`)?.price_cents ?? null;
+    const start = base ?? rows[0]?.price_cents ?? null;
+    const end = rows.at(-1)?.price_cents ?? base;
+    if (start == null || end == null) continue;
+    out.push({
+      card_id: String(p.card_id), grade: String(p.grade ?? 'raw'),
+      qty: Math.max(1, Number(p.qty) || 1), start_cents: start, end_cents: end,
+    });
+  }
+  return out;
+}

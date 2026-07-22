@@ -53,7 +53,13 @@ export function Binder({ onSelect }) {
   const [positions, setPositions] = useState(loadPositions);
   const [marks, setMarks] = useState({});
   const [series, setSeries] = useState(null);
+  const [movers, setMovers] = useState([]);
   const [days, setDays] = useState(30);
+  // Benchmark overlay (Kaleb, 2026-07-22: make the chart "more interesting"):
+  // your binder vs the market for what you hold — published franchise indexes
+  // blended by your binder's franchise value mix.
+  const [vsMarket, setVsMarket] = useState(false);
+  const [indexes, setIndexes] = useState(null);
   const [view, setView] = useState(loadView);
   const [adding, setAdding] = useState(false);
   // Card pop-out (Kaleb, 2026-07-22, inspired by pokemon.com's gallery):
@@ -76,7 +82,14 @@ export function Binder({ onSelect }) {
     api.binderMarks(req)
       .then(rows => { if (!dead) setMarks(Object.fromEntries(rows.map(r => [`${r.card_id}|${r.grade}`, r]))); })
       .catch(() => {});
-    api.binderSeries(req, days).then(s => { if (!dead) setSeries(s); }).catch(() => setSeries([]));
+    api.binderSeries(req, days).then(s => {
+      if (dead) return;
+      // {series, movers} since 2026-07-22; tolerate the old bare-array shape
+      // during a mixed deploy.
+      setSeries(Array.isArray(s) ? s : s?.series ?? []);
+      setMovers(Array.isArray(s) ? [] : s?.movers ?? []);
+    }).catch(() => { setSeries([]); setMovers([]); });
+    api.indexes(days).then(ix => { if (!dead) setIndexes(ix); }).catch(() => setIndexes([]));
     return () => { dead = true; };
   }, [positions, days]);
 
@@ -93,6 +106,69 @@ export function Binder({ onSelect }) {
     }
     return { cost, value, day, priced };
   }, [positions, marks]);
+
+  // "What moved" — the per-position movement behind the chart's change,
+  // joined with names/franchises from the marks. Impact = window Δ × qty.
+  const moversView = useMemo(() => {
+    const rows = [];
+    for (const mv of movers) {
+      const key = `${mv.card_id}|${mv.grade}`;
+      const pos = positions.find(p => posKey(p) === key);
+      const impact = (mv.end_cents - mv.start_cents) * mv.qty;
+      if (!impact || !pos) continue;
+      const m = marks[key];
+      rows.push({
+        key, pos, impact,
+        name: m?.name ?? mv.card_id, ip: m?.ip ?? pos.ip,
+        grade: mv.grade !== 'raw' ? mv.grade : '',
+        pct: mv.start_cents > 0 ? (mv.end_cents - mv.start_cents) / mv.start_cents : null,
+      });
+    }
+    rows.sort((a, b) => b.impact - a.impact);
+    return rows;
+  }, [movers, marks, positions]);
+
+  // Market benchmark: published franchise indexes blended by the binder's
+  // franchise value mix, scaled to the window's starting binder value. An
+  // honest "the market for what you hold" — never shown when nothing
+  // published overlaps the window.
+  const benchmark = useMemo(() => {
+    if (!series || series.length < 2 || !indexes?.length) return null;
+    const shareByIp = new Map();
+    let total = 0;
+    for (const p of positions) {
+      const m = marks[posKey(p)];
+      if (m?.price_cents != null) {
+        const ip = m.ip ?? p.ip;
+        shareByIp.set(ip, (shareByIp.get(ip) ?? 0) + m.price_cents * p.qty);
+        total += m.price_cents * p.qty;
+      }
+    }
+    if (!total) return null;
+    const d0 = series[0].as_of;
+    const kept = [];
+    for (const ix of indexes) {
+      const w = (shareByIp.get(ix.index_id) ?? 0) / total;
+      if (!ix.published || !ix.series?.length || w <= 0) continue;
+      const arr = ix.series;
+      const at = (d) => { let v = null; for (const r of arr) { if (r.as_of <= d) v = r.value; else break; } return v; };
+      const b = at(d0);
+      if (b > 0) kept.push({ w, at, b });
+    }
+    const wSum = kept.reduce((a, k) => a + k.w, 0);
+    if (!kept.length || wSum <= 0) return null;
+    const start = series[0].value_cents;
+    let last = start;
+    return series.map(s => {
+      let acc = 0, ws = 0;
+      for (const k of kept) {
+        const v = k.at(s.as_of);
+        if (v != null) { acc += (k.w / wSum) * (v / k.b); ws += k.w / wSum; }
+      }
+      if (ws > 0) last = start * (acc / ws);
+      return last;                       // carry-forward through index gaps
+    });
+  }, [series, indexes, positions, marks]);
 
   const removePos = (p) => setPositions(prev => prev.filter(x => posKey(x) !== posKey(p)));
   const toggleFav = (p) => {
@@ -154,6 +230,10 @@ export function Binder({ onSelect }) {
         <SectionHead title="The Binder" hint="your cards, marked to the live Oracle"
           right={<>
             {[7, 30, 90].map(r => <Chip key={r} active={days === r} onClick={() => setDays(r)}>{r}D</Chip>)}
+            {benchmark && <>
+              <span style={{ width: 1, height: 18, background: tokens.color.border, margin: '0 4px' }} />
+              <Chip active={vsMarket} onClick={() => setVsMarket(v => !v)}>VS Market</Chip>
+            </>}
           </>} />
         <div style={{ display: 'flex', gap: 32, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 6 }}>
           <Stat label="Binder value" big v={totals.priced ? fmtUsd(totals.value) : '—'} />
@@ -163,7 +243,8 @@ export function Binder({ onSelect }) {
           <Stat label="Today" v={totals.priced ? fmtUsd(totals.day) : '—'} color={pnlColor(totals.priced ? totals.day : null)} />
           <Stat label="Cards" v={String(positions.reduce((a, p) => a + p.qty, 0) || '—')} />
         </div>
-        <BinderChart series={series} costCents={totals.cost} />
+        <BinderChart series={series} costCents={totals.cost} benchmark={vsMarket ? benchmark : null} />
+        <WhatMoved rows={moversView} days={days} onPick={(pos) => setInspect(pos)} />
       </div>
 
       {/* ── Holdings: the binder itself ── */}
@@ -373,7 +454,43 @@ function Stat({ label, v, big = false, color }) {
  * (smooth curve, soft area fill, endpoint glow) plus a dashed cost-basis
  * line: above the line you're winning, below you're under water.
  */
-function BinderChart({ series, costCents }) {
+/**
+ * The movement behind the chart (Kaleb, 2026-07-22): which cards actually
+ * drove the window's change. Tape-style single strip — up to three gainers
+ * and three decliners by dollar impact (Δ × qty); click lifts the card into
+ * the pop-out. Renders nothing when nothing moved.
+ */
+function WhatMoved({ rows, days, onPick }) {
+  if (!rows?.length) return null;
+  const gainers = rows.filter(r => r.impact > 0).slice(0, 3);
+  const losers = rows.filter(r => r.impact < 0).slice(-3).reverse();
+  if (!gainers.length && !losers.length) return null;
+  const fmtPct = (p) => p == null ? '' : ` (${p > 0 ? '+' : ''}${(p * 100).toFixed(0)}%)`;
+  const entry = (r, up) => (
+    <span key={r.key} onClick={() => onPick?.(r.pos)} title={`${r.name} — open`}
+          style={{ font: `11px ${tokens.font.mono}`, cursor: 'pointer', flexShrink: 0, textTransform: 'uppercase', color: tokens.color.inkSecondary }}>
+      <span style={{ color: up ? tokens.color.up : tokens.color.down }}>{up ? '▲' : '▼'}</span>{' '}
+      <span style={{ color: tokens.color.ink }}>{r.name}</span>
+      {r.grade ? ` ${r.grade}` : ''}{' '}
+      <span style={{ color: up ? tokens.color.up : tokens.color.down }}>
+        {r.impact > 0 ? '+' : '−'}{fmtUsd(Math.abs(r.impact))}{fmtPct(r.pct)}
+      </span>
+    </span>
+  );
+  return (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${tokens.color.border}` }}>
+      <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 14 }}>
+        What moved · {days}D
+      </span>
+      <span style={{ display: 'inline-flex', gap: 18, flexWrap: 'wrap', verticalAlign: 'middle' }}>
+        {gainers.map(r => entry(r, true))}
+        {losers.map(r => entry(r, false))}
+      </span>
+    </div>
+  );
+}
+
+function BinderChart({ series, costCents, benchmark }) {
   const W = 1180, H = 160, PAD = { t: 12, r: 74, b: 20, l: 10 };
   if (!series) return <div style={{ height: H, display: 'flex', alignItems: 'center', color: tokens.color.inkMuted, font: `12px ${tokens.font.body}` }}>Loading price action…</div>;
   if (series.length < 2) {
@@ -382,12 +499,15 @@ function BinderChart({ series, costCents }) {
     </div>;
   }
   const vals = series.map(s => s.value_cents);
-  const lo = Math.min(...vals, costCents || Infinity), hi = Math.max(...vals, costCents || 0);
+  const bench = benchmark?.length === series.length ? benchmark : null;
+  const lo = Math.min(...vals, ...(bench ?? []), costCents || Infinity);
+  const hi = Math.max(...vals, ...(bench ?? []), costCents || 0);
   const span = Math.max(1, hi - lo);
   const x = (i) => PAD.l + (i / (series.length - 1)) * (W - PAD.l - PAD.r);
   const y = (v) => PAD.t + (1 - (v - lo) / span) * (H - PAD.t - PAD.b);
   const pts = series.map((s, i) => [x(i), y(s.value_cents)]);
   const d = smoothPath(pts);
+  const benchPts = bench ? bench.map((v, i) => [x(i), y(v)]) : null;
   const up = vals[vals.length - 1] >= vals[0];
   const col = up ? tokens.color.up : tokens.color.down;
   const [ex, ey] = pts[pts.length - 1];
@@ -406,6 +526,14 @@ function BinderChart({ series, costCents }) {
         </g>
       )}
       <path d={`${d} L ${ex.toFixed(1)} ${H - PAD.b} L ${pts[0][0].toFixed(1)} ${H - PAD.b} Z`} fill="url(#binder-fill)" />
+      {benchPts && (
+        <g>
+          {/* the market for what you hold — franchise indexes blended by your mix */}
+          <path d={smoothPath(benchPts)} fill="none" stroke={tokens.color.inkMuted} strokeWidth="1.3" strokeDasharray="5 4" opacity="0.85" />
+          <text x={benchPts[benchPts.length - 1][0] + 9} y={benchPts[benchPts.length - 1][1] + 12}
+                fill={tokens.color.inkMuted} style={{ font: `9px ${tokens.font.mono}` }}>MARKET</text>
+        </g>
+      )}
       <path d={d} fill="none" stroke={col} strokeWidth="1.8" />
       <circle cx={ex} cy={ey} r="3" fill={col} />
       <circle cx={ex} cy={ey} r="6" fill={col} opacity="0.25" />

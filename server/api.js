@@ -15,7 +15,7 @@ import { refreshLatestMarks, markTopGrades } from './oracle.js';
 import { findLanguageSiblings } from './language-siblings.js';
 import { getDeals } from './deals.js';
 import { getMovers } from './movers.js';
-import { buildBinderSeries } from './binder.js';
+import { buildBinderSeries, buildBinderMovers } from './binder.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -195,11 +195,16 @@ app.post('/api/binder/marks', express.json({ limit: '128kb' }), (req, res) => {
   }));
 });
 
-/** POST /api/binder/series — portfolio value history (see server/binder.js). */
+/** POST /api/binder/series — {series, movers}: portfolio value history + per-position window movement (see server/binder.js). */
 app.post('/api/binder/series', express.json({ limit: '128kb' }), (req, res) => {
   const positions = Array.isArray(req.body?.positions) ? req.body.positions : [];
   const days = Math.min(365, Math.max(7, parseInt(req.body?.days ?? '90', 10) || 90));
-  res.json(buildBinderSeries(db, positions, { days }));
+  // {series, movers}: the chart line + the per-position movement behind it
+  // ("what moved" — Kaleb, 2026-07-22). One round trip, same window.
+  res.json({
+    series: buildBinderSeries(db, positions, { days }),
+    movers: buildBinderMovers(db, positions, { days }),
+  });
 });
 
 /** GET /api/deals?limit=15 → live asks under the oracle mark (grade-matched, deduped, banded) */
