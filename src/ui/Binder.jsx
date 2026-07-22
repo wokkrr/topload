@@ -18,8 +18,24 @@ import { smoothPath } from './chart-utils.js';
 
 const STORE_KEY = 'topload-binder-v1';
 const VIEW_KEY = 'topload-binder-view';
+
+/**
+ * LOTS (Kaleb, 2026-07-22: "once it's added to your binder it needs to be
+ * treated with care as a valuable piece of the collection along with the
+ * price/date of when you added it"). Every COPY is its own lot — what you
+ * paid for THAT one, when THAT one came in. qty/cost_cents stay as derived
+ * fields (qty = lots.length, cost = avg) so pricing, series, and tiles keep
+ * working; the lots are the record.
+ */
+const withDerived = (p) => {
+  const lots = p.lots?.length ? p.lots
+    : Array.from({ length: Math.max(1, p.qty ?? 1) }, () => ({ cost_cents: p.cost_cents ?? 0, added_at: p.added_at ?? null }));
+  const qty = lots.length;
+  const cost_cents = Math.round(lots.reduce((a, l) => a + (l.cost_cents ?? 0), 0) / qty);
+  return { ...p, lots, qty, cost_cents };
+};
 const loadPositions = () => {
-  try { return JSON.parse(localStorage.getItem(STORE_KEY) ?? '[]'); } catch { return []; }
+  try { return (JSON.parse(localStorage.getItem(STORE_KEY) ?? '[]')).map(withDerived); } catch { return []; }
 };
 const savePositions = (ps) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(ps)); } catch { /* SSR/private mode */ } };
 // Default = SHOWCASE (Kaleb, 2026-07-22: art first and foremost). A stored
@@ -178,17 +194,15 @@ export function Binder({ onSelect }) {
   }, [series, indexes, positions, marks]);
 
   const removePos = (p) => setPositions(prev => prev.filter(x => posKey(x) !== posKey(p)));
-  // Copies are managed one at a time (Kaleb, 2026-07-22: removing one of two
-  // Pikachus removed both). Stepping qty keeps the blended avg cost/ea —
-  // adding or removing a copy at average cost is honest bookkeeping.
-  const adjustQty = (p, delta) => {
-    const next = Math.max(1, (p.qty ?? 1) + delta);
-    setPositions(prev => prev.map(x => posKey(x) === posKey(p) ? { ...x, qty: next } : x));
-    setInspect(cur => cur && posKey(cur) === posKey(p) ? { ...cur, qty: next } : cur);
-  };
-  const removeOne = (p) => {
-    if ((p.qty ?? 1) > 1) adjustQty(p, -1);
-    else { removePos(p); setInspect(null); }
+  // Removing a COPY means removing a specific LOT — the exact acquisition,
+  // with its own paid/date, chosen deliberately inside the armed remove flow
+  // (Kaleb, 2026-07-22: no casual +/− — binder entries are treated with care).
+  const removeLot = (p, idx) => {
+    const lots = (p.lots ?? []).filter((_, i) => i !== idx);
+    if (!lots.length) { removePos(p); setInspect(null); return; }
+    const upd = withDerived({ ...p, lots });
+    setPositions(prev => prev.map(x => posKey(x) === posKey(p) ? upd : x));
+    setInspect(cur => cur && posKey(cur) === posKey(p) ? upd : cur);
   };
   const toggleFav = (p) => {
     setPositions(prev => prev.map(x => posKey(x) === posKey(p) ? { ...x, fav: !x.fav } : x));
@@ -227,15 +241,14 @@ export function Binder({ onSelect }) {
     return flat[(i + dir + flat.length) % flat.length] ?? cur;
   });
   const addPosition = (pos) => {
+    // Every copy enters as its own LOT — the price/date of THIS acquisition
+    // is part of the record, never blended away.
+    const newLots = Array.from({ length: Math.max(1, pos.qty ?? 1) },
+      () => ({ cost_cents: pos.cost_cents ?? 0, added_at: pos.added_at ?? null }));
     setPositions(prev => {
       const i = prev.findIndex(p => posKey(p) === posKey(pos));
-      if (i >= 0) {
-        const cur = prev[i];
-        const qty = cur.qty + pos.qty;
-        const cost_cents = Math.round(((cur.cost_cents ?? 0) * cur.qty + (pos.cost_cents ?? 0) * pos.qty) / qty);
-        return prev.map((p, j) => j === i ? { ...cur, qty, cost_cents } : p);
-      }
-      return [...prev, pos];
+      if (i >= 0) return prev.map((p, j) => j === i ? withDerived({ ...p, lots: [...(p.lots ?? []), ...newLots] }) : p);
+      return [...prev, withDerived({ ...pos, lots: newLots })];
     });
     // Stay in the add flow (entering a collection is many cards) and let the
     // grid pulse the newcomer so you see it land.
@@ -327,8 +340,7 @@ export function Binder({ onSelect }) {
             onClose={() => setInspect(null)}
             onFull={() => { const id = inspect.card_id; setInspect(null); onSelect?.(id); }}
             onFav={() => toggleFav(inspect)}
-            onQty={(d) => adjustQty(inspect, d)}
-            onRemoveOne={() => removeOne(inspect)}
+            onRemoveLot={(idx) => removeLot(inspect, idx)}
             onRemove={() => { removePos(inspect); setInspect(null); }}
           />
         )}
@@ -354,16 +366,17 @@ const MODAL_CSS = `
 .tl-binder-pop { animation: tl-pop .22s ease-out; }
 `;
 
-function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onRemove, onRemoveOne, onQty, onFav }) {
+function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onRemove, onRemoveLot, onFav }) {
   // Two-step remove (Kaleb, 2026-07-22: "too easy to remove a card
   // accidentally") — REMOVE arms a red confirm that disarms itself.
   const [confirmRemove, setConfirmRemove] = useState(false);
   useEffect(() => { setConfirmRemove(false); }, [p]);
   useEffect(() => {
     if (!confirmRemove) return;
-    const t = setTimeout(() => setConfirmRemove(false), 4000);
+    // Picking WHICH copy takes a moment longer than a yes/no — give it room.
+    const t = setTimeout(() => setConfirmRemove(false), p.qty > 1 ? 7000 : 4000);
     return () => clearTimeout(t);
-  }, [confirmRemove]);
+  }, [confirmRemove, p.qty]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -433,26 +446,31 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
             {pnlPct != null && <Stat label="P&L" v={`${fmtUsd(pnl)} · ${fmtPct(pnlPct)}`} color={pnlColor(pnl)} />}
           </div>
 
-          {/* Qty steps in place — "I got another one" / "sold a copy" without
-              re-entering the add flow. − stops at 1: the LAST copy only
-              leaves through the two-step Remove below (accident safety). */}
-          <div style={row}>
-            <span style={k}>Grade · Qty</span>
-            <span style={{ ...v, display: 'flex', gap: 9, alignItems: 'center' }}>
-              {p.grade}
-              <span onClick={() => p.qty > 1 && onQty?.(-1)} title={p.qty > 1 ? 'Remove one copy' : 'Last copy — use Remove below'}
-                    style={{ cursor: p.qty > 1 ? 'pointer' : 'default', color: p.qty > 1 ? tokens.color.inkSecondary : tokens.color.border, padding: '0 3px', userSelect: 'none' }}>−</span>
-              <span>{p.qty}</span>
-              <span onClick={() => onQty?.(1)} title="Add one copy (at your average cost)"
-                    style={{ cursor: 'pointer', color: tokens.color.inkSecondary, padding: '0 3px', userSelect: 'none' }}>+</span>
-            </span>
-          </div>
-          <div style={row}><span style={k}>Paid (each)</span><span style={v}>{fmtUsd(p.cost_cents)}</span></div>
+          <div style={row}><span style={k}>Grade · Qty</span><span style={v}>{p.grade}{p.qty > 1 ? ` × ${p.qty}` : ''}</span></div>
+          {p.qty <= 1 && <div style={row}><span style={k}>Paid</span><span style={v}>{fmtUsd(p.cost_cents)}</span></div>}
           <div style={row} title={m?.basis ? (m.basis === 'solds' ? 'Value from real sales' : 'Estimated value') : undefined}>
             <span style={k}>Oracle (each)</span><span style={v}>{fmtUsd(m?.price_cents)}{m?.basis ? ` · ${m.basis === 'solds' ? 'real sales' : 'estimate'}` : ''}</span>
           </div>
           <div style={row}><span style={k}>Today</span><span style={{ ...v, color: pnlColor(d1) }}>{fmtPct(d1)}</span></div>
-          <div style={row}><span style={k}>Added</span><span style={v}>{p.added_at ?? '—'}</span></div>
+          {p.qty <= 1 && <div style={row}><span style={k}>Added</span><span style={v}>{p.lots?.[0]?.added_at ?? p.added_at ?? '—'}</span></div>}
+
+          {/* THE COPIES — each acquisition is its own record (Kaleb,
+              2026-07-22: "a valuable piece of the collection along with the
+              price/date of when you added it"). Nothing here is clickable
+              until Remove below is armed; then each copy offers its own ✕. */}
+          {p.qty > 1 && (p.lots ?? []).map((lot, i) => (
+            <div key={i} style={row}>
+              <span style={k}>Copy {i + 1}</span>
+              <span style={{ ...v, display: 'flex', gap: 14, alignItems: 'baseline' }}>
+                <span>{fmtUsd(lot.cost_cents)}</span>
+                <span style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.mono}` }}>{lot.added_at ?? '—'}</span>
+                {confirmRemove && (
+                  <span onClick={() => { onRemoveLot?.(i); setConfirmRemove(false); }} title="Remove this copy"
+                        style={{ cursor: 'pointer', color: tokens.color.down, font: `12px ${tokens.font.mono}` }}>✕</span>
+                )}
+              </span>
+            </div>
+          ))}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 18, flexWrap: 'wrap', alignItems: 'center' }}>
             <Chip active onClick={onFull}>Full Research →</Chip>
@@ -461,9 +479,8 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
                 <Chip onClick={() => setConfirmRemove(true)}>Remove…</Chip>
               ) : p.qty > 1 ? (
                 <>
-                  <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>you hold {p.qty} — remove…</span>
-                  <Chip active color={tokens.color.down} onClick={() => { onRemoveOne?.(); setConfirmRemove(false); }}>One</Chip>
-                  <Chip active color={tokens.color.down} onClick={onRemove}>All ×{p.qty}</Chip>
+                  <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>✕ a copy above, or</span>
+                  <Chip active color={tokens.color.down} onClick={onRemove}>Remove All ×{p.qty}</Chip>
                   <Chip onClick={() => setConfirmRemove(false)}>Keep</Chip>
                 </>
               ) : (
