@@ -428,6 +428,13 @@ app.get('/api/gacha', (req, res) => {
   res.json(out.filter(r => !drop.has(r)));
 });
 
+// Vintage-JP art store (seed-artofpkm-art.js downloads ONCE into data/jpart;
+// we serve from our own disk — never hotlink the fan-site source). Immutable:
+// files are content-stable per card.
+app.use('/jpart', express.static(join(__dirname, '..', 'data', 'jpart'), {
+  immutable: true, maxAge: '365d', fallthrough: true,
+}));
+
 // Production: serve the built UI from the same process (VPS mode) — /api/*
 // stays API, everything else falls through to the SPA.
 const dist = join(__dirname, '..', 'dist');
