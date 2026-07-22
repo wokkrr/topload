@@ -88,17 +88,37 @@ export function Binder({ onSelect }) {
   }, [positions, marks]);
 
   const removePos = (p) => setPositions(prev => prev.filter(x => posKey(x) !== posKey(p)));
-  // Binder-order flat list (pages by set, richest first) — the pop-out's
-  // ‹ › / arrow keys page through it like turning sleeves.
-  const flat = useMemo(() => {
-    const bySet = new Map();
-    for (const p of positions) {
-      const set = (marks[posKey(p)]?.set_name ?? p.set_name) || 'Other';
-      (bySet.get(set) ?? bySet.set(set, []).get(set)).push(p);
+  const toggleFav = (p) => {
+    setPositions(prev => prev.map(x => posKey(x) === posKey(p) ? { ...x, fav: !x.fav } : x));
+    setInspect(cur => cur && posKey(cur) === posKey(p) ? { ...cur, fav: !cur.fav } : cur);
+  };
+
+  // ── Binder pages (Kaleb, 2026-07-22): FAVORITES up front — "I liked
+  // organizing them to show off my favorite cards at the front of the
+  // binder" — then one page per FRANCHISE (set-level headers were "a bit
+  // too much"). Richest franchise first; filter chips narrow the view.
+  const [ipFilter, setIpFilter] = useState('');
+  const shown = useMemo(() =>
+    positions.filter(p => !ipFilter || (marks[posKey(p)]?.ip ?? p.ip) === ipFilter),
+    [positions, marks, ipFilter]);
+  const pages = useMemo(() => {
+    const val = (ps) => ps.reduce((a, p) => a + (marks[posKey(p)]?.price_cents ?? 0) * p.qty, 0);
+    const favs = shown.filter(p => p.fav);
+    const rest = shown.filter(p => !p.fav);
+    const byIp = new Map();
+    for (const p of rest) {
+      const ip = marks[posKey(p)]?.ip ?? p.ip ?? '?';
+      (byIp.get(ip) ?? byIp.set(ip, []).get(ip)).push(p);
     }
-    const value = (ps) => ps.reduce((a, p) => a + (marks[posKey(p)]?.price_cents ?? 0) * p.qty, 0);
-    return [...bySet.values()].map(ps => ({ ps, v: value(ps) })).sort((a, b) => b.v - a.v).flatMap(x => x.ps);
-  }, [positions, marks]);
+    const out = [];
+    if (favs.length) out.push({ key: 'fav', label: 'Favorites', star: true, ps: favs, subtotal: val(favs) });
+    out.push(...[...byIp.entries()]
+      .map(([ip, ps]) => ({ key: ip, label: tokens.series[ip]?.label ?? ip, color: tokens.series[ip]?.data, ps, subtotal: val(ps) }))
+      .sort((a, b) => b.subtotal - a.subtotal));
+    return out;
+  }, [shown, marks]);
+  // Flat binder order — the pop-out's ‹ › / arrow keys page through it.
+  const flat = useMemo(() => pages.flatMap(pg => pg.ps), [pages]);
   const navInspect = (dir) => setInspect(cur => {
     if (!cur || !flat.length) return cur;
     const i = flat.findIndex(x => posKey(x) === posKey(cur));
@@ -147,6 +167,15 @@ export function Binder({ onSelect }) {
             <Chip active={view === 'list'} onClick={() => pickView('list')}><span title="Ledger view" style={{ fontSize: 14, lineHeight: 1 }}>☰</span></Chip>
           </>} />
 
+        {positions.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+            {[['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']].map(([val, label]) => (
+              <Chip key={val || 'all'} active={ipFilter === val} onClick={() => setIpFilter(val)}
+                    color={val ? tokens.series[val]?.data : undefined}>{label}</Chip>
+            ))}
+          </div>
+        )}
+
         {adding && <AddCard onAdd={addPosition} />}
 
         {!positions.length && !adding && (
@@ -171,10 +200,10 @@ export function Binder({ onSelect }) {
         )}
 
         {positions.length > 0 && view === 'grid' && (
-          <BinderGrid positions={positions} marks={marks} onSelect={setInspect} />
+          <BinderGrid pages={pages} marks={marks} onSelect={setInspect} />
         )}
         {positions.length > 0 && view === 'list' && (
-          <BinderTable positions={positions} marks={marks} onSelect={setInspect} />
+          <BinderTable positions={[...shown].sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0))} marks={marks} onSelect={setInspect} />
         )}
 
         {inspect && (
@@ -184,6 +213,7 @@ export function Binder({ onSelect }) {
             onNav={navInspect}
             onClose={() => setInspect(null)}
             onFull={() => { const id = inspect.card_id; setInspect(null); onSelect?.(id); }}
+            onFav={() => toggleFav(inspect)}
             onRemove={() => { removePos(inspect); setInspect(null); }}
           />
         )}
@@ -209,7 +239,7 @@ const MODAL_CSS = `
 .tl-binder-pop { animation: tl-pop .22s ease-out; }
 `;
 
-function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onRemove }) {
+function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onRemove, onFav }) {
   // Two-step remove (Kaleb, 2026-07-22: "too easy to remove a card
   // accidentally") — REMOVE arms a red confirm that disarms itself.
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -260,7 +290,13 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
         {/* Your numbers. */}
         <div style={{ flex: '1 1 54%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-            <div style={{ font: `19px ${tokens.font.display}`, color: tokens.color.ink }}>{m?.name ?? p.name}</div>
+            <div style={{ font: `19px ${tokens.font.display}`, color: tokens.color.ink, display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.name ?? p.name}</span>
+              <span onClick={onFav} title={p.fav ? 'Remove from Favorites' : 'Pin to the front of your Binder'}
+                    style={{ cursor: 'pointer', fontSize: 16, color: p.fav ? tokens.color.brass : tokens.color.inkMuted, flexShrink: 0 }}>
+                {p.fav ? '★' : '☆'}
+              </span>
+            </div>
             <span style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexShrink: 0 }}>
               {total > 1 && (
                 <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkMuted, textTransform: 'uppercase' }}>
@@ -382,31 +418,19 @@ const GRID_CSS = `
 `;
 
 /**
- * Binder PAGES (Kaleb, 2026-07-22: "a really nice beautiful binder of cards
- * people would enjoy looking at and organizing") — cards group by set like
- * a real binder's pages, richest page first, each with its own subtotal.
+ * Binder pages: FAVORITES up front (the flex page), then one page per
+ * franchise. Headers wear the star / franchise color dot.
  */
-function BinderGrid({ positions, marks, onSelect }) {
-  const pages = useMemo(() => {
-    const bySet = new Map();
-    for (const p of positions) {
-      const m = marks[posKey(p)];
-      const set = (m?.set_name ?? p.set_name) || 'Other';
-      (bySet.get(set) ?? bySet.set(set, []).get(set)).push(p);
-    }
-    const value = (ps) => ps.reduce((a, p) => a + (marks[posKey(p)]?.price_cents ?? 0) * p.qty, 0);
-    return [...bySet.entries()]
-      .map(([set, ps]) => ({ set, ps, subtotal: value(ps) }))
-      .sort((a, b) => b.subtotal - a.subtotal);
-  }, [positions, marks]);
-
+function BinderGrid({ pages, marks, onSelect }) {
   return (
     <div>
       <style>{GRID_CSS}</style>
-      {pages.map(({ set, ps, subtotal }) => (
-        <div key={set} style={{ marginBottom: 26 }}>
+      {pages.map(({ key, label, star, color, ps, subtotal }) => (
+        <div key={key} style={{ marginBottom: 26 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, margin: '2px 0 10px', borderBottom: `1px solid ${tokens.color.border}`, paddingBottom: 6 }}>
-            <span style={{ font: `11px ${tokens.font.mono}`, textTransform: 'uppercase', letterSpacing: '1px', color: tokens.color.ink }}>{set}</span>
+            {star && <span style={{ color: tokens.color.brass, fontSize: 12 }}>★</span>}
+            {color && <span style={{ width: 8, height: 8, borderRadius: 2, background: color, alignSelf: 'center' }} />}
+            <span style={{ font: `11px ${tokens.font.mono}`, textTransform: 'uppercase', letterSpacing: '1px', color: tokens.color.ink }}>{label}</span>
             <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>
               {ps.reduce((a, p) => a + p.qty, 0)} card{ps.reduce((a, p) => a + p.qty, 0) === 1 ? '' : 's'}
             </span>
@@ -445,6 +469,12 @@ function PageGrid({ ps, marks, onSelect }) {
                 color: tokens.color.ink, background: tokens.color.overlay, borderRadius: 3, padding: '2px 6px',
               }}>{p.grade}{p.qty > 1 ? ` ×${p.qty}` : ''}{langCode(m?.language ?? p.language) !== 'EN' ? ` · ${langCode(m?.language ?? p.language)}` : ''}</span>
               <span className="tl-shine" aria-hidden />
+              {p.fav && (
+                <span style={{
+                  position: 'absolute', top: 6, right: 6, font: `12px ${tokens.font.mono}`,
+                  color: tokens.color.brass, background: tokens.color.overlay, borderRadius: 3, padding: '1px 6px',
+                }}>★</span>
+              )}
             </div>
             <div style={{ padding: '8px 10px 9px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
@@ -487,7 +517,7 @@ function BinderTable({ positions, marks, onSelect }) {
             <tr key={posKey(p)} style={{ cursor: 'pointer' }} onClick={() => onSelect?.(p)}>
               <td style={{ ...tdL, display: 'flex', alignItems: 'center' }}>
                 <Thumb src={m?.image} size={34} />
-                <span>{m?.name ?? p.name} <span style={{ color: tokens.color.inkMuted }}>· {m?.set_name ?? p.set_name} {m?.number ?? p.number}</span></span>
+                <span>{p.fav && <span style={{ color: tokens.color.brass }}>★ </span>}{m?.name ?? p.name} <span style={{ color: tokens.color.inkMuted }}>· {m?.set_name ?? p.set_name} {m?.number ?? p.number}</span></span>
               </td>
               <td style={{ ...td, textAlign: 'left' }}>
                 <span style={{ color: langCode(m?.language ?? p.language) === 'EN' ? tokens.color.inkMuted : tokens.color.ink }}>{langCode(m?.language ?? p.language)}</span>
