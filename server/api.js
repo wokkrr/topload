@@ -131,6 +131,35 @@ app.get('/api/movers', (_req, res) => {
   })));
 });
 
+/**
+ * POST /api/binder/marks — bulk live values for Binder positions.
+ * Body: {positions:[{card_id, grade}]} (≤200). Returns per position the
+ * current Oracle mark + lookbacks + live card meta. Positions themselves
+ * live in the USER'S browser (no accounts yet — they arrive with the Buy
+ * Flow's sign-in); the server only prices what it's shown.
+ */
+app.post('/api/binder/marks', express.json({ limit: '128kb' }), (req, res) => {
+  const positions = Array.isArray(req.body?.positions) ? req.body.positions.slice(0, 200) : [];
+  const mark = db.prepare(
+    `SELECT price_cents, price_1d, price_7d, basis, confidence, sales_7d FROM latest_marks WHERE card_id = ? AND grade = ?`);
+  const meta = db.prepare(
+    `SELECT id, ip, name, set_name, number, language, image AS card_image, image_kind AS card_kind,
+            (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo
+     FROM cards WHERE id = ?`);
+  res.json(positions.map(p => {
+    const c = p?.card_id ? meta.get(String(p.card_id)) : null;
+    if (!c) return { card_id: p?.card_id ?? null, grade: p?.grade ?? null, missing: true };
+    const m = mark.get(c.id, String(p.grade ?? 'raw')) ?? null;
+    return {
+      card_id: c.id, grade: String(p.grade ?? 'raw'),
+      ip: c.ip, name: c.name, set_name: c.set_name, number: c.number, language: c.language,
+      ...pickImage(c.id, c.card_image, c.card_kind, c.listing_photo),
+      price_cents: m?.price_cents ?? null, price_1d: m?.price_1d ?? null, price_7d: m?.price_7d ?? null,
+      basis: m?.basis ?? null, confidence: m?.confidence ?? null, sales_7d: m?.sales_7d ?? null,
+    };
+  }));
+});
+
 /** GET /api/deals?limit=15 → live asks under the oracle mark (grade-matched, deduped, banded) */
 app.get('/api/deals', (req, res) => {
   const limit = Math.min(50, parseInt(req.query.limit ?? '15', 10));

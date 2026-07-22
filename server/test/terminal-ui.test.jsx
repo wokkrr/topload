@@ -87,6 +87,17 @@ describe('CardsTable (2026-07-21/22 column rework)', () => {
   });
 });
 
+describe('Binder (v1 walking skeleton)', () => {
+  it('renders SSR-safe with no localStorage (empty state + stat header)', async () => {
+    const React = (await import('react')).default;
+    const { Binder } = await import('../../src/ui/Binder.jsx');
+    const html = renderToString(React.createElement(Binder, { onSelect: () => {} }));
+    expect(html).toContain('Binder value');
+    expect(html).toContain('Your Binder is empty');
+    expect(html).toContain('Add Card');
+  });
+});
+
 describe('IndexTable', () => {
   it('renders uneven series without crashing (shorter index shows dashes)', async () => {
     const { renderToString } = await import('react-dom/server');

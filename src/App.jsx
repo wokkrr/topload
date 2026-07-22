@@ -6,6 +6,7 @@ import { CardDetail } from './ui/CardDetail.jsx';
 import { ListingDetail } from './ui/ListingDetail.jsx';
 import { GachaDesk } from './ui/tables.jsx';
 import { Terminal, CardsPage } from './ui/Terminal.jsx';
+import { Binder } from './ui/Binder.jsx';
 
 /**
  * Real pages, lazy data (Kaleb, 2026-07-21: "would it make sense for the
@@ -24,11 +25,13 @@ import { Terminal, CardsPage } from './ui/Terminal.jsx';
 // TERMINAL / CARDS / LISTINGS (Kaleb, 2026-07-21): the lookup table moves to
 // its own CARDS tab — the database gets a home; the Terminal page is the
 // market-strength snapshot + deal radar.
-const TABS = [['Terminal', '/'], ['Cards', '/cards'], ['Listings', '/desk']];
+// BINDER (2026-07-22): major build #1 — the portfolio tracker gets a tab.
+const TABS = [['Terminal', '/'], ['Cards', '/cards'], ['Listings', '/desk'], ['Binder', '/binder']];
 
 const parseRoute = (path) => {
   if (path === '/desk') return { page: 'desk' };
   if (path === '/cards') return { page: 'cards' };
+  if (path === '/binder') return { page: 'binder' };
   const card = /^\/card\/(.+)$/.exec(path);
   if (card) return { page: 'card', cardId: decodeURIComponent(card[1]) };
   const listing = /^\/listing\/([^/]+)\/(.+)$/.exec(path);
@@ -71,7 +74,7 @@ export default function App() {
     else navigate(fallback);
   };
 
-  const openCard = (id) => { if (route.page !== 'listing') setOrigin(route.page === 'desk' ? 'desk' : route.page === 'cards' ? 'cards' : 'terminal'); navigate(`/card/${encodeURIComponent(id)}`); };
+  const openCard = (id) => { if (route.page !== 'listing') setOrigin(route.page === 'desk' ? 'desk' : route.page === 'cards' ? 'cards' : route.page === 'binder' ? 'binder' : 'terminal'); navigate(`/card/${encodeURIComponent(id)}`); };
   const openListing = (l, ctx) => {
     if (route.page === 'desk') setOrigin('desk');
     if (ctx) setNavListings(ctx);
@@ -136,7 +139,7 @@ export default function App() {
         </a>
         <nav style={{ display: 'flex', gap: 2, marginLeft: 'auto', alignItems: 'center' }}>
           {TABS.map(([label, to]) => {
-            const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/desk') || (route.page === 'cards' && to === '/cards');
+            const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/desk') || (route.page === 'cards' && to === '/cards') || (route.page === 'binder' && to === '/binder');
             return (
               <button key={to} onClick={() => { setOrigin(to === '/desk' ? 'desk' : to === '/cards' ? 'cards' : 'terminal'); navigate(to); }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.color = tokens.color.ink; }}
@@ -166,7 +169,7 @@ export default function App() {
         {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 12, textTransform: 'uppercase' }}>{err}</div>}
 
         {route.page === 'card' && (
-          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/desk' : origin === 'cards' ? '/cards' : '/')} onOpenCard={openCard} />
+          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/desk' : origin === 'cards' ? '/cards' : origin === 'binder' ? '/binder' : '/')} onOpenCard={openCard} />
         )}
 
         {route.page === 'listing' && (
@@ -200,6 +203,14 @@ export default function App() {
         {(route.page === 'cards' || (route.page === 'card' && origin === 'cards')) && (
           <div style={{ display: route.page === 'cards' ? 'block' : 'none' }}>
             <CardsPage onSelect={openCard} />
+          </div>
+        )}
+
+        {/* Binder stays MOUNTED (hidden) under card pages opened from it —
+            positions state + add-flow survive the back-click, same pattern. */}
+        {(route.page === 'binder' || (route.page === 'card' && origin === 'binder')) && (
+          <div style={{ display: route.page === 'binder' ? 'block' : 'none' }}>
+            <Binder onSelect={openCard} />
           </div>
         )}
 

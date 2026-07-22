@@ -9,6 +9,12 @@ async function get(path) {
   return res.json();
 }
 
+async function post(path, body) {
+  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  return res.json();
+}
+
 export const api = {
   /** [{index_id, series:[{as_of, value}]}] — normalized to 100 at window start */
   indexes: (days = 90) => get(`/api/indexes?days=${days}`),
@@ -42,6 +48,8 @@ export const api = {
   cardSales: (id) => get(`/api/cards/${encodeURIComponent(id)}/sales`),
   /** global on-chain sales tape */
   recentSales: () => get('/api/sales/recent'),
+  /** Binder: bulk live values for locally-stored positions */
+  binderMarks: (positions) => post('/api/binder/marks', { positions }),
 };
 
 /** Marketplace display names — no chain/crypto jargon on user surfaces. */
