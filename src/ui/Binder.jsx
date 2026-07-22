@@ -320,11 +320,17 @@ function BinderTable({ positions, marks, onSelect, onRemove }) {
   );
 }
 
-/** Search → pick card → grade/qty/cost → add. Reuses the screener API. */
+/**
+ * Search → SEE the card (thumbnails — many cards share a name across sets;
+ * you pick by sight) → grade dropdown with LIVE Oracle values per tracked
+ * grade → qty/cost → add. (Kaleb, 2026-07-22: "more intuitive when searching
+ * exactly which card to add".)
+ */
 function AddCard({ onAdd }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
   const [pick, setPick] = useState(null);
+  const [ladder, setLadder] = useState(null);        // tracked grades w/ live values
   const [grade, setGrade] = useState('raw');
   const [qty, setQty] = useState('1');
   const [cost, setCost] = useState('');
@@ -334,10 +340,30 @@ function AddCard({ onAdd }) {
     if (!q.trim()) { setResults(null); return; }
     clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
-      api.cards({ q, limit: 8 }).then(setResults).catch(() => setResults([]));
+      api.cards({ q, limit: 12 }).then(setResults).catch(() => setResults([]));
     }, 250);
     return () => clearTimeout(debounce.current);
   }, [q]);
+
+  // On pick: pull the card's full grade ladder so the dropdown can say
+  // "PSA10 — $5,260" instead of making the user guess what we track.
+  useEffect(() => {
+    if (!pick) { setLadder(null); return; }
+    let dead = false;
+    api.card(pick.card_id)
+      .then(c => { if (!dead) setLadder(c?.grades ?? []); })
+      .catch(() => { if (!dead) setLadder([]); });
+    return () => { dead = true; };
+  }, [pick]);
+
+  const gradeOptions = useMemo(() => {
+    const tracked = new Map((ladder ?? []).map(g => [g.grade, g.price_cents]));
+    const rest = GRADES.filter(g => !tracked.has(g));
+    return [
+      ...[...tracked.entries()].map(([g, cents]) => ({ g, label: `${g.toUpperCase()} — ${fmtUsd(cents)}` })),
+      ...rest.map(g => ({ g, label: g.toUpperCase() })),
+    ];
+  }, [ladder]);
 
   const input = {
     background: tokens.color.surface, border: `1px solid ${tokens.color.border}`,
@@ -349,42 +375,71 @@ function AddCard({ onAdd }) {
     <div style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 8, padding: 16, marginBottom: 18, background: tokens.color.surfaceRaised }}>
       {!pick && (
         <div>
-          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search the card you own…" style={{ ...input, width: 320 }} />
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+                 placeholder="Search the card you own — name, set, or number…" style={{ ...input, width: 360 }} />
           {results && (
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 12 }}>
               {results.length === 0 && <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}` }}>No matches — try fewer words.</div>}
-              {results.map(c => (
-                <div key={c.card_id} onClick={() => setPick(c)}
-                     style={{ padding: '6px 8px', cursor: 'pointer', borderTop: `1px solid ${tokens.color.surface}`, font: `13px ${tokens.font.body}` }}>
-                  {c.name} <span style={{ color: tokens.color.inkMuted }}>· {c.set_name} {c.number} · {langCode(c.language)}</span>
-                </div>
-              ))}
+              {/* Visual picker: thumbnails, because "Charizard" is forty cards. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+                {results.map(c => (
+                  <div key={c.card_id} onClick={() => { setPick(c); setGrade(c.grade ?? 'raw'); }}
+                       onMouseEnter={e => e.currentTarget.style.borderColor = tokens.color.brass}
+                       onMouseLeave={e => e.currentTarget.style.borderColor = tokens.color.border}
+                       style={{
+                         display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', cursor: 'pointer',
+                         border: `1px solid ${tokens.color.border}`, borderRadius: 6, background: tokens.color.surface,
+                         transition: 'border-color .12s ease',
+                       }}>
+                    <Thumb src={c.image} size={46} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', font: `13px ${tokens.font.body}`, color: tokens.color.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                      <span style={{ display: 'block', font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.set_name} {c.number}{langCode(c.language) !== 'EN' ? ` · ${langCode(c.language)}` : ''}
+                      </span>
+                      {c.price_cents != null && (
+                        <span style={{ display: 'block', font: `10px ${tokens.font.mono}`, color: tokens.color.inkSecondary, textTransform: 'uppercase' }}>
+                          {c.grade} {fmtUsd(c.price_cents)}{c.grades_tracked > 1 ? ` · +${c.grades_tracked - 1} grades` : ''}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       )}
       {pick && (
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <span style={{ font: `13px ${tokens.font.body}`, color: tokens.color.ink, paddingBottom: 8 }}>
-            {pick.name} <span style={{ color: tokens.color.inkMuted }}>· {pick.set_name} {pick.number}</span>
-          </span>
-          <Field label="Grade">
-            <select value={grade} onChange={e => setGrade(e.target.value)} style={{ ...input, padding: '6px 8px', textTransform: 'uppercase', font: `12px ${tokens.font.mono}` }}>
-              {GRADES.map(g => <option key={g} value={g}>{g.toUpperCase()}</option>)}
-            </select>
-          </Field>
-          <Field label="Qty"><input value={qty} onChange={e => setQty(e.target.value.replace(/\D/g, ''))} style={{ ...input, width: 52 }} /></Field>
-          <Field label="Cost each ($)"><input value={cost} onChange={e => setCost(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.00" style={{ ...input, width: 100 }} /></Field>
-          <Chip active onClick={() => {
-            const nQty = Math.max(1, parseInt(qty || '1', 10));
-            onAdd({
-              card_id: pick.card_id, grade, qty: nQty,
-              cost_cents: Math.round(parseFloat(cost || '0') * 100),
-              added_at: new Date().toISOString().slice(0, 10),
-              name: pick.name, set_name: pick.set_name, number: pick.number, ip: pick.ip, language: pick.language,
-            });
-          }}>Add To Binder</Chip>
-          <Chip onClick={() => setPick(null)}>Back</Chip>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* The card you're adding, big enough to be sure it's the right one. */}
+          <Thumb src={pick.image} size={92} />
+          <div style={{ flex: '1 1 auto', minWidth: 260 }}>
+            <div style={{ font: `15px ${tokens.font.body}`, color: tokens.color.ink, marginBottom: 2 }}>{pick.name}</div>
+            <div style={{ font: `11px ${tokens.font.body}`, color: tokens.color.inkMuted, marginBottom: 12 }}>
+              {pick.set_name} {pick.number}{langCode(pick.language) !== 'EN' ? ` · ${langCode(pick.language)}` : ''}
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <Field label={ladder === null ? 'Grade (loading values…)' : 'Grade'}>
+                <select value={grade} onChange={e => setGrade(e.target.value)}
+                        style={{ ...input, padding: '6px 8px', textTransform: 'uppercase', font: `12px ${tokens.font.mono}` }}>
+                  {gradeOptions.map(o => <option key={o.g} value={o.g}>{o.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Qty"><input value={qty} onChange={e => setQty(e.target.value.replace(/\D/g, ''))} style={{ ...input, width: 52 }} /></Field>
+              <Field label="Cost each ($)"><input value={cost} onChange={e => setCost(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.00" style={{ ...input, width: 100 }} /></Field>
+              <Chip active onClick={() => {
+                const nQty = Math.max(1, parseInt(qty || '1', 10));
+                onAdd({
+                  card_id: pick.card_id, grade, qty: nQty,
+                  cost_cents: Math.round(parseFloat(cost || '0') * 100),
+                  added_at: new Date().toISOString().slice(0, 10),
+                  name: pick.name, set_name: pick.set_name, number: pick.number, ip: pick.ip, language: pick.language,
+                });
+              }}>Add To Binder</Chip>
+              <Chip onClick={() => setPick(null)}>Back</Chip>
+            </div>
+          </div>
         </div>
       )}
     </div>
