@@ -59,6 +59,12 @@ export function Binder({ onSelect }) {
   // clicking a card lifts it out of the page with YOUR numbers beside it;
   // the full research page is one more click, not the default jump.
   const [inspect, setInspect] = useState(null);
+  const [lastAdded, setLastAdded] = useState(null);
+  useEffect(() => {
+    if (!lastAdded) return;
+    const t = setTimeout(() => setLastAdded(null), 2600);
+    return () => clearTimeout(t);
+  }, [lastAdded]);
   useEffect(() => { savePositions(positions); }, [positions]);
   const pickView = (v) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ } };
 
@@ -135,7 +141,9 @@ export function Binder({ onSelect }) {
       }
       return [...prev, pos];
     });
-    setAdding(false);
+    // Stay in the add flow (entering a collection is many cards) and let the
+    // grid pulse the newcomer so you see it land.
+    setLastAdded(posKey(pos));
   };
 
   return (
@@ -200,7 +208,7 @@ export function Binder({ onSelect }) {
         )}
 
         {positions.length > 0 && view === 'grid' && (
-          <BinderGrid pages={pages} marks={marks} onSelect={setInspect} />
+          <BinderGrid pages={pages} marks={marks} onSelect={setInspect} lastAdded={lastAdded} />
         )}
         {positions.length > 0 && view === 'list' && (
           <BinderTable positions={[...shown].sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0))} marks={marks} onSelect={setInspect} />
@@ -415,13 +423,15 @@ const GRID_CSS = `
   transform: translateX(-130%); transition: transform .55s ease;
 }
 .tl-binder-card:hover .tl-shine::after { transform: translateX(130%); }
+@keyframes tl-added-pulse { 0% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 100% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
+.tl-just-added { border-color: ${tokens.color.brass}; animation: tl-added-pulse 1.4s ease-out; }
 `;
 
 /**
  * Binder pages: FAVORITES up front (the flex page), then one page per
  * franchise. Headers wear the star / franchise color dot.
  */
-function BinderGrid({ pages, marks, onSelect }) {
+function BinderGrid({ pages, marks, onSelect, lastAdded }) {
   return (
     <div>
       <style>{GRID_CSS}</style>
@@ -438,14 +448,14 @@ function BinderGrid({ pages, marks, onSelect }) {
               {subtotal > 0 ? fmtUsd(subtotal) : ''}
             </span>
           </div>
-          <PageGrid ps={ps} marks={marks} onSelect={onSelect} />
+          <PageGrid ps={ps} marks={marks} onSelect={onSelect} lastAdded={lastAdded} />
         </div>
       ))}
     </div>
   );
 }
 
-function PageGrid({ ps, marks, onSelect }) {
+function PageGrid({ ps, marks, onSelect, lastAdded }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 22 }}>
       {ps.map(p => {
@@ -453,7 +463,7 @@ function PageGrid({ ps, marks, onSelect }) {
         const val = m?.price_cents != null ? m.price_cents * p.qty : null;
         const pnlPct = val != null && p.cost_cents > 0 ? ((val / (p.cost_cents * p.qty)) - 1) * 100 : null;
         return (
-          <div key={posKey(p)} className="tl-binder-card" onClick={() => onSelect?.(p)}
+          <div key={posKey(p)} className={`tl-binder-card${posKey(p) === lastAdded ? ' tl-just-added' : ''}`} onClick={() => onSelect?.(p)}
                title={m?.name ?? p.name}
                style={{
                  border: `1px solid ${tokens.color.border}`, borderRadius: 8, overflow: 'hidden',
@@ -554,7 +564,13 @@ function AddCard({ onAdd }) {
   const [grade, setGrade] = useState('raw');
   const [qty, setQty] = useState('1');
   const [cost, setCost] = useState('');
+  const [justAdded, setJustAdded] = useState(null);  // "Added ✓ …" toast
   const debounce = useRef(null);
+  useEffect(() => {
+    if (!justAdded) return;
+    const t = setTimeout(() => setJustAdded(null), 2600);
+    return () => clearTimeout(t);
+  }, [justAdded]);
 
   useEffect(() => {
     if (!q.trim()) { setResults(null); return; }
@@ -595,8 +611,15 @@ function AddCard({ onAdd }) {
     <div style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 8, padding: 16, marginBottom: 18, background: tokens.color.surfaceRaised }}>
       {!pick && (
         <div>
-          <input autoFocus value={q} onChange={e => setQ(e.target.value)}
-                 placeholder="Search the card you own — name, set, or number…" style={{ ...input, width: 360 }} />
+          <span style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+                   placeholder="Search the card you own — name, set, or number…" style={{ ...input, width: 360 }} />
+            {justAdded && (
+              <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.up, textTransform: 'uppercase' }}>
+                ✓ added {justAdded}
+              </span>
+            )}
+          </span>
           {results && (
             <div style={{ marginTop: 12 }}>
               {results.length === 0 && <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}` }}>No matches — try fewer words.</div>}
@@ -656,6 +679,10 @@ function AddCard({ onAdd }) {
                   added_at: new Date().toISOString().slice(0, 10),
                   name: pick.name, set_name: pick.set_name, number: pick.number, ip: pick.ip, language: pick.language,
                 });
+                // Reset for the NEXT card — collections are added in runs.
+                setJustAdded(pick.name);
+                setPick(null); setQ(''); setResults(null);
+                setGrade('raw'); setQty('1'); setCost('');
               }}>Add To Binder</Chip>
               <Chip onClick={() => setPick(null)}>Back</Chip>
             </div>
