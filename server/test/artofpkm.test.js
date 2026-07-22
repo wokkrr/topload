@@ -87,9 +87,10 @@ describe('THE SPINE RULE — --seed-missing creates identity rows (2026-07-22)',
     expect(res.knownElsewhere).toBe(1);          // Charizard already lives here with better art
     expect(res.seedable).toBe(1);                // Dratini is a card we didn't know existed
     expect(res.seedSamples[0]).toContain('Dratini');
-    // without the flag it stays an honest unmatched count
+    // without the flag, a fully-arted set is skipped — nothing to upgrade,
+    // nothing seeded (the pre-spine-rule behavior, unchanged)
     const res2 = await importArtofpkm(db, { sets: ['6'], dry: true, fetchImpl: stub, log: () => {} });
-    expect(res2.unmatchedName).toBe(1);
+    expect(res2.matched).toBe(0);
     expect(res2.seedable).toBe(0);
   });
 });
