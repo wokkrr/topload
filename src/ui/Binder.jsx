@@ -178,6 +178,18 @@ export function Binder({ onSelect }) {
   }, [series, indexes, positions, marks]);
 
   const removePos = (p) => setPositions(prev => prev.filter(x => posKey(x) !== posKey(p)));
+  // Copies are managed one at a time (Kaleb, 2026-07-22: removing one of two
+  // Pikachus removed both). Stepping qty keeps the blended avg cost/ea —
+  // adding or removing a copy at average cost is honest bookkeeping.
+  const adjustQty = (p, delta) => {
+    const next = Math.max(1, (p.qty ?? 1) + delta);
+    setPositions(prev => prev.map(x => posKey(x) === posKey(p) ? { ...x, qty: next } : x));
+    setInspect(cur => cur && posKey(cur) === posKey(p) ? { ...cur, qty: next } : cur);
+  };
+  const removeOne = (p) => {
+    if ((p.qty ?? 1) > 1) adjustQty(p, -1);
+    else { removePos(p); setInspect(null); }
+  };
   const toggleFav = (p) => {
     setPositions(prev => prev.map(x => posKey(x) === posKey(p) ? { ...x, fav: !x.fav } : x));
     setInspect(cur => cur && posKey(cur) === posKey(p) ? { ...cur, fav: !cur.fav } : cur);
@@ -315,6 +327,8 @@ export function Binder({ onSelect }) {
             onClose={() => setInspect(null)}
             onFull={() => { const id = inspect.card_id; setInspect(null); onSelect?.(id); }}
             onFav={() => toggleFav(inspect)}
+            onQty={(d) => adjustQty(inspect, d)}
+            onRemoveOne={() => removeOne(inspect)}
             onRemove={() => { removePos(inspect); setInspect(null); }}
           />
         )}
@@ -340,7 +354,7 @@ const MODAL_CSS = `
 .tl-binder-pop { animation: tl-pop .22s ease-out; }
 `;
 
-function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onRemove, onFav }) {
+function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onRemove, onRemoveOne, onQty, onFav }) {
   // Two-step remove (Kaleb, 2026-07-22: "too easy to remove a card
   // accidentally") — REMOVE arms a red confirm that disarms itself.
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -419,7 +433,20 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
             {pnlPct != null && <Stat label="P&L" v={`${fmtUsd(pnl)} · ${fmtPct(pnlPct)}`} color={pnlColor(pnl)} />}
           </div>
 
-          <div style={row}><span style={k}>Grade · Qty</span><span style={v}>{p.grade}{p.qty > 1 ? ` × ${p.qty}` : ''}</span></div>
+          {/* Qty steps in place — "I got another one" / "sold a copy" without
+              re-entering the add flow. − stops at 1: the LAST copy only
+              leaves through the two-step Remove below (accident safety). */}
+          <div style={row}>
+            <span style={k}>Grade · Qty</span>
+            <span style={{ ...v, display: 'flex', gap: 9, alignItems: 'center' }}>
+              {p.grade}
+              <span onClick={() => p.qty > 1 && onQty?.(-1)} title={p.qty > 1 ? 'Remove one copy' : 'Last copy — use Remove below'}
+                    style={{ cursor: p.qty > 1 ? 'pointer' : 'default', color: p.qty > 1 ? tokens.color.inkSecondary : tokens.color.border, padding: '0 3px', userSelect: 'none' }}>−</span>
+              <span>{p.qty}</span>
+              <span onClick={() => onQty?.(1)} title="Add one copy (at your average cost)"
+                    style={{ cursor: 'pointer', color: tokens.color.inkSecondary, padding: '0 3px', userSelect: 'none' }}>+</span>
+            </span>
+          </div>
           <div style={row}><span style={k}>Paid (each)</span><span style={v}>{fmtUsd(p.cost_cents)}</span></div>
           <div style={row} title={m?.basis ? (m.basis === 'solds' ? 'Value from real sales' : 'Estimated value') : undefined}>
             <span style={k}>Oracle (each)</span><span style={v}>{fmtUsd(m?.price_cents)}{m?.basis ? ` · ${m.basis === 'solds' ? 'real sales' : 'estimate'}` : ''}</span>
@@ -432,6 +459,13 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
             <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
               {!confirmRemove ? (
                 <Chip onClick={() => setConfirmRemove(true)}>Remove…</Chip>
+              ) : p.qty > 1 ? (
+                <>
+                  <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>you hold {p.qty} — remove…</span>
+                  <Chip active color={tokens.color.down} onClick={() => { onRemoveOne?.(); setConfirmRemove(false); }}>One</Chip>
+                  <Chip active color={tokens.color.down} onClick={onRemove}>All ×{p.qty}</Chip>
+                  <Chip onClick={() => setConfirmRemove(false)}>Keep</Chip>
+                </>
               ) : (
                 <>
                   <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>take it out of the binder?</span>
