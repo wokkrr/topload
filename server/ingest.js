@@ -563,6 +563,18 @@ export async function ingest({ db = null, dates = null } = {}) {
 
   const sourceSummary = live ? await runLive(database, today) : await runDemo(database);
 
+  // Sealed-book attribution (2026-07-23): pin today's sealed listings to the
+  // products shelf so the order book can group them (mint-dedupe happens at
+  // read time). Server-side mirror of the desk's isSealed rules.
+  try {
+    const { attributeSealedListings } = await import('./sealed.js');
+    const isSealedFn = (l) => (l.grade ?? 'raw') === 'raw' && (
+      l.platform === 'mnstr' ||
+      /\b(booster|packs?|box|etb|elite trainer|display|blister|tins?|case)\b/i.test(l.item_name ?? ''));
+    const sb = attributeSealedListings(database, { isSealedFn });
+    if (sb.sealedListings) console.log(`[ingest] sealed book: ${JSON.stringify(sb)}`);
+  } catch (e) { console.warn(`[ingest] sealed attribution failed: ${e.message}`); }
+
   // Distill the ALT fair-market values riding today's listing snapshots
   // (Phygitals/Beezie carry them) into 'altfmv' external marks BEFORE the
   // oracle refresh — a respected sales-derived source we were already

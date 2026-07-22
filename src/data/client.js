@@ -52,6 +52,7 @@ export const api = {
   binderMarks: (positions) => post('/api/binder/marks', { positions }),
   /** Binder: portfolio value history (sum of positions' oracle series) */
   binderSeries: (positions, days = 90) => post('/api/binder/series', { positions, days }),
+  sealed: () => get('/api/sealed'),
 };
 
 /** Marketplace display names — no chain/crypto jargon on user surfaces. */

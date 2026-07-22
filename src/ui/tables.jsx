@@ -443,6 +443,15 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
       <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginBottom: 12 }}>
         {shown.length.toLocaleString()} card listings
       </div>
+      {/* Sealed chip = the ORDER BOOK (Kaleb, 2026-07-23): fungible product,
+          one entry per product, mint-deduped depth. Flat grid inside is the
+          fallback until the product shelf has attributions. */}
+      {graderFilter === 'sealed' ? (
+        <SealedBook>
+          <GachaGrid listings={shown} onSelect={onSelect}
+            onOpenListing={onOpenListing ? (l) => onOpenListing(l, shown) : undefined} />
+        </SealedBook>
+      ) : <>
       {view === 'grid' && <GachaGrid listings={shown} onSelect={onSelect}
         onOpenListing={onOpenListing ? (l) => onOpenListing(l, shown) : undefined} />}
       {view === 'table' && <div style={{ overflowX: 'auto' }}>
@@ -488,6 +497,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
         </div>
       )}
       </div>}
+      </>}
     </div>
   );
 }
@@ -497,6 +507,66 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
  * is /assets/:blockchain/:cardAddress). Research stays here; buying happens
  * on the marketplace — unmatched listings open this directly.
  */
+/**
+ * THE SEALED BOOK (Kaleb, 2026-07-23): sealed is FUNGIBLE — one entry per
+ * PRODUCT, cheapest physical unit as the buy box, depth beneath it. Mirror
+ * listings of the same token were collapsed server-side (double-spend
+ * guard), so "×3 AVAILABLE" means three real boxes. Falls back to the flat
+ * grid until the product shelf has attributions (children = the old view).
+ */
+export function SealedBook({ children, onOpen }) {
+  const [book, setBook] = useState(null);
+  useEffect(() => {
+    let dead = false;
+    api.sealed().then(b => { if (!dead) setBook(Array.isArray(b) ? b : []); }).catch(() => setBook([]));
+    return () => { dead = true; };
+  }, []);
+  if (book === null) return <div style={{ padding: 24, color: tokens.color.inkMuted, font: `12px ${tokens.font.body}` }}>Opening the sealed book…</div>;
+  if (!book.length) return children ?? null;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+      {book.map(p => {
+        const url = listingUrl(p.best);
+        return (
+          <div key={p.product_id} style={{ border: `1px solid ${tokens.color.border}`, borderRadius: 8, background: tokens.color.surfaceRaised, padding: 14, display: 'flex', gap: 14 }}>
+            <div style={{ width: 84, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+              {(p.image || p.best.image) && (
+                <img src={p.image ?? p.best.image} alt="" loading="lazy" onError={imgFallback}
+                     style={{ width: '100%', borderRadius: 4, objectFit: 'contain' }} />
+              )}
+            </div>
+            <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ font: `13px ${tokens.font.body}`, color: tokens.color.ink, lineHeight: 1.35 }}>{p.name}</div>
+              <div style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 2, textTransform: 'uppercase' }}>
+                {p.set_name}{p.language === 'Japanese' ? ' · JP' : ''} · {p.units} available
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 'auto', paddingTop: 10 }}>
+                <span style={{ font: `16px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(p.best.price_cents)}</span>
+                {p.market_cents != null && (
+                  <span style={{ font: `10px ${tokens.font.mono}`, color: p.discount > 0 ? tokens.color.up : tokens.color.inkMuted, textTransform: 'uppercase' }}>
+                    market {fmtUsd(p.market_cents)}{p.discount > 0 ? ` · ${(p.discount * 100).toFixed(0)}% under` : ''}
+                  </span>
+                )}
+              </div>
+              {p.asks.length > 1 && (
+                <div style={{ font: `10px ${tokens.font.mono}`, color: tokens.color.inkMuted, marginTop: 4, textTransform: 'uppercase' }}>
+                  next: {p.asks.slice(1, 4).map(a => fmtUsd(a.price_cents)).join(' · ')}
+                </div>
+              )}
+              {url && (
+                <a href={url} target="_blank" rel="noreferrer" onClick={() => onOpen?.(p)}
+                   style={{ marginTop: 8, alignSelf: 'flex-start', font: `10px ${tokens.font.mono}`, textTransform: 'uppercase', color: tokens.color.ink, border: `1px solid ${tokens.color.brass}`, borderRadius: 3, padding: '3px 12px', textDecoration: 'none', background: tokens.color.surface }}>
+                  Buy · {PLATFORM_LABELS[p.best.platform] ?? p.best.platform}
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function listingUrl(l) {
   if (l.platform === 'collectorcrypt' && l.nft_address) {
     return `https://collectorcrypt.com/assets/solana/${l.nft_address}`;

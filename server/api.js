@@ -16,6 +16,7 @@ import { findLanguageSiblings } from './language-siblings.js';
 import { getDeals } from './deals.js';
 import { getMovers } from './movers.js';
 import { buildBinderSeries, buildBinderMovers } from './binder.js';
+import { buildSealedBook } from './sealed.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -205,6 +206,13 @@ app.post('/api/binder/series', express.json({ limit: '128kb' }), (req, res) => {
     series: buildBinderSeries(db, positions, { days }),
     movers: buildBinderMovers(db, positions, { days }),
   });
+});
+
+/** GET /api/sealed — the sealed order book: one entry per product, cheapest
+ *  physical unit as the buy box, mint-deduped depth (mirror listings of the
+ *  same token collapse — the double-spend guard), market reference price. */
+app.get('/api/sealed', (_req, res) => {
+  res.json(buildSealedBook(db));
 });
 
 /** GET /api/deals?limit=15 → live asks under the oracle mark (grade-matched, deduped, banded) */
