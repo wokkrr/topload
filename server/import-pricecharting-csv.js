@@ -80,6 +80,16 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
     `SELECT id, name, number, set_name, language FROM cards
      WHERE ip = ? AND json_extract(external_ids, '$.pricecharting') IS NULL`
   ).all(ip);
+  // RESURRECTION GUARD (live bug, 2026-07-23): a product ALREADY ATTACHED to
+  // a card — e.g. a satellite the mop-up absorbed into its canonical — must
+  // route its marks to THAT card. Before this, the import saw no unattached
+  // match and re-created the retired satellite from scratch, resurrecting
+  // every absorbed duplicate within a day (Kaleb's screenshot: Mew Expedition
+  // twice, both priced — the mop-up's work silently undone nightly).
+  const attachedByPc = new Map(db.prepare(
+    `SELECT json_extract(external_ids, '$.pricecharting') pc, id FROM cards
+     WHERE ip = ? AND json_extract(external_ids, '$.pricecharting') IS NOT NULL`
+  ).all(ip).map(r => [String(r.pc), r.id]));
   const insCard = db.prepare(
     // On re-import, re-apply the (now-better) name/number split — these ids are
     // PC-created (op-pc<rowid>), so this never clobbers pokemontcg-seeded cards.
@@ -125,14 +135,17 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
     // Dawn #87 was wearing the [Regional Championships Staff] promo's $585
     // mark — a bracketed PC product must never claim an unbracketed base
     // card; those promos are DISTINCT printings and stay satellites).
-    let cardId = null;
-    const label = labelOf(row['product-name']);
-    const hit = matchListing(`${row['product-name']} ${setName}`,
-      existing.filter(c => !matchedExisting.has(c.id) && labelOf(c.name) === label));
-    if (hit) { cardId = hit; matchedExisting.add(hit); attachPc.run(String(row.id), hit); merged++; }
-    else {
-      cardId = `${ip.toLowerCase()}-pc${row.id}`;
-      insCard.run(cardId, ip, name, setName, number, JSON.stringify({ pricecharting: String(row.id) }));
+    let cardId = attachedByPc.get(String(row.id)) ?? null;   // resurrection guard: attached product → its card, always
+    if (!cardId) {
+      const label = labelOf(row['product-name']);
+      const hit = matchListing(`${row['product-name']} ${setName}`,
+        existing.filter(c => !matchedExisting.has(c.id) && labelOf(c.name) === label));
+      if (hit) { cardId = hit; matchedExisting.add(hit); attachPc.run(String(row.id), hit); merged++; }
+      else {
+        cardId = `${ip.toLowerCase()}-pc${row.id}`;
+        insCard.run(cardId, ip, name, setName, number, JSON.stringify({ pricecharting: String(row.id) }));
+      }
+      attachedByPc.set(String(row.id), cardId);
     }
     const released = /^\d{4}-\d{2}-\d{2}/.exec((row['release-date'] ?? '').trim())?.[0];
     if (released) fillReleased.run(released, cardId);

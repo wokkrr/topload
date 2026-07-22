@@ -97,3 +97,18 @@ describe('THE SPINE RULE — gates protect marks, not existence (2026-07-22)', (
     expect(db.prepare(`SELECT COUNT(*) n FROM external_marks WHERE card_id = 'pkmn-pc902'`).get().n).toBeGreaterThan(0);
   });
 });
+
+describe('RESURRECTION GUARD — absorbed satellites stay absorbed (2026-07-23)', () => {
+  it('a product already attached to a canonical routes marks there; the satellite is never recreated', async () => {
+    const { importCsv } = await import('../import-pricecharting-csv.js');
+    const db = openDb(':memory:');
+    // The post-mopup state: canonical Mew wears the absorbed satellite's pc id.
+    db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, external_ids)
+                VALUES ('pkmn-ecard1-19', 'PKMN', 'Mew', 'Expedition Base Set', '19/165', 'English', '{"pricecharting":"777"}')`).run();
+    const header = 'id,product-name,console-name,genre,sales-volume,loose-price';
+    const text = [header, '777,Mew #19,Pokemon Expedition,Pokemon Card,50,$1950.00'].join('\n');
+    importCsv(db, { text, ip: 'PKMN', asOf: '2026-07-23' });
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id = 'pkmn-pc777'`).get().n).toBe(0);          // NOT resurrected
+    expect(db.prepare(`SELECT COUNT(*) n FROM external_marks WHERE card_id = 'pkmn-ecard1-19'`).get().n).toBeGreaterThan(0);  // marks → canonical
+  });
+});
