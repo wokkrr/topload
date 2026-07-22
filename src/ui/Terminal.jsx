@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { tokens } from '../tokens.js';
 import { api, PLATFORM_LABELS } from '../data/client.js';
-import { Chip, Thumb, BasketTable } from './tables.jsx';
+import { Chip, Thumb, BasketTable, ORACLE_HINT } from './tables.jsx';
 import { Screener } from './Screener.jsx';
 import { IndexChart } from './IndexChart.jsx';
 
@@ -289,16 +289,17 @@ function DealsPanel({ onOpenListing, onSelect }) {
               {d.sales_30d > 0
                 ? ` · ${d.sales_30d} sale${d.sales_30d === 1 ? '' : 's'}/30D`
                 : ' · thin trading'}
-              {/* Mark provenance: a discount against REAL solds is a different
-                  animal than one against an external estimate. */}
+              {/* Mark provenance in plain words (Kaleb, 2026-07-22: "solds-
+                  backed mark" was terminal-user-hostile): a discount against
+                  real sales is a different animal than one vs an estimate. */}
               <span style={{ color: d.basis === 'solds' ? tokens.color.up : tokens.color.inkMuted }}>
-                {d.basis === 'solds' ? ' · solds-backed mark' : ' · estimated mark'}
+                {d.basis === 'solds' ? ' · value from real sales' : ' · estimated value'}
               </span>
             </span>
           </span>
           <span style={{ flex: 'none', textAlign: 'right', font: `12px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
             <span style={{ display: 'block', color: tokens.color.ink }}>{fmtUsd(d.ask_cents)} ask</span>
-            <span style={{ color: tokens.color.inkMuted }}>{fmtUsd(d.mark_cents)} mark</span>
+            <span style={{ color: tokens.color.inkMuted }} title={ORACLE_HINT}>{fmtUsd(d.mark_cents)} value</span>
           </span>
           <span style={{
             flex: 'none', width: 74, textAlign: 'right',

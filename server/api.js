@@ -14,6 +14,7 @@ import { PLATFORMS } from './platforms.js';
 import { refreshLatestMarks, markTopGrades } from './oracle.js';
 import { findLanguageSiblings } from './language-siblings.js';
 import { getDeals } from './deals.js';
+import { getMovers } from './movers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -115,33 +116,15 @@ app.get('/api/indexes', (req, res) => {
   }));
 });
 
-/** GET /api/movers?window=1 → biggest 1D oracle moves with confidence */
+/** GET /api/movers?window=1 → biggest 1D oracle moves (see movers.js gates) */
 app.get('/api/movers', (_req, res) => {
-  // Reads the materialized latest_marks (1D lookback baked in) — the live
-  // version scanned every mark on the latest day (~277k rows) per request.
-  const rows = db.prepare(`
-    SELECT c.ip, c.name, c.set_name, lm.card_id, lm.grade,
-           c.image AS card_image, c.image_kind AS card_kind,
-           (SELECT g.image FROM gacha_listings g WHERE g.card_id = c.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo,
-           lm.price_cents AS price_now, lm.price_1d AS price_then,
-           lm.confidence, lm.sales_7d,
-           ROUND((lm.price_cents * 100.0 / lm.price_1d) - 100, 2) AS change_pct
-    FROM latest_marks lm
-    JOIN cards c ON c.id = lm.card_id
-    WHERE lm.confidence >= 0.3 AND lm.price_1d > 0
-      AND lm.price_cents != lm.price_1d
-      -- Sanity band: a ±500%+ "move" is a data event (mark migration, source
-      -- switch, first real comp), not a market move — seen live 2026-07-21
-      -- when the OP satellite mop-up produced +54,072% "movers".
-      AND ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) <= 5.0
-    ORDER BY ABS((lm.price_cents * 1.0 / lm.price_1d) - 1) DESC
-    LIMIT 20`).all();
+  const rows = getMovers(db);
   // 14-day mini-series per mover — the sparkline that makes a move legible
   // at a glance (Kaleb, 2026-07-21: movers should SHOW the climb).
   const sparkStmt = db.prepare(`
     SELECT price_cents FROM oracle_prices
     WHERE card_id = ? AND grade = ? ORDER BY as_of DESC LIMIT 14`);
-  res.json(rows.map(({ card_image, card_kind, listing_photo, ...r }) => ({
+  res.json(rows.map(({ card_image, card_kind, listing_photo, rn, ...r }) => ({
     ...r,
     ...pickImage(r.card_id, card_image, card_kind, listing_photo),
     spark: sparkStmt.all(r.card_id, r.grade).map(p => p.price_cents).reverse(),

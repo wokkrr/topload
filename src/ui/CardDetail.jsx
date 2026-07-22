@@ -211,7 +211,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           {/* 'Oracle' = the mark, renamed terminal-wide (Kaleb, 2026-07-21).
               Δ30D/Conf/Basis stay HERE — the card page is the deep dive. */}
           <th style={thL}>Grade</th><th style={th} title="The Topload price oracle — one fair-value mark per card + grade, blended from recorded sales and external market data">Oracle</th><th style={th}>Δ1D</th><th style={th}>Δ30D</th>
-          <th style={th}>Sales/7D</th><th style={th}>Conf</th><th style={thL}>Basis</th>
+          <th style={th}>Sales/7D</th><th style={th}>Conf</th><th style={thL} title="What this grade's Oracle value is based on">Priced From</th>
         </tr></thead>
         <tbody>
           {card.grades.map(g => (
@@ -223,11 +223,12 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
               <td style={td}>{g.sales_7d}</td>
               <td style={td}>{(g.confidence * 100).toFixed(0)}</td>
               {/* No source names on the surface — which feeds power the
-                  oracle stays our business (Kaleb, 2026-07-22). Solds vs
-                  estimate is the only provenance a user needs. */}
+                  oracle stays our business (Kaleb, 2026-07-22). Real sales
+                  vs estimate is the only provenance a user needs, in words
+                  a terminal user actually understands. */}
               <td style={{ ...tdL, color: g.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}
-                  title={g.basis === 'solds' ? 'Mark backed by recorded sales' : 'Mark estimated from external market data — no recorded sales yet'}>
-                {g.basis === 'solds' ? 'solds' : 'estimate'}
+                  title={g.basis === 'solds' ? 'Value computed from recorded sales' : 'Value estimated from market data — no recorded sales yet'}>
+                {g.basis === 'solds' ? 'real sales' : 'estimate'}
               </td>
             </tr>
           ))}

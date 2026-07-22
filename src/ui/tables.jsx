@@ -39,7 +39,7 @@ const Conf = ({ c }) => (
 // 'Mark' renamed 'Oracle' across every table (Kaleb, 2026-07-21: "you choose
 // what best describes it") — it's the price the oracle publishes, and the term
 // already lives in the product copy ("price oracle mark", "solds-backed mark").
-const ORACLE_HINT = 'The Topload price oracle — one fair-value mark per card + grade, blended from recorded sales and external market data';
+export const ORACLE_HINT = 'The Topload price oracle — one fair-value mark per card + grade, blended from recorded sales and external market data';
 
 const LANG_CODES = { English: 'EN', Japanese: 'JP', Korean: 'KR', Chinese: 'CN', German: 'DE', French: 'FR', Italian: 'IT', Spanish: 'ES', Portuguese: 'PT' };
 export const langCode = (l) => LANG_CODES[l] ?? (l ? l.slice(0, 2).toUpperCase() : 'EN');
