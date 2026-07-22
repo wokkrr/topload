@@ -209,37 +209,40 @@ export function CardsTable({ cards, onSelect, sort, onSort }) {
 }
 
 /**
- * Marketplace chips. When `hidden`/`onToggle` are provided the chips are
- * filters: every marketplace is shown by default, click one to exclude it.
+ * Marketplace chips — SELECTION filter (Kaleb, 2026-07-22: "all toggled on by
+ * default; click one → only that marketplace; click two → those two. Then we
+ * don't need the hidden text and it makes more sense functionally").
+ * Empty selection = everything shows and every chip reads live. Clicking a
+ * chip narrows to it; clicking more widens the selection; clicking a selected
+ * chip drops it (empty again = back to all).
  * No chain/crypto jargon on the surface — users are buying cards, not tokens.
  */
-export function PlatformStrip({ platforms, hidden, onToggle }) {
+export function PlatformStrip({ platforms, selected, onToggle }) {
   // Only marketplaces we actually pull LISTINGS from belong on the desk's
-  // toggle strip (Kaleb, 2026-07-20) — sales-only sources (Beezie) feed the
-  // tape + oracle silently and return here when their listings land.
-  // (Phygitals graduated to the strip 2026-07-21 when its listings shipped.)
+  // toggle strip (Kaleb, 2026-07-20) — sales-only sources feed the tape +
+  // oracle silently and return here when their listings land.
   const shown = (platforms ?? []).filter(p => p.listings)
     .toSorted((a, b) => a.name.localeCompare(b.name));   // alphabetical (Kaleb, 2026-07-21)
   if (!shown.length) return null;
   const interactive = typeof onToggle === 'function';
+  const anySelected = (selected?.size ?? 0) > 0;
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
       {shown.map(p => {
-        const off = hidden?.has(p.id);
-        const live = p.listings || p.sales; // any real data flowing
-        const suffix = off ? ' · HIDDEN' : '';
+        const on = !anySelected || selected.has(p.id);   // no selection = all on
+        const focused = anySelected && selected.has(p.id);
         return (
           <button key={p.id}
                   onClick={interactive ? () => onToggle(p.id) : undefined}
-                  title={interactive ? (off ? `Show ${p.name}` : `Hide ${p.name}${p.listings ? ' listings & sales' : p.sales ? ' sales (listings coming)' : ''}`) : undefined}
+                  title={interactive ? (focused ? `Showing ${p.name} — click to remove` : `Show only ${p.name}`) : undefined}
                   style={{
                     font: `10px ${tokens.font.mono}`, padding: '3px 9px', borderRadius: 3, textTransform: 'uppercase',
-                    border: off ? `1px dashed ${tokens.color.border}` : `1px solid ${live ? tokens.color.brass : tokens.color.border}`,
-                    color: off ? tokens.color.inkMuted : live ? tokens.color.ink : tokens.color.inkMuted,
-                    background: !off && p.listings ? tokens.color.surfaceRaised : 'none',
-                    opacity: off ? 0.55 : 1, cursor: interactive ? 'pointer' : 'default',
+                    border: on ? `1px solid ${tokens.color.brass}` : `1px solid ${tokens.color.border}`,
+                    color: on ? tokens.color.ink : tokens.color.inkMuted,
+                    background: on ? tokens.color.surfaceRaised : 'none',
+                    opacity: on ? 1 : 0.55, cursor: interactive ? 'pointer' : 'default',
                   }}>
-            {p.name.toUpperCase()}{suffix}
+            {p.name.toUpperCase()}
           </button>
         );
       })}
@@ -279,11 +282,6 @@ function timeAgo(iso) {
 }
 
 const VIEW_KEY = 'topload-gacha-view';
-const HIDDEN_KEY = 'topload-hidden-platforms';
-const loadHidden = () => {
-  try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? '[]')); }
-  catch { return new Set(); }
-};
 
 const GACHA_SORTS = [
   ['recent', 'Recent', (a, b) => (b.listed_at ?? '').localeCompare(a.listed_at ?? '') || b.price_cents - a.price_cents],
@@ -344,7 +342,9 @@ export function isSealed(l) {
 export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing }) {
   // Thumbnails are the default — the cards ARE the product; List is the opt-in.
   const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) ?? 'grid');
-  const [hidden, setHidden] = useState(loadHidden);
+  // Marketplace SELECTION (empty = all). Session state like the other filter
+  // chips — a narrowed desk shouldn't quietly persist into tomorrow's visit.
+  const [selectedPlatforms, setSelectedPlatforms] = useState(() => new Set());
   const [sort, setSort] = useState('recent');
   const [q, setQ] = useState('');
   const [ipFilter, setIpFilter] = useState('');
@@ -352,19 +352,19 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
   const [langFilter, setLangFilter] = useState('');
   const pickView = (v) => { setView(v); localStorage.setItem(VIEW_KEY, v); };
   const togglePlatform = (id) => {
-    setHidden(prev => {
+    setSelectedPlatforms(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
       return next;
     });
   };
+  const platformShown = (id) => selectedPlatforms.size === 0 || selectedPlatforms.has(id);
   if (!listings) return <Empty label="gacha" />;
-  const shownSales = sales?.filter(s => !hidden.has(s.source));
+  const shownSales = sales?.filter(s => platformShown(s.source));
   if (!listings.length) {
     return (
       <div>
-        <PlatformStrip platforms={platforms} hidden={hidden} onToggle={togglePlatform} />
+        <PlatformStrip platforms={platforms} selected={selectedPlatforms} onToggle={togglePlatform} />
         <SalesTape sales={shownSales} onSelect={onSelect} />
         <div style={{ padding: '32px 24px', color: tokens.color.inkMuted, font: `13px ${tokens.font.body}`, lineHeight: 1.7 }}>
           <div style={{ font: `18px ${tokens.font.display}`, color: tokens.color.inkSecondary, marginBottom: 8 }}>No listings yet</div>
@@ -378,7 +378,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
   const normSearch = (s) => (s ?? '').toLowerCase().replace(/\bfirst\b/g, '1st');
   const needle = normSearch(q.trim());
   const shown = listings
-    .filter(l => !hidden.has(l.platform))
+    .filter(l => platformShown(l.platform))
     .filter(l => !ipFilter || listingIp(l) === ipFilter)
     .filter(l => !langFilter || listingLanguage(l) === langFilter)
     .filter(l => !graderFilter
@@ -391,7 +391,7 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
     .sort(GACHA_SORTS.find(([id]) => id === sort)[2]);
   return (
     <div>
-      <PlatformStrip platforms={platforms} hidden={hidden} onToggle={togglePlatform} />
+      <PlatformStrip platforms={platforms} selected={selectedPlatforms} onToggle={togglePlatform} />
       <SalesTape sales={shownSales} onSelect={onSelect} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
         <input
