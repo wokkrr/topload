@@ -4,8 +4,7 @@ import { api } from '../data/client.js';
 import { CardsTable, Chip } from './tables.jsx';
 
 const IPS = [['', 'All'], ['PKMN', 'Pokémon'], ['OP', 'One Piece'], ['YGO', 'Yu-Gi-Oh']];
-const GRADES = ['', 'raw', 'PSA9', 'PSA10', 'BGS10', 'CGC10'];
-const SORTS = [['price', 'Price'], ['change', 'Δ1D'], ['volume', 'Volume']];
+const GRADES = [['', 'Any Grade'], ['raw', 'Raw'], ['PSA9', 'PSA9'], ['PSA10', 'PSA10'], ['BGS10', 'BGS10'], ['CGC10', 'CGC10']];
 
 /** Cards screener: search + franchise/grade filters over the full universe. */
 export function Screener({ onSelect }) {
@@ -49,13 +48,8 @@ export function Screener({ onSelect }) {
           ))}
         </span>
         <span style={{ display: 'flex', gap: 4 }}>
-          {GRADES.map(g => (
-            <Chip key={g || 'any'} active={grade === g} onClick={() => setGrade(g)}>{g || 'Any grade'}</Chip>
-          ))}
-        </span>
-        <span style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-          {SORTS.map(([val, label]) => (
-            <Chip key={val} active={sort === val} onClick={() => setSort(val)}>{label}</Chip>
+          {GRADES.map(([val, label]) => (
+            <Chip key={val || 'any'} active={grade === val} onClick={() => setGrade(val)}>{label}</Chip>
           ))}
         </span>
       </div>
@@ -66,7 +60,11 @@ export function Screener({ onSelect }) {
           {cards.length === 100 ? 'top 100 results — refine to narrow' : `${cards.length} result${cards.length === 1 ? '' : 's'}`}
         </div>
       )}
-      <CardsTable cards={cards} onSelect={onSelect} />
+      {/* Sort chips retired (Kaleb, 2026-07-22) — sorting lives on the table's
+          own column headers now; clicking the active column falls back to the
+          Oracle-price default. */}
+      <CardsTable cards={cards} onSelect={onSelect} sort={sort}
+        onSort={(id) => setSort(s => (s === id && id !== 'price') ? 'price' : id)} />
     </section>
   );
 }

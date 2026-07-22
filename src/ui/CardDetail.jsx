@@ -222,8 +222,12 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
               <td style={{ ...td, color: deltaColor(g.change_30d_pct) }}>{fmtPct(g.change_30d_pct)}</td>
               <td style={td}>{g.sales_7d}</td>
               <td style={td}>{(g.confidence * 100).toFixed(0)}</td>
-              <td style={{ ...tdL, color: g.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
-                {g.basis === 'solds' ? 'solds' : `ext·${(g.source ?? '?').slice(0, 4)}`}
+              {/* No source names on the surface — which feeds power the
+                  oracle stays our business (Kaleb, 2026-07-22). Solds vs
+                  estimate is the only provenance a user needs. */}
+              <td style={{ ...tdL, color: g.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}
+                  title={g.basis === 'solds' ? 'Mark backed by recorded sales' : 'Mark estimated from external market data — no recorded sales yet'}>
+                {g.basis === 'solds' ? 'solds' : 'estimate'}
               </td>
             </tr>
           ))}

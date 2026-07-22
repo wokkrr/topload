@@ -50,26 +50,33 @@ describe('isSealed', () => {
   });
 });
 
-describe('CardsTable (2026-07-21 column rework)', () => {
-  it('shows Lang + Oracle + Sales/7D + spelled-out Source; drops Δ30D/Conf/Basis columns', async () => {
+describe('CardsTable (2026-07-21/22 column rework)', () => {
+  const cards = [
+    { card_id: 'a', ip: 'PKMN', name: 'Umbreon VMAX', set_name: 'Evolving Skies', number: '215',
+      language: 'English', grade: 'BGS10', grades_tracked: 4, price_cents: 4595500,
+      change_1d_pct: 0, sales_7d: 3, confidence: 0.7, basis: 'external', source: 'pricecharting' },
+    { card_id: 'b', ip: 'PKMN', name: 'Umbreon VMAX', set_name: 'Evolving Skies JA', number: '215',
+      language: 'Japanese', grade: 'BGS10', grades_tracked: 2, price_cents: 4595500,
+      change_1d_pct: null, sales_7d: null, confidence: 0.85, basis: 'solds', source: null },
+  ];
+  it('shows Lang + Oracle + Sales/7D; no Δ30D/Conf/Basis and NO source names', async () => {
     const React = (await import('react')).default;
-    const { CardsTable, langCode } = await import('../../src/ui/tables.jsx');
-    const cards = [
-      { card_id: 'a', ip: 'PKMN', name: 'Umbreon VMAX', set_name: 'Evolving Skies', number: '215',
-        language: 'English', grade: 'BGS10', grades_tracked: 4, price_cents: 4595500,
-        change_1d_pct: 0, sales_7d: 3, confidence: 0.7, basis: 'external', source: 'pricecharting' },
-      { card_id: 'b', ip: 'PKMN', name: 'Umbreon VMAX', set_name: 'Evolving Skies JA', number: '215',
-        language: 'Japanese', grade: 'BGS10', grades_tracked: 2, price_cents: 4595500,
-        change_1d_pct: null, sales_7d: null, confidence: 0.85, basis: 'solds', source: null },
-    ];
+    const { CardsTable } = await import('../../src/ui/tables.jsx');
     const html = renderToString(React.createElement(CardsTable, { cards, onSelect: () => {} }));
     expect(html).toContain('Oracle');            // Mark renamed
     expect(html).toContain('>EN<');              // language column, both codes
     expect(html).toContain('>JP<');
-    expect(html).toContain('PriceCharting');     // source spelled out…
-    expect(html).toContain('solds');             // …solds stays solds
-    expect(html).not.toContain('EXT·');          // cryptic basis gone
+    expect(html).not.toContain('Source');        // sources stay our business
+    expect(html).not.toContain('PriceCharting');
+    expect(html).not.toContain('EXT·');
     expect(html).not.toContain('Δ30D');          // dead columns dropped
+  });
+  it('column headers sort: active column carries the ▼ marker', async () => {
+    const React = (await import('react')).default;
+    const { CardsTable } = await import('../../src/ui/tables.jsx');
+    const html = renderToString(React.createElement(CardsTable, { cards, sort: 'volume', onSort: () => {} }));
+    expect(html).toContain('▼');
+    expect(html.indexOf('Sales/7D')).toBeLessThan(html.indexOf('▼', html.indexOf('Sales/7D')));
   });
   it('langCode maps known languages and degrades sanely', async () => {
     const { langCode } = await import('../../src/ui/tables.jsx');

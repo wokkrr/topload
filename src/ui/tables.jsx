@@ -41,18 +41,6 @@ const ORACLE_HINT = 'The Topload price oracle — one fair-value mark per card +
 const LANG_CODES = { English: 'EN', Japanese: 'JP', Korean: 'KR', Chinese: 'CN', German: 'DE', French: 'FR', Italian: 'IT', Spanish: 'ES', Portuguese: 'PT' };
 export const langCode = (l) => LANG_CODES[l] ?? (l ? l.slice(0, 2).toUpperCase() : 'EN');
 
-// Where an external mark comes from, spelled out — 'EXT·PRIC' told nobody
-// anything (Kaleb, 2026-07-21). Confidence rides in the tooltip.
-const SOURCE_LABELS = { pricecharting: 'PriceCharting', tcgplayer: 'TCGplayer' };
-const MarkSource = ({ basis, source, confidence }) => {
-  const conf = confidence != null ? ` · confidence ${(confidence * 100).toFixed(0)}/100` : '';
-  return basis === 'solds'
-    ? <span style={{ color: tokens.color.up }} title={`Mark backed by recorded sales${conf}`}>solds</span>
-    : <span style={{ color: tokens.color.inkSecondary }} title={`Estimated from ${SOURCE_LABELS[source] ?? source ?? 'external'} market data — no recorded sales yet${conf}`}>
-        {SOURCE_LABELS[source] ?? source ?? '—'}
-      </span>;
-};
-
 // A failed image load degrades to this transparent pixel — the styled frame
 // stays, the browser's broken-image icon never shows.
 export const BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -176,22 +164,35 @@ export function BasketTable({ basket, onSelect, maxHeight = 440 }) {
 }
 
 /**
- * Card Database lookup. Column rework (Kaleb, 2026-07-21): Δ30D/Conf/Basis
+ * Card Database lookup. Column rework (Kaleb, 2026-07-21/22): Δ30D/Conf/Basis
  * were dead weight while history builds (all '—', all '70', all 'EXT·PRIC') —
  * replaced with columns that answer real questions today: LANG (an EN and a
  * JP copy of the same card are different assets at the same price — the
- * screenshot's "duplicate" rows), Sales/7D (is there an exit?), and a
- * spelled-out mark Source with confidence in the tooltip.
+ * screenshot's "duplicate" rows) and Sales/7D (is there an exit?). No source
+ * column: which feeds power the oracle stays our business (Kaleb, 2026-07-22).
+ * Sorting lives ON the column headers — click Oracle/Δ1D/Sales/7D to sort,
+ * click the active one again to fall back to the Oracle default.
  */
-export function CardsTable({ cards, onSelect }) {
+export function CardsTable({ cards, onSelect, sort, onSort }) {
+  const SortTh = ({ id, hint, children }) => {
+    const active = sort === id;
+    if (!onSort) return <th style={th} title={hint}>{children}</th>;
+    return (
+      <th style={{ ...th, cursor: 'pointer', userSelect: 'none', color: active ? tokens.color.ink : th.color }}
+          title={hint ?? `Sort by ${children}`}
+          onClick={() => onSort(id)}>
+        {children}<span style={{ color: active ? tokens.color.brass : 'transparent' }}> ▼</span>
+      </th>
+    );
+  };
   if (!cards?.length) return <Empty label="card" />;
   return (
     <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
       <thead><tr>
         <th style={thL}>Card</th><th style={thL}>Lang</th><th style={thL}>Grade</th>
-        <th style={th} title={ORACLE_HINT}>Oracle</th>
-        <th style={th}>Δ1D</th><th style={th} title="Recorded sales in the last 7 days — liquidity at a glance">Sales/7D</th>
-        <th style={thL} title="Where the oracle mark comes from">Source</th>
+        <SortTh id="price" hint={ORACLE_HINT}>Oracle</SortTh>
+        <SortTh id="change" hint="Sort by one-day move">Δ1D</SortTh>
+        <SortTh id="volume" hint="Recorded sales in the last 7 days — sort by liquidity">Sales/7D</SortTh>
       </tr></thead>
       <tbody>
         {cards.map(c => (
@@ -211,9 +212,6 @@ export function CardsTable({ cards, onSelect }) {
             <td style={td}>{fmtUsd(c.price_cents)}</td>
             <td style={td}><Delta pct={c.change_1d_pct} /></td>
             <td style={td}>{c.sales_7d ?? '—'}</td>
-            <td style={{ ...tdL, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
-              <MarkSource basis={c.basis} source={c.source} confidence={c.confidence} />
-            </td>
           </tr>
         ))}
       </tbody>
