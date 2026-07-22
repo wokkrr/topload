@@ -21,9 +21,26 @@
  *   node server/repair-variant-marks.js --dry data/imports/2026-07-22-PKMN.csv:PKMN [more file:IP …]
  *   node server/repair-variant-marks.js data/imports/…-PKMN.csv:PKMN data/imports/…-YGO.csv:YGO data/imports/…-OP.csv:OP
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { openDb } from './db.js';
 import { parseCsv, splitProductName, labelOf } from './import-pricecharting-csv.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** --latest: self-locate the newest daily CSV per game in data/imports (no
+ *  shell substitution — a $(ls …) in a systemd payload came up empty and fed
+ *  the repair '-PKMN.csv', live 2026-07-22). */
+export function latestCsvs() {
+  const dir = join(__dirname, '..', 'data', 'imports');
+  const latest = {};
+  for (const f of readdirSync(dir).sort()) {
+    const m = /-(PKMN|YGO|OP)\.csv$/.exec(f);
+    if (m) latest[m[1]] = f;               // sorted → last wins = newest date
+  }
+  return Object.entries(latest).map(([ip, f]) => ({ text: readFileSync(join(dir, f), 'utf8'), ip, file: f }));
+}
 
 export function repairVariantMarks(db, { csvs, dry = false }) {
   // pc-id → product info, for every BRACKETED product in the guides.
@@ -78,11 +95,14 @@ export function repairVariantMarks(db, { csvs, dry = false }) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const dry = process.argv.includes('--dry');
-  const csvs = process.argv.slice(2).filter(a => a.includes(':')).map(a => {
-    const i = a.lastIndexOf(':');
-    return { text: readFileSync(a.slice(0, i), 'utf8'), ip: a.slice(i + 1) };
-  });
-  if (!csvs.length) { console.error('usage: node server/repair-variant-marks.js [--dry] <csv-path>:<IP> …'); process.exit(1); }
+  const csvs = process.argv.includes('--latest')
+    ? latestCsvs()
+    : process.argv.slice(2).filter(a => a.includes(':')).map(a => {
+        const i = a.lastIndexOf(':');
+        return { text: readFileSync(a.slice(0, i), 'utf8'), ip: a.slice(i + 1) };
+      });
+  if (!csvs.length) { console.error('usage: node server/repair-variant-marks.js [--dry] --latest | <csv-path>:<IP> …'); process.exit(1); }
+  if (process.argv.includes('--latest')) console.log('[repair] using:', csvs.map(c => c.file).join(', '));
   const res = repairVariantMarks(openDb(), { csvs, dry });
   console.log(`[repair:variant-marks]${dry ? ' DRY RUN' : ''}`, JSON.stringify(res, null, 1));
   if (!dry) console.log('[repair] NEXT: npm run oracle:refresh — canonical base cards re-match their true products on the next CSV import.');
