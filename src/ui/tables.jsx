@@ -9,16 +9,19 @@ const tdL = { ...td, textAlign: 'left', font: `12px ${tokens.font.body}` };
 
 export function Chip({ active, onClick, color, children }) {
   // Edge highlight on hover — clickability must be visible (Kaleb, 2026-07-21).
+  // Restyled to match the card page's grade chips (Kaleb, 2026-07-22): mono
+  // face, ALL CAPS (the VHS rule — this font never renders lowercase), brass
+  // active border unless a franchise color is passed.
   return (
     <button onClick={onClick}
       onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = color ?? tokens.color.inkMuted; }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = tokens.color.border; }}
       style={{
         background: active ? tokens.color.surfaceRaised : 'none',
-        border: `1px solid ${active ? (color ?? tokens.color.inkMuted) : tokens.color.border}`,
+        border: `1px solid ${active ? (color ?? tokens.color.brass) : tokens.color.border}`,
         color: active ? tokens.color.ink : tokens.color.inkSecondary,
-        borderRadius: 4, padding: '4px 11px', font: `11px ${tokens.font.body}`, cursor: 'pointer',
-        whiteSpace: 'nowrap', transition: 'border-color .12s ease',
+        borderRadius: 4, padding: '3px 12px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
+        textTransform: 'uppercase', whiteSpace: 'nowrap', transition: 'border-color .12s ease',
       }}>{children}</button>
   );
 }
