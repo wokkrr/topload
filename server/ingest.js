@@ -25,6 +25,8 @@ import { makePhygitalsListingsAdapter } from './adapters/phygitals-listings.js';
 import { makeBeezieListingsAdapter } from './adapters/beezie-listings.js';
 import { runSolanaIndexer, registerListings } from './indexer-solana.js';
 import { importCsv } from './import-pricecharting-csv.js';
+import { importTcgcsv } from './import-tcgcsv.js';
+import { tagLanguages } from './seed-language-tags.js';
 import { matchListings } from './match.js';
 import { writeFileSync } from 'node:fs';
 import { refreshOutlierFlags, refreshOracle } from './oracle.js';
@@ -151,6 +153,18 @@ async function runLive(db, today) {
       console.warn(`[ingest] pricecharting csv ${ip} failed: ${e.message}`);
     }
   }
+  // Language-tag any satellites the CSV import just created (set-name carries
+  // the language: 'Pokemon Japanese …'). Without this, new JP satellites sit
+  // untagged until a manual catalog:langtags run — invisible to language
+  // routing AND to the tcgcsv Pokemon Japan (cat 85) matcher below
+  // (2026-07-22, wired while building the art stack). Idempotent, ~ms.
+  if (csvSources.length) {
+    try {
+      const lt = tagLanguages(db);
+      summary.langTagged = (lt.Japanese ?? 0) + (lt.Chinese ?? 0) + (lt.Korean ?? 0);
+      if (summary.langTagged) console.log(`[ingest] language tags: ${JSON.stringify(lt)}`);
+    } catch (e) { rollback(); console.warn(`[ingest] language tagging failed: ${e.message}`); }
+  }
 
   // 2b. PriceCharting per-card API — ONLY for setups with no CSV subscription
   //     at all. Gate on whether CSV URLs are CONFIGURED, not on this run's
@@ -189,6 +203,22 @@ async function runLive(db, today) {
       .all().map(r => ({ id: r.id, external_ids: JSON.parse(r.external_ids) }));
     const marks = await pc.fetchExternalMarks(resolved, today);
     for (const m of marks) { insMark.run(m.source, m.card_id, m.grade, m.as_of, m.price_cents); summary.externalMarks++; }
+  }
+
+  // 2c. TCGCSV nightly (2026-07-22, Kaleb: "improve data flows for the
+  //     oracle"): TCGplayer market marks + product-image art fills across all
+  //     four categories (YGO/PKMN/OP + Pokemon Japan), previously a manual
+  //     queue-behind-the-guard run. Rides the freshSkip gate so it goes out
+  //     once per day with the CSV import, after language tagging (the JA
+  //     universe must be tagged before category 85 can see it). Attach-only,
+  //     short per-group transactions. TCGCSV_NIGHTLY=0 turns it off.
+  if (!freshSkip && process.env.TCGCSV_NIGHTLY !== '0') {
+    try {
+      summary.tcgcsv = await importTcgcsv(db, { asOf: today, delayMs: Number(process.env.TCGCSV_DELAY_MS ?? 120) });
+    } catch (e) {
+      rollback();
+      console.warn(`[ingest] tcgcsv import failed: ${e.message}`);
+    }
   }
 
   // 3. Gacha listings: Collector Crypt current listings (asking prices → aggregator only).
@@ -548,7 +578,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // guard and stalling every queued job behind them. No run may outlive 90
   // minutes: name what was pending, die, let the next cron slot retry. The
   // timer is NOT unref'd — an idle-hang can't outwait it; success clears it.
-  const WATCHDOG_MS = Number(process.env.INGEST_WATCHDOG_MS ?? 90 * 60 * 1000);
+  // 150min (was 90): the nightly tcgcsv leg (2c) adds ~15-20min of paced
+  // fetching to the once-a-day full run; keep generous headroom over the
+  // longest healthy run so the watchdog only ever fires on true hangs.
+  const WATCHDOG_MS = Number(process.env.INGEST_WATCHDOG_MS ?? 150 * 60 * 1000);
   const watchdog = setTimeout(() => {
     console.error(`[ingest] WATCHDOG: run exceeded ${Math.round(WATCHDOG_MS / 60000)}min — aborting so the guard never starves.`);
     try {
