@@ -37,7 +37,7 @@ import { openDb } from './db.js';
 import { matchListing } from './match.js';
 import { numberKey } from './import-tcgcsv.js';
 
-const isSat = (id) => /-pc\d+$/.test(id);
+const isSat = (id) => /-(?:pc|tp)\d+$/.test(id);   // -tp: tcgplayer-seeded stubs (2026-07-22)
 const normSet = (s) => (s ?? '').toLowerCase().replace(/^\s*(pokemon|yugioh)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 export function mopupSatellites(db, { ip, dry = false } = {}) {

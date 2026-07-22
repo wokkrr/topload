@@ -101,14 +101,21 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
      VALUES ('pricecharting', ?, ?, ?, ?, ?)`
   );
 
-  let kept = 0, merged = 0, marks = 0, skipped = 0;
+  let kept = 0, merged = 0, marks = 0, skipped = 0, gated = 0;
   const matchedExisting = new Set();
   db.exec('BEGIN');
   for (const row of rows) {
     if (!(row.genre ?? '').includes('Card')) { skipped++; continue; }
     const volume = parseInt(row['sales-volume'] || '0', 10);
     const loose = cents(row['loose-price']);
-    if (volume < minVolume || (loose ?? 0) < minPriceCents) { skipped++; continue; }
+    // THE SPINE RULE (Kaleb, 2026-07-22: "full scope complete card database…
+    // we can't have a broken spine"): the gates protect the PRICE FEED, they
+    // no longer decide EXISTENCE. Every card product gets a row; thin ones
+    // (volume<min / price<min) simply carry no marks until they earn them.
+    // Before this, a vintage card that trades twice a year never entered the
+    // database at all (live example: half the JP vintage tail).
+    const passesGates = volume >= minVolume && (loose ?? 0) >= minPriceCents;
+    if (!passesGates) gated++;
 
     const { name, number } = splitProductName(row['product-name']);
     const setName = (row['console-name'] ?? '').trim();
@@ -130,14 +137,16 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
     const released = /^\d{4}-\d{2}-\d{2}/.exec((row['release-date'] ?? '').trim())?.[0];
     if (released) fillReleased.run(released, cardId);
 
-    for (const [field, grade] of Object.entries(CSV_GRADE_FIELDS)) {
-      const p = cents(row[field]);
-      if (p != null) { insMark.run(cardId, grade, asOf, p, volume); marks++; }
+    if (passesGates) {
+      for (const [field, grade] of Object.entries(CSV_GRADE_FIELDS)) {
+        const p = cents(row[field]);
+        if (p != null) { insMark.run(cardId, grade, asOf, p, volume); marks++; }
+      }
     }
     kept++;
   }
   db.exec('COMMIT');
-  return { rows: rows.length, kept, merged, marks, skipped };
+  return { rows: rows.length, kept, merged, marks, skipped, gated };
 }
 
 // CLI

@@ -72,3 +72,24 @@ describe('importArtofpkm e2e (stub fetch, dry)', () => {
     expect(res.samples[0]).not.toContain('pk-z3');   // official art never targeted
   });
 });
+
+describe('THE SPINE RULE — --seed-missing creates identity rows (2026-07-22)', () => {
+  it('unknown printing in an aliased set → unpriced pkmn-apk row; known-elsewhere skipped', async () => {
+    const db = openDb(':memory:');
+    const ins = db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, image, image_kind, external_ids) VALUES (?, 'PKMN', ?, ?, ?, 'Japanese', ?, ?, '{}')`);
+    ins.run('pk-z9', 'Charizard', 'Pokemon Japanese Expansion Pack', '6', 'https://official/z.png', null);  // arted → knownElsewhere
+    const SET = `
+      <h1>Base Set</h1>
+      <a href="/c/1"><img class="card-cut" src="/rails/active_storage/representations/redirect/X/charizard6.png"></a>
+      <a href="/c/2"><img class="card-cut" src="/rails/active_storage/representations/redirect/Y/dratini26.png"></a>`;
+    const stub = async (url) => url.endsWith('/sets/6') ? SET : '<html></html>';
+    const res = await importArtofpkm(db, { sets: ['6'], dry: true, seedMissing: true, fetchImpl: stub, log: () => {} });
+    expect(res.knownElsewhere).toBe(1);          // Charizard already lives here with better art
+    expect(res.seedable).toBe(1);                // Dratini is a card we didn't know existed
+    expect(res.seedSamples[0]).toContain('Dratini');
+    // without the flag it stays an honest unmatched count
+    const res2 = await importArtofpkm(db, { sets: ['6'], dry: true, fetchImpl: stub, log: () => {} });
+    expect(res2.unmatchedName).toBe(1);
+    expect(res2.seedable).toBe(0);
+  });
+});

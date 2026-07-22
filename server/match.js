@@ -82,7 +82,7 @@ function compileCard(card) {
   const numShortRe = numShort ? new RegExp(`\\b${escRe(numShort)}\\b`) : null;
   // PriceCharting-derived remnant ids ("pkmn-pc7309838") yield to canonical
   // catalog cards on equal evidence — same physical card, one spine.
-  const remnant = /^[a-z]+-pc\d+$/.test(card.id ?? '');
+  const remnant = /^[a-z]+-(?:pc|tp)\d+$/.test(card.id ?? '');   // -tp: tcgplayer-seeded stubs (2026-07-22)
   // JP-exclusive parallel/reprint rows ("op-eb01-006_p4-ja") share their base
   // card's number — on equal evidence the BASE wins (listings that don't
   // distinguish an alt-art attribute conservatively to the base printing).

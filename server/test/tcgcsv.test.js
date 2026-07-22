@@ -200,3 +200,30 @@ describe('art quality tiering (2026-07-22 — "match higher quality card art")',
     expect(img('op-b')).toEqual({ image: 'https://official/b.png', image_kind: null });
   });
 });
+
+describe('THE SPINE RULE — unmatched products become -tp stubs (2026-07-22)', () => {
+  it('creates a stub with bracketed label, marks, art, and satellite identity', async () => {
+    const { openDb } = await import('../db.js');
+    const { importTcgcsv } = await import('../import-tcgcsv.js');
+    const db = openDb(':memory:');
+    // Catalog knows NOTHING about this set (the ME05 situation).
+    const groups = [{ groupId: 7, name: 'ME05: Pitch Black', abbreviation: 'ME05', publishedOn: '2026-06-20T00:00:00' }];
+    const products = [
+      { productId: 991, name: 'Eevee ex - 001/084', url: 'x', extendedData: [{ name: 'Number', value: '001/084' }] },
+      { productId: 992, name: 'Eevee ex (Special Art Rare) - 105/084', url: 'x', extendedData: [{ name: 'Number', value: '105/084' }] },
+    ];
+    const prices = products.map(p => ({ productId: p.productId, subTypeName: 'Normal', marketPrice: 40 }));
+    const stub = async (url) => ({ ok: true, json: async () => url.includes('/groups') ? groups : url.includes('/products') ? products : prices });
+    const res = await importTcgcsv(db, { ips: ['PKMN'], asOf: '2026-07-22', delayMs: 0, fetchImpl: stub, createStubs: true });
+    expect(res.PKMN.stubs).toBe(2);
+    const r1 = db.prepare(`SELECT name, set_name, number, language, image_kind, released_at FROM cards WHERE id = 'pkmn-tp991'`).get();
+    expect(r1).toEqual({ name: 'Eevee ex', set_name: 'Pitch Black', number: '001/084', language: 'English', image_kind: 'tcgplayer', released_at: '2026-06-20' });
+    expect(db.prepare(`SELECT name FROM cards WHERE id = 'pkmn-tp992'`).get().name).toBe('Eevee ex [Special Art Rare]');
+    expect(db.prepare(`SELECT COUNT(*) n FROM external_marks WHERE card_id = 'pkmn-tp991' AND source = 'tcgplayer'`).get().n).toBe(1);
+    // createStubs:false keeps the old attach-only behavior
+    const db2 = openDb(':memory:');
+    const res2 = await importTcgcsv(db2, { ips: ['PKMN'], asOf: '2026-07-22', delayMs: 0, fetchImpl: stub, createStubs: false });
+    expect(res2.PKMN.stubs).toBe(0);
+    expect(db2.prepare(`SELECT COUNT(*) n FROM cards`).get().n).toBe(0);
+  });
+});

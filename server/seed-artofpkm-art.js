@@ -25,6 +25,8 @@
  *   node server/seed-artofpkm-art.js --dry            # crawl + match report, no downloads/writes
  *   node server/seed-artofpkm-art.js --sets=5,6,11    # specific sets
  *   node server/seed-artofpkm-art.js --deep           # follow detail links for nameless files (promos)
+ *   node server/seed-artofpkm-art.js --seed-missing   # SPINE RULE: unknown printings in aliased sets
+ *                                                     # become unpriced identity rows (pkmn-apk-*)
  *
  * WRITER (guard token: see[d]-). Resumable: cards already wearing
  * image_kind='artofpkm' are skipped; images already in data/jpart are not
@@ -122,7 +124,7 @@ async function fetchText(url) {
   return r.text();
 }
 
-export async function importArtofpkm(db, { sets = null, dry = false, deep = false, limit = Infinity, fetchImpl = fetchText, log = console.log } = {}) {
+export async function importArtofpkm(db, { sets = null, dry = false, deep = false, seedMissing = false, limit = Infinity, fetchImpl = fetchText, log = console.log } = {}) {
   mkdirSync(JPART_DIR, { recursive: true });
   // Candidates: JP PKMN rows whose art this tier may improve.
   const cands = db.prepare(
@@ -134,10 +136,30 @@ export async function importArtofpkm(db, { sets = null, dry = false, deep = fals
     const k = ourSetKey(c.set_name);
     (bySet.get(k) ?? bySet.set(k, []).get(k)).push(c);
   }
-  const ourSetKeys = [...bySet.keys()].filter(Boolean);
+  // Alias + set-name context comes from the WHOLE JP catalog (arted rows
+  // included) — a fully-illustrated set must still alias so --seed-missing
+  // can add the printings it lacks.
+  const allJp = db.prepare(`SELECT name, set_name FROM cards WHERE ip = 'PKMN' AND language = 'Japanese'`).all();
+  const setNameByKey = new Map();
+  const namesByKey = new Map();
+  for (const c of allJp) {
+    const k = ourSetKey(c.set_name);
+    if (k && !setNameByKey.has(k)) setNameByKey.set(k, c.set_name);
+    if (k) (namesByKey.get(k) ?? namesByKey.set(k, new Set()).get(k)).add(squashName(c.name));
+  }
+  const ourSetKeys = [...setNameByKey.keys()];
   const upd = db.prepare(
     `UPDATE cards SET image = ?, image_kind = 'artofpkm'
      WHERE id = ? AND (image IS NULL OR image_kind IN ('pricecharting', 'borrowed'))`);
+  // THE SPINE RULE (Kaleb, 2026-07-22: "full scope complete card database…
+  // can't have a broken spine"): an image in an aliased set that matches NO
+  // row — not even an arted one — is a card our catalog doesn't know exists.
+  // --seed-missing turns it into an unpriced identity row (name, set, number,
+  // clean art, artofpkm provenance) instead of a dead end.
+  const insSeed = db.prepare(
+    `INSERT INTO cards (id, ip, name, set_name, number, variant, language, image, image_kind, external_ids)
+     VALUES (?, 'PKMN', ?, ?, ?, '', 'Japanese', ?, 'artofpkm', ?)
+     ON CONFLICT(id) DO NOTHING`);
 
   // Set list: explicit --sets or the full index.
   let setIds = sets;
@@ -148,7 +170,8 @@ export async function importArtofpkm(db, { sets = null, dry = false, deep = fals
   }
 
   const res = { setsVisited: 0, setsAliased: 0, imagesSeen: 0, matched: 0, applied: 0, downloaded: 0,
-                nameless: 0, ambiguous: 0, unmatchedName: 0, deepFetched: 0, samples: [], unaliased: [] };
+                nameless: 0, ambiguous: 0, unmatchedName: 0, knownElsewhere: 0, deepFetched: 0,
+                seedable: 0, seeded: 0, samples: [], seedSamples: [], unaliased: [] };
 
   for (const sid of setIds) {
     if (res.applied >= limit) break;
@@ -161,12 +184,16 @@ export async function importArtofpkm(db, { sets = null, dry = false, deep = fals
     if (!alias) { if (res.unaliased.length < 25) res.unaliased.push(`${sid}:${page.h1}`); continue; }
     res.setsAliased++;
     const pool = bySet.get(alias) ?? [];
-    if (!pool.length) continue;
+    // A fully-arted set has no upgrade pool but may still hide printings we
+    // don't know exist — seed-missing walks it anyway.
+    if (!pool.length && !seedMissing) continue;
 
     for (const card of page.cards) {
       if (res.applied >= limit) break;
       res.imagesSeen++;
-      let { name } = parseSlug(card.filename);
+      const slug = parseSlug(card.filename);
+      let name = slug.name;
+      let displayName = name ? name[0].toUpperCase() + name.slice(1) : null;
       // Nameless file (promos): the detail page carries the name — deep mode only.
       if (!name && deep && card.href) {
         try {
@@ -174,7 +201,7 @@ export async function importArtofpkm(db, { sets = null, dry = false, deep = fals
           res.deepFetched++;
           const h1 = (/<h1[^>]*>([^<]{0,120})/.exec(detail)?.[1] ?? '').trim()
             || (/<title>([^<|]{0,120})/.exec(detail)?.[1] ?? '').trim();
-          if (h1) name = squashName(h1);
+          if (h1) { displayName = h1; name = squashName(h1); }
         } catch { /* stays nameless */ }
         await sleep(DELAY);
       }
@@ -182,7 +209,32 @@ export async function importArtofpkm(db, { sets = null, dry = false, deep = fals
 
       // All same-art variants of this name in the aliased set get the image.
       const hitsByName = pool.filter(c => squashName(c.name) === name || tokenKey(c.name) === tokenKey(name));
-      if (!hitsByName.length) { res.unmatchedName++; continue; }
+      if (!hitsByName.length) {
+        // Not in the upgradeable pool. Known elsewhere in the set (already
+        // wearing better art) → nothing to do. UNKNOWN to the whole catalog →
+        // this printing doesn't exist in our database: seed the identity.
+        if (namesByKey.get(alias)?.has(name)) { res.knownElsewhere++; continue; }
+        if (!seedMissing || !displayName) { res.unmatchedName++; continue; }
+        res.seedable++;
+        const file = `${sid}_${card.filename.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+        if (res.seedSamples.length < 10) res.seedSamples.push(`${displayName} · ${page.h1} (${card.filename})`);
+        if (dry) continue;
+        try {
+          const path = join(JPART_DIR, file);
+          if (!existsSync(path)) {
+            const r = await timedFetch(card.img, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            if (!r.ok) continue;
+            writeFileSync(path, Buffer.from(await r.arrayBuffer()));
+            res.downloaded++;
+            await sleep(DELAY);
+          }
+          const id = `pkmn-apk-${sid}-${name}${slug.num ? `-${slug.num}` : ''}`.slice(0, 64);
+          const made = insSeed.run(id, displayName, setNameByKey.get(alias), slug.num ?? null,
+            `/jpart/${file}`, JSON.stringify({ artofpkm: `${sid}/${card.filename}` })).changes;
+          res.seeded += Number(made);
+        } catch { /* next card */ }
+        continue;
+      }
       // Distinct IDENTITIES (beyond bracket variants) sharing a name = ambiguous.
       const distinctNums = new Set(hitsByName.map(c => (c.number ?? '').toString()));
       if (distinctNums.size > 3) { res.ambiguous++; continue; }   // e.g. six different Pikachu promos
@@ -215,6 +267,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     sets: arg('sets')?.split(','),
     dry: process.argv.includes('--dry'),
     deep: process.argv.includes('--deep'),
+    seedMissing: process.argv.includes('--seed-missing'),
     limit: Number(arg('limit') ?? Infinity),
   });
   console.log(`[artofpkm]${process.argv.includes('--dry') ? ' DRY RUN' : ''}`, JSON.stringify(res, null, 1));

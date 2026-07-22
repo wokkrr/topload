@@ -78,3 +78,22 @@ describe('released_at enrichment from PC release-date (2026-07-22)', () => {
     expect(db.prepare(`SELECT released_at FROM cards WHERE id = 'pk-dated'`).get().released_at).toBe('1999-01-01');  // COALESCE holds
   });
 });
+
+describe('THE SPINE RULE — gates protect marks, not existence (2026-07-22)', () => {
+  it('a thin vintage product gets a ROW but no marks until it earns them', async () => {
+    const { importCsv } = await import('../import-pricecharting-csv.js');
+    const db = openDb(':memory:');
+    const header = 'id,product-name,console-name,genre,sales-volume,loose-price';
+    const text = [header,
+      '901,Ooyama Pikachu #25,Pokemon Japanese Vending,Pokemon Card,2,$150.00',   // volume 2 < 10 → gated
+      '902,Pikachu #58,Pokemon Base Set,Pokemon Card,50,$5.00',                   // passes → marks
+    ].join('\n');
+    const res = importCsv(db, { text, ip: 'PKMN', asOf: '2026-07-22' });
+    expect(res.kept).toBe(2);
+    expect(res.gated).toBe(1);
+    const row = db.prepare(`SELECT name, set_name FROM cards WHERE id = 'pkmn-pc901'`).get();
+    expect(row).toEqual({ name: 'Ooyama Pikachu', set_name: 'Pokemon Japanese Vending' });   // it EXISTS
+    expect(db.prepare(`SELECT COUNT(*) n FROM external_marks WHERE card_id = 'pkmn-pc901'`).get().n).toBe(0);  // unpriced
+    expect(db.prepare(`SELECT COUNT(*) n FROM external_marks WHERE card_id = 'pkmn-pc902'`).get().n).toBeGreaterThan(0);
+  });
+});
