@@ -58,6 +58,11 @@ export function mapItem(item, ip, chain, site, seenAt) {
   if (grade === 'raw') grade = gradeFromTitle(name);
 
   const listedMs = Number(item.SellOrder.createdAt);
+  // Photo indexes (verified live 2026-07-22, tokenId 15343): 0/1 = slab
+  // front/back on a DARK tile (clashes on our light desk — Kaleb), 2/3 =
+  // the same slab scans on WHITE. Prefer white; ~1-in-12 items lack idx
+  // 2/3, so the client imgFallback retries the dark set on 404.
+  const img = (idx) => item.tokenId != null ? `https://images.beezie.com/${chain}/${item.tokenId}/${idx}/original.jpg` : null;
   return {
     platform: 'beezie',
     external_id: `beezie:${chain}:${item.id}`,
@@ -68,11 +73,14 @@ export function mapItem(item, ip, chain, site, seenAt) {
     price_cents: cents,
     currency: 'USDC',
     listed_at: Number.isFinite(listedMs) && listedMs > 0 ? new Date(listedMs).toISOString() : seenAt ?? null,
-    image: item.metadata?.image ?? null,
+    image: img(2) ?? item.metadata?.image ?? null,
+    image_back: img(3),
     nft_address: item.tokenId != null ? `${chain}:${item.tokenId}` : null,
     cert: a.serial != null && String(a.serial).trim() !== '' ? String(a.serial).trim() : null,
     // proof carries chain + site slug → listingUrl() rebuilds the exact page.
-    slug: `${chain}:${slugFor(name, item.id)}`,
+    // Their collectible URLs key on the TOKEN id, not the item id (item.id
+    // 404s — live 2026-07-22, the Eevee Kaleb clicked).
+    slug: `${chain}:${slugFor(name, item.tokenId ?? item.id)}`,
     language: a.language ?? null,
     fmv_usd: Number.isFinite(Number(item.altFmv)) && Number(item.altFmv) > 0 ? Number(item.altFmv) : null,
     seen_at: seenAt ?? null,

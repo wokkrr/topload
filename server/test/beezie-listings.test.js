@@ -41,7 +41,11 @@ describe('beezie mapItem', () => {
       nft_address: 'base:8657',
     });
     expect(r.listed_at).toBe(new Date(1778511286071).toISOString());
-    expect(r.slug).toBe('base:2002-Neo-Destiny-1st-Edition-Unown-Z-60-TAG-85-8910');
+    // Site URLs key on TOKEN id (item.id 404s — live 2026-07-22).
+    expect(r.slug).toBe('base:2002-Neo-Destiny-1st-Edition-Unown-Z-60-TAG-85-8657');
+    // White-background slab scans (idx 2 front / 3 back), not the dark tiles.
+    expect(r.image).toBe('https://images.beezie.com/base/8657/2/original.jpg');
+    expect(r.image_back).toBe('https://images.beezie.com/base/8657/3/original.jpg');
   });
   it('skips unpriced items and troll asks', () => {
     expect(mapItem({ ...ITEM, SellOrder: null }, 'PKMN', 'base', 'x', 'd')).toBeNull();

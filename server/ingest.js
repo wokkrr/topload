@@ -413,7 +413,7 @@ async function runLive(db, today) {
       const prior = prevListedB.get(l.external_id);
       const listedAt = prior && l.listed_at ? (prior < l.listed_at ? prior : l.listed_at) : (prior ?? l.listed_at);
       insB.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, listedAt, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, listedAt, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
     }
     summary.beezieListings = listings.length;
     summary.beezieMatched = matches.size;

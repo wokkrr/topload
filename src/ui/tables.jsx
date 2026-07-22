@@ -50,9 +50,15 @@ export const BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEA
 
 // Some Phygitals ids have no '-cropped' variant on their CDN (found live:
 // raw Wailmer, 2026-07-21) — retry the plain image before giving up.
+// Beezie: we prefer the white-background slab scans (photo idx 2/3), but
+// ~1-in-12 items only shot the dark set (idx 0/1) — retry those (2026-07-22).
 export const imgFallback = (e) => {
   const el = e.currentTarget;
   if (el.src.includes('-cropped')) { el.src = el.src.replace('-cropped', ''); return; }
+  if (el.src.includes('images.beezie.com')) {
+    if (/\/2\/(?=[^/]+$)/.test(el.src)) { el.src = el.src.replace(/\/2\/(?=[^/]+$)/, '/0/'); return; }
+    if (/\/3\/(?=[^/]+$)/.test(el.src)) { el.src = el.src.replace(/\/3\/(?=[^/]+$)/, '/1/'); return; }
+  }
   el.onerror = null;
   el.src = BLANK_IMG;
 };
