@@ -97,6 +97,51 @@ export function mapGroupProducts(products, prices, group) {
   return out;
 }
 
+/**
+ * The SEALED side of a group: number-less priced products (booster boxes,
+ * ETBs, decks, tins…) the card mapper deliberately drops. Feeds the
+ * `products` bucket (Kaleb, 2026-07-22 — on hand, in house, unsurfaced).
+ */
+export function productKind(name) {
+  const n = (name ?? '').toLowerCase();
+  if (/booster box|display/.test(n)) return 'booster-box';
+  if (/elite trainer|etb/.test(n)) return 'etb';
+  if (/booster (pack|bundle)|blister|sleeved booster/.test(n)) return 'pack';
+  if (/deck/.test(n)) return 'deck';
+  if (/tin/.test(n)) return 'tin';
+  if (/collection|box|case/.test(n)) return 'box';
+  return 'other';
+}
+export function mapGroupSealed(products, prices, group) {
+  const byProduct = new Map();
+  for (const pr of prices ?? []) {
+    const g = byProduct.get(pr.productId) ?? {};
+    g[pr.subTypeName ?? 'Normal'] = {
+      market_cents: toCents(pr.marketPrice), low_cents: toCents(pr.lowPrice),
+      mid_cents: toCents(pr.midPrice), high_cents: toCents(pr.highPrice),
+      direct_low_cents: toCents(pr.directLowPrice),
+    };
+    byProduct.set(pr.productId, g);
+  }
+  const out = [];
+  for (const p of products ?? []) {
+    if ((extData(p).Number ?? '').trim()) continue;         // numbered = a card, not sealed
+    const priceRows = byProduct.get(p.productId);
+    if (!priceRows) continue;                               // unpriced accessory noise
+    out.push({
+      product_id: p.productId,
+      name: (p.name ?? '').trim(),
+      kind: productKind(p.name),
+      image_url: `https://tcgplayer-cdn.tcgplayer.com/product/${p.productId}_in_1000x1000.jpg`,
+      group_name: group?.name ?? '',
+      group_published: (group?.publishedOn ?? '').slice(0, 10) || null,
+      url: p.url ?? null,
+      prices: priceRows,
+    });
+  }
+  return out;
+}
+
 /** Fetch JSON with the tcgcsv envelope unwrapped. */
 export async function fetchTcgcsv(path, { fetchImpl = timedFetch } = {}) {
   const res = await fetchImpl(`${BASE}${path}`, { headers: { accept: 'application/json', 'User-Agent': 'Mozilla/5.0' } });

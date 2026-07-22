@@ -150,6 +150,36 @@ CREATE TABLE IF NOT EXISTS pulse_log (
 );
 
 -- TCGplayer daily snapshot (via the TCGCSV mirror) — LATEST per card+subtype.
+-- THE SEALED BUCKET (Kaleb, 2026-07-22: "put the sealed product in a
+-- separate bucket from the card database but one that could be called upon
+-- whenever we may want to address sealed product… great data to have on
+-- hand and in house"). Number-less TCGplayer products — booster boxes,
+-- ETBs, decks, tins, collections — the card mapper deliberately drops.
+-- Deliberately UNSURFACED for now (earn-your-pixels): a data shelf, not a
+-- feature. Never joins card comps.
+CREATE TABLE IF NOT EXISTS products (
+  id           TEXT PRIMARY KEY,             -- '<ip>-tp<productId>'
+  ip           TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  set_name     TEXT,
+  language     TEXT NOT NULL DEFAULT 'English',
+  kind         TEXT,                         -- 'booster-box'|'etb'|'pack'|'deck'|'tin'|'box'|'other'
+  image        TEXT,
+  released_at  TEXT,
+  external_ids TEXT NOT NULL DEFAULT '{}'
+);
+CREATE TABLE IF NOT EXISTS product_prices (
+  product_id       TEXT NOT NULL,
+  subtype          TEXT NOT NULL,
+  as_of            TEXT NOT NULL,
+  market_cents     INTEGER,
+  low_cents        INTEGER,
+  mid_cents        INTEGER,
+  high_cents       INTEGER,
+  direct_low_cents INTEGER,
+  PRIMARY KEY (product_id, subtype, as_of)   -- daily history, sealed charts later
+);
+
 -- market feeds external_marks (oracle bootstrap); low/direct_low are ask
 -- FLOORS: display-only comps ("cheapest on TCGplayer"), never oracle input.
 CREATE TABLE IF NOT EXISTS tcgplayer_prices (

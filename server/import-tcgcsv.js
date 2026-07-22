@@ -13,7 +13,7 @@
  */
 import { openDb } from './db.js';
 import { refreshOracle } from './oracle.js';
-import { CATEGORY_IDS, fetchTcgcsv, mapGroupProducts, normName } from './adapters/tcgcsv.js';
+import { CATEGORY_IDS, fetchTcgcsv, mapGroupProducts, mapGroupSealed, normName } from './adapters/tcgcsv.js';
 
 const cardLabel = (name) => (/\[([^\]]+)\]/.exec(name ?? '')?.[1] ?? '').toLowerCase().trim();
 const isSatellite = (id) => /-(?:pc|tp)\d+$/.test(id);   // -tp = tcgplayer-seeded stubs (2026-07-22)
@@ -99,7 +99,7 @@ export function markPrice(product, cardName) {
   return row?.market_cents ?? null;
 }
 
-export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'], asOf, delayMs = 120, maxGroups = Infinity, fetchImpl, createStubs = process.env.TCGCSV_CREATE_STUBS !== '0' } = {}) {
+export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'], asOf, delayMs = 120, maxGroups = Infinity, fetchImpl, createStubs = process.env.TCGCSV_CREATE_STUBS !== '0', sealedBucket = process.env.TCGCSV_SEALED !== '0' } = {}) {
   const insPrice = db.prepare(
     `INSERT OR REPLACE INTO tcgplayer_prices
      (card_id, subtype, as_of, market_cents, low_cents, mid_cents, high_cents, direct_low_cents, product_id, product_url)
@@ -143,6 +143,16 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'],
   const bracketed = (p) => p.label
     ? `${p.name} [${p.label.replace(/\b[a-z]/g, (c) => c.toUpperCase())}]`
     : p.name;
+  // THE SEALED BUCKET (Kaleb, 2026-07-22): boxes/ETBs/decks land in the
+  // separate `products` shelf with daily price history — on hand, in house,
+  // never mixed into card comps, unsurfaced until wanted. TCGCSV_SEALED=0 off.
+  const insProduct = db.prepare(
+    `INSERT INTO products (id, ip, name, set_name, language, kind, image, released_at, external_ids)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name, set_name = excluded.set_name, kind = excluded.kind`);
+  const insProductPrice = db.prepare(
+    `INSERT OR REPLACE INTO product_prices (product_id, subtype, as_of, market_cents, low_cents, mid_cents, high_cents, direct_low_cents)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
 
   const summary = {};
   for (const key of ips) {
@@ -156,15 +166,16 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'],
       cards = cards.filter(c => want.has(c.language ?? 'English'));
     }
     const groups = (await fetchTcgcsv(`/${catId}/groups`, { fetchImpl })).slice(0, maxGroups);
-    let products = 0, matched = 0, marks = 0, artFilled = 0, stubs = 0, unmatchedSample = [];
+    let products = 0, matched = 0, marks = 0, artFilled = 0, stubs = 0, sealed = 0, unmatchedSample = [];
     for (const g of groups) {
-      let mapped;
+      let mapped, sealedRows = [];
       try {
         const [ps, prs] = [
           await fetchTcgcsv(`/${catId}/${g.groupId}/products`, { fetchImpl }),
           await fetchTcgcsv(`/${catId}/${g.groupId}/prices`, { fetchImpl }),
         ];
         mapped = mapGroupProducts(ps, prs, g);
+        if (sealedBucket) sealedRows = mapGroupSealed(ps, prs, g);
       } catch (e) {
         console.warn(`[tcgcsv] ${ip} ${g.name}: ${e.message} — skipping group`);
         continue;
@@ -173,6 +184,16 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'],
       products += mapped.length;
       if (unmatchedSample.length < 8) unmatchedSample.push(...misses.slice(0, 8 - unmatchedSample.length).map(m => `${m.name} ${m.number} (${m.group_name})`));
       db.exec('BEGIN');
+      for (const p of sealedRows) {
+        const pid = `${ip.toLowerCase()}-tp${p.product_id}`;
+        insProduct.run(pid, ip, p.name, stripGroupCode(p.group_name),
+          target.langs?.includes('Japanese') ? 'Japanese' : 'English',
+          p.kind, p.image_url, p.group_published, JSON.stringify({ tcgplayer: String(p.product_id) }));
+        for (const [subtype, r] of Object.entries(p.prices)) {
+          insProductPrice.run(pid, subtype, asOf, r.market_cents, r.low_cents, r.mid_cents, r.high_cents, r.direct_low_cents);
+        }
+        sealed++;
+      }
       if (createStubs) {
         for (const p of misses) {
           const stubId = `${ip.toLowerCase()}-tp${p.product_id}`;
@@ -204,7 +225,7 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'],
       db.exec('COMMIT');
       if (delayMs) await new Promise(r => setTimeout(r, delayMs));
     }
-    summary[key] = { groups: groups.length, products, matched, unmatched: products - matched, stubs, marks, artFilled };
+    summary[key] = { groups: groups.length, products, matched, unmatched: products - matched, stubs, sealed, marks, artFilled };
     console.log(`[tcgcsv] ${key}:`, JSON.stringify(summary[key]));
     if (unmatchedSample.length) console.log(`[tcgcsv] ${key} unmatched sample: ${unmatchedSample.join(' · ')}`);
   }

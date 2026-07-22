@@ -227,3 +227,29 @@ describe('THE SPINE RULE — unmatched products become -tp stubs (2026-07-22)', 
     expect(db2.prepare(`SELECT COUNT(*) n FROM cards`).get().n).toBe(0);
   });
 });
+
+describe('THE SEALED BUCKET — separate shelf, never in card comps (2026-07-22)', () => {
+  it('number-less priced products land in products/product_prices; cards table untouched', async () => {
+    const { openDb } = await import('../db.js');
+    const { importTcgcsv } = await import('../import-tcgcsv.js');
+    const { productKind } = await import('../adapters/tcgcsv.js');
+    expect(productKind('Prismatic Evolutions Booster Box')).toBe('booster-box');
+    expect(productKind('Sword & Shield Elite Trainer Box')).toBe('etb');
+    expect(productKind('V Battle Deck [Mewtwo V]')).toBe('deck');
+    const db = openDb(':memory:');
+    const groups = [{ groupId: 3, name: 'SV8a: Terastal Fest ex', abbreviation: 'SV8a', publishedOn: '2024-12-06T00:00:00' }];
+    const products = [
+      { productId: 501, name: 'Terastal Fest Booster Box', url: 'x', extendedData: [] },                                     // sealed
+      { productId: 502, name: 'Umbreon ex - 161/187', url: 'x', extendedData: [{ name: 'Number', value: '161/187' }] },     // card → stub path
+    ];
+    const prices = products.map(p => ({ productId: p.productId, subTypeName: 'Normal', marketPrice: 90 }));
+    const stub = async (url) => ({ ok: true, json: async () => url.includes('/groups') ? groups : url.includes('/products') ? products : prices });
+    const res = await importTcgcsv(db, { ips: ['PKMN_JA'], asOf: '2026-07-22', delayMs: 0, fetchImpl: stub, createStubs: true, sealedBucket: true });
+    expect(res.PKMN_JA.sealed).toBe(1);
+    const p = db.prepare(`SELECT ip, name, set_name, language, kind, released_at FROM products WHERE id = 'pkmn-tp501'`).get();
+    expect(p).toEqual({ ip: 'PKMN', name: 'Terastal Fest Booster Box', set_name: 'Terastal Fest ex', language: 'Japanese', kind: 'booster-box', released_at: '2024-12-06' });
+    expect(db.prepare(`SELECT market_cents FROM product_prices WHERE product_id = 'pkmn-tp501'`).get().market_cents).toBe(9000);
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id = 'pkmn-tp501'`).get().n).toBe(0);   // NEVER a card row
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id = 'pkmn-tp502'`).get().n).toBe(1);   // the single became a stub
+  });
+});
