@@ -542,5 +542,25 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (process.argv.includes('--if-stale')) {
     process.env.TOPLOAD_SKIP_FRESH = '1';
   }
-  ingest().catch(e => { console.error(e); process.exit(1); });
+  // WATCHDOG (2026-07-22): two consecutive ingests hung 7-9.5 HOURS on the
+  // droplet (03:00 + 06:00 UTC, 0-CPU idle — a promise somewhere never
+  // settled despite timedFetch's per-call timeout), starving the canonical
+  // guard and stalling every queued job behind them. No run may outlive 90
+  // minutes: name what was pending, die, let the next cron slot retry. The
+  // timer is NOT unref'd — an idle-hang can't outwait it; success clears it.
+  const WATCHDOG_MS = Number(process.env.INGEST_WATCHDOG_MS ?? 90 * 60 * 1000);
+  const watchdog = setTimeout(() => {
+    console.error(`[ingest] WATCHDOG: run exceeded ${Math.round(WATCHDOG_MS / 60000)}min — aborting so the guard never starves.`);
+    try {
+      // Best-effort hint at what wedged, for the postmortem.
+      const reqs = process._getActiveRequests?.() ?? [];
+      const handles = process._getActiveHandles?.() ?? [];
+      console.error(`[ingest] WATCHDOG pending: ${reqs.length} requests, ${handles.length} handles:`,
+        [...new Set([...reqs, ...handles].map(h => h?.constructor?.name ?? typeof h))].join(', '));
+    } catch { /* diagnostics only */ }
+    process.exit(112);
+  }, WATCHDOG_MS);
+  ingest()
+    .then(() => clearTimeout(watchdog))
+    .catch(e => { console.error(e); process.exit(1); });
 }
