@@ -132,6 +132,40 @@ app.get('/api/movers', (_req, res) => {
   })));
 });
 
+// ── Beezie slab-crop proxy ─────────────────────────────────────────────────
+// Beezie shoots SQUARE photos (slab floating in padding — dark set idx 0/1,
+// white set idx 2/3); every other platform gives tight slab crops, so their
+// tiles looked wrong on the desk (Kaleb, 2026-07-22: "we need the cropped
+// images of the slabs"). No cropped variant exists on their CDN → we make
+// our own: fetch the white-background photo, sharp.trim() the uniform
+// border down to the slab edges, cache to disk, serve from our origin.
+// Falls back to the dark set server-side when an item lacks white photos.
+const BEEZIE_IMG_CACHE = join(__dirname, '..', 'data', 'imgcache-beezie');
+mkdirSync(BEEZIE_IMG_CACHE, { recursive: true });
+app.get('/api/beezie-img/:chain/:token/:idx', async (req, res) => {
+  const { chain, token, idx } = req.params;
+  if (!/^(base|flow)$/.test(chain) || !/^\d{1,10}$/.test(token) || !/^[0-3]$/.test(idx)) return res.status(400).end();
+  const file = join(BEEZIE_IMG_CACHE, `${chain}-${token}-${idx}.jpg`);
+  if (existsSync(file)) return res.sendFile(file, { maxAge: '30d' });
+  try {
+    const sharp = (await import('sharp')).default;
+    let buf = null;
+    // Requested index first; white → dark fallback (2→0, 3→1) for the
+    // ~1-in-12 items that only shot the dark set.
+    const tries = [idx, ...(idx === '2' ? ['0'] : idx === '3' ? ['1'] : [])];
+    for (const i of tries) {
+      const r = await timedFetch(`https://images.beezie.com/${chain}/${token}/${i}/original.jpg`);
+      if (r.ok) { buf = Buffer.from(await r.arrayBuffer()); break; }
+    }
+    if (!buf) return res.status(404).end();
+    const out = await sharp(buf).trim({ threshold: 25 }).jpeg({ quality: 88 }).toBuffer();
+    await writeFile(file, out);
+    res.set('Cache-Control', 'public, max-age=2592000').type('jpeg').send(out);
+  } catch {
+    res.status(502).end();
+  }
+});
+
 /**
  * POST /api/binder/marks — bulk live values for Binder positions.
  * Body: {positions:[{card_id, grade}]} (≤200). Returns per position the

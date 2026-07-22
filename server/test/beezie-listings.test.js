@@ -43,9 +43,9 @@ describe('beezie mapItem', () => {
     expect(r.listed_at).toBe(new Date(1778511286071).toISOString());
     // Site URLs key on TOKEN id (item.id 404s — live 2026-07-22).
     expect(r.slug).toBe('base:2002-Neo-Destiny-1st-Edition-Unown-Z-60-TAG-85-8657');
-    // White-background slab scans (idx 2 front / 3 back), not the dark tiles.
-    expect(r.image).toBe('https://images.beezie.com/base/8657/2/original.jpg');
-    expect(r.image_back).toBe('https://images.beezie.com/base/8657/3/original.jpg');
+    // Our slab-crop proxy (idx 2 front / 3 back) — trimmed to the slab edges.
+    expect(r.image).toBe('/api/beezie-img/base/8657/2');
+    expect(r.image_back).toBe('/api/beezie-img/base/8657/3');
   });
   it('skips unpriced items and troll asks', () => {
     expect(mapItem({ ...ITEM, SellOrder: null }, 'PKMN', 'base', 'x', 'd')).toBeNull();

@@ -59,10 +59,11 @@ export function mapItem(item, ip, chain, site, seenAt) {
 
   const listedMs = Number(item.SellOrder.createdAt);
   // Photo indexes (verified live 2026-07-22, tokenId 15343): 0/1 = slab
-  // front/back on a DARK tile (clashes on our light desk — Kaleb), 2/3 =
-  // the same slab scans on WHITE. Prefer white; ~1-in-12 items lack idx
-  // 2/3, so the client imgFallback retries the dark set on 404.
-  const img = (idx) => item.tokenId != null ? `https://images.beezie.com/${chain}/${item.tokenId}/${idx}/original.jpg` : null;
+  // front/back on a DARK tile, 2/3 = same on WHITE — ALL square with the
+  // slab floating in padding (Kaleb: "we need the cropped images"). Serve
+  // through OUR slab-crop proxy (/api/beezie-img — sharp.trim to the slab
+  // edges, disk-cached, white→dark fallback server-side).
+  const img = (idx) => item.tokenId != null ? `/api/beezie-img/${chain}/${item.tokenId}/${idx}` : null;
   return {
     platform: 'beezie',
     external_id: `beezie:${chain}:${item.id}`,
