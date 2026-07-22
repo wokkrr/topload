@@ -61,7 +61,7 @@ const tiltMove = (e) => {
   const py = (e.clientY - r.top) / r.height;
   el.style.transform = `perspective(700px) rotateX(${(-(py - 0.5) * 6).toFixed(2)}deg) rotateY(${((px - 0.5) * 7).toFixed(2)}deg) translateY(-2px)`;
   const g = el.querySelector('.tl-shine');
-  if (g) g.style.background = `radial-gradient(circle at ${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%, rgba(255,255,255,0.15), rgba(212,175,55,0.05) 38%, transparent 62%)`;
+  if (g) g.style.background = `radial-gradient(circle at ${((1 - px) * 100).toFixed(1)}% ${((1 - py) * 100).toFixed(1)}%, rgba(255,255,255,0.15), rgba(212,175,55,0.05) 38%, transparent 62%)`;
 };
 const tiltLeave = (e) => {
   e.currentTarget.style.transform = '';
@@ -80,8 +80,8 @@ const glossMove = (e) => {
   el.style.transform = `perspective(900px) rotateX(${(-(py - 0.5) * 7).toFixed(2)}deg) rotateY(${((px - 0.5) * 8).toFixed(2)}deg)`;
   const g = el.querySelector('.tl-gloss');
   if (g) g.style.background =
-    `radial-gradient(circle at ${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%, rgba(255,255,255,0.20), rgba(255,255,255,0.05) 32%, transparent 56%), ` +
-    `linear-gradient(${(95 + (px - 0.5) * 40).toFixed(1)}deg, transparent ${(30 + px * 14).toFixed(1)}%, rgba(212,175,55,0.10) ${(44 + px * 14).toFixed(1)}%, transparent ${(58 + px * 14).toFixed(1)}%)`;
+    `radial-gradient(circle at ${((1 - px) * 100).toFixed(1)}% ${((1 - py) * 100).toFixed(1)}%, rgba(255,255,255,0.20), rgba(255,255,255,0.05) 32%, transparent 56%), ` +
+    `linear-gradient(${(95 - (px - 0.5) * 40).toFixed(1)}deg, transparent ${(30 + (1 - px) * 14).toFixed(1)}%, rgba(212,175,55,0.10) ${(44 + (1 - px) * 14).toFixed(1)}%, transparent ${(58 + (1 - px) * 14).toFixed(1)}%)`;
 };
 const glossLeave = (e) => {
   e.currentTarget.style.transform = '';
