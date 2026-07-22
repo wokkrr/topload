@@ -140,11 +140,12 @@ export function refreshOutlierFlags(db, opts = {}) {
  * cover the same (card, grade, date). Discounts reflect how close each source
  * is to real solds:
  *  - pricecharting: derived from actual sold listings, per-grade → 0.7
- *  - altfmv: the ALT fair-market values the gacha platforms themselves price
- *    against (harvested off our own Phygitals/Beezie listing snapshots —
- *    Kaleb, 2026-07-22: "pull the most respected sources and blend them in").
- *    Sales-derived, per-slab, widely trusted in the hobby — but observed via
- *    third-party integrations, so it sits just under pricecharting → 0.65
+ *  - altfmv: the fair-market values the gacha platforms themselves price
+ *    against (ALT on Phygitals/Beezie/MNSTR; Courtyard's own estimate),
+ *    harvested off our own listing snapshots — Kaleb, 2026-07-22: "pull the
+ *    most respected sources and blend them in". Sales-derived, per-slab,
+ *    widely trusted — but observed via third-party integrations and blended
+ *    cross-platform by median, so it sits just under pricecharting → 0.65
  *  - tcgplayer: pokemontcg.io's bundled TCGplayer *market price* snapshot —
  *    asking-adjacent, raw only → 0.5 (free bootstrap tier)
  */

@@ -277,12 +277,12 @@ async function runLive(db, today) {
     // so each ingest adds the new flow on top of everything already seen.
     const insY = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
-       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, fmv_usd, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
       insY.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.image_back ?? null, l.nft_address, l.proof ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, l.listed_at, l.image, l.image_back ?? null, l.nft_address, l.proof ?? null, l.cert ?? null, l.fmv_usd ?? null, l.seen_at);
     }
     // Prune SOLD: our own Courtyard sales indexer sees every fill — a sale of
     // the same token on/after the listing date means this ask is gone. (Sales
@@ -333,12 +333,12 @@ async function runLive(db, today) {
     db.exec(`DELETE FROM gacha_listings WHERE platform = 'mnstr'`); // full snapshot refresh
     const insM = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
-       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, fmv_usd, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
       insM.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, prevListed.get(l.external_id) ?? nowIso, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, prevListed.get(l.external_id) ?? nowIso, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.fmv_usd ?? null, l.seen_at);
     }
     summary.mnstrListings = listings.length;
     summary.mnstrMatched = matches.size;
