@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { tokens } from '../tokens.js';
 import { fmtUsd, fmtPct, PLATFORM_LABELS } from '../data/client.js';
-import { listingUrl, listingLanguage, imgFallback } from './tables.jsx';
+import { listingUrl, listingLanguage, imgFallback, isSealed } from './tables.jsx';
 import { CardResearch, headingStyle } from './CardDetail.jsx';
 
 /**
@@ -133,7 +133,9 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
 
           {/* Identity as a chip row (card-page language), not a text run. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-            <MetaChip strong>{l.grade === 'raw' ? 'Raw' : l.grade}</MetaChip>
+            {/* A factory-sealed pack is not an ungraded CARD — 'Raw' is the
+                wrong condition class entirely (Kaleb, 2026-07-23). */}
+            <MetaChip strong>{isSealed(l) ? 'Sealed' : l.grade === 'raw' ? 'Raw' : l.grade}</MetaChip>
             {listingLanguage(l) === 'Japanese' && <MetaChip>Japanese</MetaChip>}
             {l.category && <MetaChip>{l.category}</MetaChip>}
             <MetaChip>{platform}</MetaChip>
@@ -217,7 +219,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                        title="Verify this cert on the grader's site">{cert} ↗</a>
                   : cert} />
               )}
-              {!gm && <Row k="Condition" v="Raw / ungraded" />}
+              {!gm && <Row k="Condition" v={isSealed(l) ? 'Sealed / factory product' : 'Raw / ungraded'} />}
               {l.pop_count != null && (
                 <Row k="PSA population" v={`${Number(l.pop_count).toLocaleString()} at this grade${l.pop_higher != null ? ` · ${Number(l.pop_higher).toLocaleString()} higher` : ''}`} />
               )}
@@ -260,7 +262,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                   <span style={{ font: `12px ${tokens.font.body}`, color: tokens.color.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {s.item_name}
                   </span>
-                  <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, flexShrink: 0, textTransform: 'uppercase' }}>{s.grade}</span>
+                  <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkSecondary, flexShrink: 0, textTransform: 'uppercase' }}>{isSealed(s) ? 'Sealed' : s.grade}</span>
                   <span style={{ font: `12px ${tokens.font.mono}`, color: tokens.color.ink, flexShrink: 0 }}>{fmtUsd(s.price_cents)}</span>
                   {s.delta_pct != null && (
                     <span style={{ font: `11px ${tokens.font.mono}`, color: s.delta_pct <= 0 ? tokens.color.up : tokens.color.down, flexShrink: 0, minWidth: 56, textAlign: 'right' }}>
