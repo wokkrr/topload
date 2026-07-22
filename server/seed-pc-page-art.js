@@ -46,6 +46,20 @@ export function extractOgImage(html) {
   return url;
 }
 
+/**
+ * PC serves product photos from a GCS bucket (images.pricecharting.com) and
+ * does NOT set og:image (probe verdict, live 2026-07-22 — pages were 200 with
+ * nothing to extract). Harvest every bucket URL in the page instead; first
+ * match = the main product photo. A trailing /240.jpg thumbnail is upgraded
+ * to the /1600.jpg original the site serves for the zoom view.
+ */
+export function extractCardImage(html) {
+  const urls = [...String(html ?? '').matchAll(/https?:\/\/[^"'\s>]*images\.pricecharting\.com[^"'\s>]*\.(?:jpe?g|png|webp)/gi)]
+    .map(m => m[0]).filter(u => !/no-image|placeholder|default/i.test(u));
+  if (!urls.length) return extractOgImage(html);
+  return urls[0].replace(/\/240\.(jpe?g|png|webp)$/i, '/1600.$1');
+}
+
 /** pc id → {console, product} name map from the freshest daily CSVs. */
 export function pcNameMap() {
   const map = new Map();
@@ -91,7 +105,7 @@ export async function fillPageArt(db, { ips = ['PKMN', 'OP'], limit = 500, delay
       const r = await fetchImpl(url, { headers: { 'User-Agent': 'Mozilla/5.0', accept: 'text/html' } });
       if (!r.ok) { res.httpErr++; }
       else {
-        const img = extractOgImage(await r.text());
+        const img = extractCardImage(await r.text());
         if (!img) res.noImage++;
         else {
           res.filled += Number(upd.run(img, card.id).changes);
@@ -125,8 +139,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const url = pageUrl(p.n.console, p.n.product);
       try {
         const r = await timedFetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', accept: 'text/html' } });
-        const img = r.ok ? extractOgImage(await r.text()) : null;
-        console.log(`[pc-art probe] ${p.id} "${p.n.product}" → HTTP ${r.status} · og:image ${img ?? '(none)'}`);
+        const html = r.ok ? await r.text() : '';
+        console.log(`[pc-art probe] ${p.id} "${p.n.product}" → HTTP ${r.status} · image ${extractCardImage(html) ?? '(none)'}`);
+        // Show the raw image markup so extraction failures are diagnosable
+        // from the log alone (og:image came back empty on the first live run).
+        const tags = [...html.matchAll(/<img[^>]{0,300}>/gi)].map(m => m[0].slice(0, 160));
+        for (const t of tags.slice(0, 4)) console.log(`    img: ${t}`);
+        if (!tags.length) console.log('    (no <img> tags — image likely set via CSS/JS; first 2 image-ish lines below)',
+          [...html.matchAll(/[^\n]{0,60}(?:image|photo)[^\n]{0,80}/gi)].slice(0, 2).map(m => m[0]).join(' | '));
       } catch (e) { console.log(`[pc-art probe] ${p.id} → ${e.message}`); }
       await new Promise(r2 => setTimeout(r2, 1500));
     }
