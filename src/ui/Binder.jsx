@@ -168,12 +168,12 @@ export function Binder({ onSelect }) {
 
       {/* ── Holdings: the binder itself ── */}
       <div style={panel}>
-        <SectionHead title="Holdings" hint={view === 'grid' ? 'the gallery — click a card to inspect it' : view === 'binder' ? 'the binder — pages of nine, just your cards' : 'the ledger — every position, marked'}
+        <SectionHead title="Holdings" hint={view === 'grid' ? 'the gallery — click a card to inspect it' : view === 'binder' ? 'just the cards — your collection, wall to wall' : 'the ledger — every position, marked'}
           right={<>
             <Chip active={adding} onClick={() => setAdding(a => !a)}>{adding ? 'Close' : '+ Add Card'}</Chip>
             <span style={{ width: 1, height: 18, background: tokens.color.border, margin: '0 4px' }} />
             <Chip active={view === 'grid'} onClick={() => pickView('grid')}><span title="Gallery" style={{ fontSize: 14, lineHeight: 1 }}>⊞</span></Chip>
-            <Chip active={view === 'binder'} onClick={() => pickView('binder')}><span title="True binder — nine-pocket pages" style={{ fontSize: 14, lineHeight: 1 }}>▦</span></Chip>
+            <Chip active={view === 'binder'} onClick={() => pickView('binder')}><span title="Cards only" style={{ fontSize: 14, lineHeight: 1 }}>▦</span></Chip>
             <Chip active={view === 'list'} onClick={() => pickView('list')}><span title="Ledger" style={{ fontSize: 14, lineHeight: 1 }}>☰</span></Chip>
           </>} />
 
@@ -506,75 +506,41 @@ function PageGrid({ ps, marks, onSelect, lastAdded }) {
 }
 
 /**
- * TRUE BINDER view (Kaleb, 2026-07-22): "purely for aesthetics and viewing
- * the cards in your collection" — the classic black nine-pocket page, cards
- * shoulder to shoulder, a thin franchise-colored sleeve outline as the only
- * annotation. No prices, no names, no chrome: the shelf copy.
+ * CARDS-ONLY view (Kaleb, 2026-07-22 v2 — the nine-pocket skeuomorph was
+ * "way too on the nose"; the IDEA stays): a dense, chrome-free wall of just
+ * the cards, in binder order, on the terminal's own surface. The single
+ * annotation is a thin franchise-tinted frame (+ a small ★ on favorites).
+ * No prices, no names, no panels-within-panels. Iterate from here.
  */
 function BinderSleeves({ flat, marks, onSelect }) {
-  const pageOf = [];
-  for (let i = 0; i < flat.length; i += 9) pageOf.push(flat.slice(i, i + 9));
-  if (!pageOf.length) return null;
-  const PAGE_BG = '#211d18';                 // physical black page, both themes
-  const ring = {
-    width: 13, height: 13, borderRadius: '50%',
-    border: '2.5px solid #8f8b83', background: tokens.color.surface,
-    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5)',
-  };
+  if (!flat.length) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 26, justifyContent: 'center' }}>
-      {pageOf.map((page, pi) => (
-        <div key={pi} style={{
-          flex: '0 1 500px', minWidth: 340, background: PAGE_BG, borderRadius: 10,
-          padding: '18px 18px 18px 40px', position: 'relative', boxSizing: 'border-box',
-          boxShadow: '0 8px 26px rgba(0,0,0,0.28)',
-        }}>
-          {/* Ring spine */}
-          {[18, 50, 82].map(top => (
-            <span key={top} style={{ ...ring, position: 'absolute', left: 10, top: `${top}%` }} />
-          ))}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {Array.from({ length: 9 }, (_, i) => {
-              const p = page[i];
-              if (!p) {
-                // Empty sleeve — the honest pocket waiting for its card.
-                return <div key={i} style={{
-                  aspectRatio: '3/4', borderRadius: 6,
-                  background: 'rgba(255,255,255,0.03)',
-                  boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.55)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                }} />;
-              }
-              const m = marks[posKey(p)];
-              const ip = m?.ip ?? p.ip;
-              const edge = tokens.series[ip]?.data ?? 'rgba(255,255,255,0.18)';
-              return (
-                <div key={posKey(p)} onClick={() => onSelect?.(p)} title={m?.name ?? p.name}
-                     style={{
-                       aspectRatio: '3/4', borderRadius: 6, cursor: 'pointer', position: 'relative',
-                       background: 'rgba(255,255,255,0.03)',
-                       boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.55)',
-                       border: `1.5px solid ${edge}55`,
-                       overflow: 'hidden',
-                     }}>
-                  {m?.image
-                    ? <img src={m.image} alt="" loading="lazy" onError={imgFallback}
-                           style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', padding: 4, boxSizing: 'border-box' }} />
-                    : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(255,255,255,0.32)', font: `9px ${tokens.font.body}`, textAlign: 'center', padding: 6 }}>{(m?.name ?? p.name ?? '').slice(0, 26)}</div>}
-                  {/* Sleeve gloss: the plastic's top edge catching light. */}
-                  <span aria-hidden style={{
-                    position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 5,
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.02) 12%, transparent 22%)',
-                  }} />
-                  {p.fav && (
-                    <span style={{ position: 'absolute', top: 3, right: 5, color: tokens.color.brass, fontSize: 10, textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>★</span>
-                  )}
-                </div>
-              );
-            })}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 10 }}>
+      {flat.map(p => {
+        const m = marks[posKey(p)];
+        const ip = m?.ip ?? p.ip;
+        const edge = tokens.series[ip]?.data ?? tokens.color.border;
+        return (
+          <div key={posKey(p)} onClick={() => onSelect?.(p)} title={m?.name ?? p.name}
+               onMouseEnter={e => e.currentTarget.style.borderColor = edge}
+               onMouseLeave={e => e.currentTarget.style.borderColor = `${edge}66`}
+               style={{
+                 aspectRatio: '3/4', borderRadius: 6, cursor: 'pointer', position: 'relative',
+                 background: tokens.color.surfaceRaised,
+                 border: `1.5px solid ${edge}66`,
+                 transition: 'border-color .12s ease',
+                 overflow: 'hidden',
+               }}>
+            {m?.image
+              ? <img src={m.image} alt="" loading="lazy" onError={imgFallback}
+                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', padding: 5, boxSizing: 'border-box' }} />
+              : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: tokens.color.inkMuted, font: `9px ${tokens.font.body}`, textAlign: 'center', padding: 6 }}>{(m?.name ?? p.name ?? '').slice(0, 26)}</div>}
+            {p.fav && (
+              <span style={{ position: 'absolute', top: 4, right: 6, color: tokens.color.brass, fontSize: 10 }}>★</span>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
