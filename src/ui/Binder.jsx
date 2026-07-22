@@ -62,6 +62,24 @@ const tiltMove = (e) => {
   el.style.transform = `perspective(700px) rotateX(${(-py * 6).toFixed(2)}deg) rotateY(${(px * 7).toFixed(2)}deg) translateY(-2px)`;
 };
 const tiltLeave = (e) => { e.currentTarget.style.transform = ''; };
+// Pop-out gloss (Kaleb, 2026-07-22): a soft light source that follows the
+// cursor across the big card — the desk-lamp reflection — plus a gentler
+// tilt than the grid tiles (it's a bigger object in the hand).
+const glossMove = (e) => {
+  if (REDUCED_MOTION) return;
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width;
+  const py = (e.clientY - r.top) / r.height;
+  el.style.transform = `perspective(900px) rotateX(${(-(py - 0.5) * 4).toFixed(2)}deg) rotateY(${((px - 0.5) * 5).toFixed(2)}deg)`;
+  const g = el.querySelector('.tl-gloss');
+  if (g) g.style.background = `radial-gradient(circle at ${(px * 100).toFixed(1)}% ${(py * 100).toFixed(1)}%, rgba(255,255,255,0.15), rgba(255,255,255,0.04) 34%, transparent 58%)`;
+};
+const glossLeave = (e) => {
+  e.currentTarget.style.transform = '';
+  const g = e.currentTarget.querySelector('.tl-gloss');
+  if (g) g.style.background = 'none';
+};
 const pnlColor = (v) => v == null ? tokens.color.inkMuted : v >= 0 ? tokens.color.up : tokens.color.down;
 const posKey = (p) => `${p.card_id}|${p.grade}`;
 
@@ -305,12 +323,14 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
         borderRadius: 10, padding: 22, boxSizing: 'border-box', boxShadow: '0 18px 60px rgba(0,0,0,0.35)',
       }}>
         {/* The card itself, as big as the room allows. */}
-        <div onMouseMove={tiltMove} onMouseLeave={tiltLeave}
-             style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8, transition: 'transform .18s ease' }}>
+        <div onMouseMove={glossMove} onMouseLeave={glossLeave}
+             style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8, transition: 'transform .18s ease', position: 'relative' }}>
           {m?.image
             ? <img src={m.image} alt="" onError={imgFallback}
-                   style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', display: 'block', padding: 12, boxSizing: 'border-box' }} />
+                   style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', display: 'block', padding: 12, boxSizing: 'border-box',
+                            filter: 'drop-shadow(0 12px 26px rgba(30,22,10,0.30))' }} />
             : <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, padding: 40 }}>no image yet</div>}
+          <span className="tl-gloss" aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 8, pointerEvents: 'none' }} />
         </div>
 
         {/* Your numbers. */}
@@ -437,8 +457,8 @@ const GRID_CSS = `
 .tl-binder-card .tl-shine { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .tl-binder-card .tl-shine::after {
   content: ''; position: absolute; inset: -20%;
-  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.30) 47%, rgba(212,175,55,0.16) 53%, transparent 62%);
-  transform: translateX(-130%); transition: transform .55s ease;
+  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.17) 47%, rgba(212,175,55,0.09) 53%, transparent 62%);
+  transform: translateX(-130%); transition: transform .95s ease-in-out;
 }
 .tl-binder-card:hover .tl-shine::after { transform: translateX(130%); }
 @keyframes tl-added-pulse { 0% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 100% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
