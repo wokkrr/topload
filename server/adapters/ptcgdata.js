@@ -45,6 +45,7 @@ export function mapCard(card, set, { language = 'English' } = {}) {
     number,
     variant: card.rarity ?? '',                    // rarity carries the parallel/chase signal
     image: card.images?.large ?? card.images?.small ?? null,
+    released_at: set?.releaseDate ? String(set.releaseDate).slice(0, 10).replace(/\//g, '-') : null,
     language,
     external_ids: {
       ptcgdata: card.id,

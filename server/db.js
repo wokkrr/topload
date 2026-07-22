@@ -50,6 +50,7 @@ function migrate(db) {
   // Sources: Courtyard 'Serial' attribute; MNSTR serialNumber. Never guessed.
   ensureColumn(db, 'gacha_listings', 'cert', 'TEXT');
   ensureColumn(db, 'gacha_listings', 'fmv_usd', 'REAL');        // platform-side ALT fair-market value (Phygitals/Beezie) → altfmv marks
+  ensureColumn(db, 'cards', 'released_at', 'TEXT');             // set release date YYYY-MM-DD (tcgcsv publishedOn / PC release-date / ptcgdata)
   ensureColumn(db, 'latest_marks', 'is_top', 'INTEGER');        // per-card top-grade flag (lookup dedup)
   ensureColumn(db, 'latest_marks', 'grades_tracked', 'INTEGER');
   ensureColumn(db, 'latest_marks', 'price_7d', 'INTEGER');      // movers 7D window (Kaleb, 2026-07-22)

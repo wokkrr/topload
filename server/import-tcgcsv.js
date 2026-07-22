@@ -116,6 +116,11 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'],
   // mark is fine; a loosely-matched IMAGE is visibly wrong art).
   const fillArt = db.prepare(
     `UPDATE cards SET image = ?, image_kind = 'tcgplayer' WHERE id = ? AND image IS NULL`);
+  // Relevant-data enrichment (Kaleb, 2026-07-22): the set's release date rides
+  // every tcgcsv group (publishedOn) — never stored until now. COALESCE: first
+  // writer wins, better sources (per-product PC dates) are not overwritten.
+  const fillReleased = db.prepare(
+    `UPDATE cards SET released_at = COALESCE(released_at, ?) WHERE id = ?`);
 
   const summary = {};
   for (const key of ips) {
@@ -156,6 +161,7 @@ export async function importTcgcsv(db, { ips = ['YGO', 'PKMN', 'OP', 'PKMN_JA'],
         if (product.image_url && cardLabel(card.name) === product.label) {
           artFilled += fillArt.run(product.image_url, card.id).changes;
         }
+        if (product.group_published) fillReleased.run(product.group_published, card.id);
         matched++;
       }
       db.exec('COMMIT');

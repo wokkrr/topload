@@ -61,3 +61,20 @@ describe('splitProductName — promo codes', () => {
     expect(splitProductName('Monkey D. Luffy')).toEqual({ name: 'Monkey D. Luffy', number: null });
   });
 });
+
+describe('released_at enrichment from PC release-date (2026-07-22)', () => {
+  it('fills satellites and never overwrites an existing date', async () => {
+    const { importCsv } = await import('../import-pricecharting-csv.js');
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, released_at, external_ids)
+                VALUES ('pk-dated', 'PKMN', 'Mew', 'Promo', '9', 'English', '1999-01-01', '{}')`).run();
+    const header = 'id,product-name,console-name,genre,sales-volume,loose-price,release-date';
+    const text = [header,
+      '111,Illustrator Pikachu,Pokemon Japanese Promo,Pokemon Card,25,$100.00,1998-01-15',
+      '222,Mew #9,Promo,Pokemon Card,25,$50.00,2001-06-01',
+    ].join('\n');
+    importCsv(db, { text, ip: 'PKMN', asOf: '2026-07-22' });
+    expect(db.prepare(`SELECT released_at FROM cards WHERE id = 'pkmn-pc111'`).get().released_at).toBe('1998-01-15');
+    expect(db.prepare(`SELECT released_at FROM cards WHERE id = 'pk-dated'`).get().released_at).toBe('1999-01-01');  // COALESCE holds
+  });
+});

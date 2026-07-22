@@ -90,6 +90,7 @@ export function mapGroupProducts(products, prices, group) {
       rarity: ext.Rarity ?? null,
       group_name: group?.name ?? '',
       group_abbr: group?.abbreviation ?? '',
+      group_published: (group?.publishedOn ?? '').slice(0, 10) || null,   // set release date
       prices: priceRows,                                     // {Normal:{...}, Foil:{...}}
     });
   }

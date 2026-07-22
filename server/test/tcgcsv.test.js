@@ -155,7 +155,7 @@ describe('PKMN_JA target — Japanese-only universe (category 85)', () => {
     const ins = db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, language, image, external_ids) VALUES (?, 'PKMN', ?, ?, ?, ?, NULL, '{}')`);
     ins.run('pk-en', 'Umbreon ex', 'Prismatic Evolutions', '161', 'English');
     ins.run('pk-ja', 'Umbreon ex', 'Pokemon Japanese Terastal Fest', '161', 'Japanese');
-    const groups = [{ groupId: 9, name: 'SV8a: Terastal Fest ex', abbreviation: 'SV8a' }];
+    const groups = [{ groupId: 9, name: 'SV8a: Terastal Fest ex', abbreviation: 'SV8a', publishedOn: '2024-12-06T00:00:00' }];
     const products = [{ productId: 77, name: 'Umbreon ex - 161/187', url: 'x', extendedData: [{ name: 'Number', value: '161/187' }] }];
     const prices = [{ productId: 77, subTypeName: 'Normal', marketPrice: 800 }];
     const stub = async (url) => ({ ok: true, json: async () => url.includes('/groups') ? groups : url.includes('/products') ? products : prices });
@@ -164,6 +164,9 @@ describe('PKMN_JA target — Japanese-only universe (category 85)', () => {
     const img = (id) => db.prepare(`SELECT image, image_kind FROM cards WHERE id = ?`).get(id);
     expect(img('pk-ja')).toEqual({ image: 'https://tcgplayer-cdn.tcgplayer.com/product/77_in_1000x1000.jpg', image_kind: 'tcgplayer' });
     expect(img('pk-en').image).toBeNull();                            // EN twin untouched by the JP catalog
+    // Relevant-data enrichment: the group's publishedOn becomes released_at.
+    expect(db.prepare(`SELECT released_at FROM cards WHERE id = 'pk-ja'`).get().released_at).toBe('2024-12-06');
+    expect(db.prepare(`SELECT released_at FROM cards WHERE id = 'pk-en'`).get().released_at).toBeNull();
   });
 });
 

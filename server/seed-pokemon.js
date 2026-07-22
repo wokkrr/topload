@@ -64,19 +64,20 @@ async function loadRows(useSnapshot) {
  */
 export function seedPokemon(db, rows, { migrate = true } = {}) {
   const ins = db.prepare(
-    `INSERT INTO cards (id, ip, name, set_name, number, variant, image, language, external_ids)
-     VALUES (?, 'PKMN', ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO cards (id, ip, name, set_name, number, variant, image, language, released_at, external_ids)
+     VALUES (?, 'PKMN', ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name, set_name = excluded.set_name, number = excluded.number,
        variant = excluded.variant, image = COALESCE(excluded.image, cards.image),
        language = excluded.language,
+       released_at = COALESCE(excluded.released_at, cards.released_at),
        external_ids = json_patch(cards.external_ids, excluded.external_ids)`
   );
   db.exec('BEGIN');
 
   // 1. Upsert the canonical catalog (so re-point targets exist).
   let n = 0;
-  for (const r of rows) { ins.run(r.id, r.name, r.set_name, r.number, r.variant, r.image, r.language, JSON.stringify(r.external_ids)); n++; }
+  for (const r of rows) { ins.run(r.id, r.name, r.set_name, r.number, r.variant, r.image, r.language, r.released_at ?? null, JSON.stringify(r.external_ids)); n++; }
 
   // Refresh path: upsert only. New sets flow in; nothing old is touched.
   if (!migrate) { db.exec('COMMIT'); return { seeded: n, purgedOld: 0, salesRepointed: 0, oldKeptStillHasSales: 0, mode: 'upsert-only' }; }

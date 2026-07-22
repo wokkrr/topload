@@ -90,6 +90,12 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
        external_ids = json_patch(cards.external_ids, excluded.external_ids)`
   );
   const attachPc = db.prepare(`UPDATE cards SET external_ids = json_set(external_ids, '$.pricecharting', ?) WHERE id = ?`);
+  // Relevant-data enrichment (2026-07-22): PC carries a per-product release
+  // date — the ONLY release source for vintage-JP/exotic satellites no other
+  // feed models. Per-product beats set-level, so it may overwrite a tcgcsv
+  // group date; a real date never overwrites another real date arbitrarily —
+  // only NULLs are filled.
+  const fillReleased = db.prepare(`UPDATE cards SET released_at = COALESCE(released_at, ?) WHERE id = ?`);
   const insMark = db.prepare(
     `INSERT OR REPLACE INTO external_marks (source, card_id, grade, as_of, price_cents, sales_volume)
      VALUES ('pricecharting', ?, ?, ?, ?, ?)`
@@ -121,6 +127,8 @@ export function importCsv(db, { text, ip, asOf, minVolume = 10, minPriceCents = 
       cardId = `${ip.toLowerCase()}-pc${row.id}`;
       insCard.run(cardId, ip, name, setName, number, JSON.stringify({ pricecharting: String(row.id) }));
     }
+    const released = /^\d{4}-\d{2}-\d{2}/.exec((row['release-date'] ?? '').trim())?.[0];
+    if (released) fillReleased.run(released, cardId);
 
     for (const [field, grade] of Object.entries(CSV_GRADE_FIELDS)) {
       const p = cents(row[field]);
