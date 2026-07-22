@@ -140,13 +140,49 @@ export function refreshOutlierFlags(db, opts = {}) {
  * cover the same (card, grade, date). Discounts reflect how close each source
  * is to real solds:
  *  - pricecharting: derived from actual sold listings, per-grade → 0.7
+ *  - altfmv: the ALT fair-market values the gacha platforms themselves price
+ *    against (harvested off our own Phygitals/Beezie listing snapshots —
+ *    Kaleb, 2026-07-22: "pull the most respected sources and blend them in").
+ *    Sales-derived, per-slab, widely trusted in the hobby — but observed via
+ *    third-party integrations, so it sits just under pricecharting → 0.65
  *  - tcgplayer: pokemontcg.io's bundled TCGplayer *market price* snapshot —
  *    asking-adjacent, raw only → 0.5 (free bootstrap tier)
  */
 export const EXTERNAL_SOURCES = {
   pricecharting: { discount: 0.7, priority: 1 },
-  tcgplayer: { discount: 0.5, priority: 2 },
+  altfmv: { discount: 0.65, priority: 2 },
+  tcgplayer: { discount: 0.5, priority: 3 },
 };
+
+/**
+ * Distill today's listing snapshots into 'altfmv' external marks: median FMV
+ * per (card, grade) across every matched listing that carries a platform-side
+ * ALT valuation. Median (not mean) so one mispriced slab can't drag the mark.
+ * Idempotent per (source, card, grade, as_of).
+ */
+export function harvestAltFmvMarks(db, asOf) {
+  const rows = db.prepare(
+    `SELECT card_id, grade, fmv_usd FROM gacha_listings
+     WHERE seen_at = ? AND card_id IS NOT NULL AND fmv_usd IS NOT NULL AND fmv_usd > 0
+       AND grade IS NOT NULL`).all(asOf);
+  const byKey = new Map();
+  for (const r of rows) {
+    const k = `${r.card_id}|${r.grade}`;
+    (byKey.get(k) ?? byKey.set(k, []).get(k)).push(r.fmv_usd);
+  }
+  const ins = db.prepare(
+    `INSERT OR REPLACE INTO external_marks (source, card_id, grade, as_of, price_cents, sales_volume)
+     VALUES ('altfmv', ?, ?, ?, ?, NULL)`);
+  let n = 0;
+  for (const [k, vals] of byKey) {
+    vals.sort((a, b) => a - b);
+    const mid = vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2;
+    const [card_id, grade] = [k.slice(0, k.lastIndexOf('|')), k.slice(k.lastIndexOf('|') + 1)];
+    ins.run(card_id, grade, asOf, Math.round(mid * 100));
+    n++;
+  }
+  return { listingsWithFmv: rows.length, marks: n };
+}
 /** Back-compat: default discount (pricecharting tier). */
 export const EXTERNAL_CONFIDENCE_DISCOUNT = 0.7;
 

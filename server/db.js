@@ -49,6 +49,7 @@ function migrate(db) {
   // Grading-slab certification number (verifiable on the grader's site).
   // Sources: Courtyard 'Serial' attribute; MNSTR serialNumber. Never guessed.
   ensureColumn(db, 'gacha_listings', 'cert', 'TEXT');
+  ensureColumn(db, 'gacha_listings', 'fmv_usd', 'REAL');        // platform-side ALT fair-market value (Phygitals/Beezie) → altfmv marks
   ensureColumn(db, 'latest_marks', 'is_top', 'INTEGER');        // per-card top-grade flag (lookup dedup)
   ensureColumn(db, 'latest_marks', 'grades_tracked', 'INTEGER');
   ensureColumn(db, 'latest_marks', 'price_7d', 'INTEGER');      // movers 7D window (Kaleb, 2026-07-22)

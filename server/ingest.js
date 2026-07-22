@@ -29,7 +29,7 @@ import { importTcgcsv } from './import-tcgcsv.js';
 import { tagLanguages } from './seed-language-tags.js';
 import { matchListings } from './match.js';
 import { writeFileSync } from 'node:fs';
-import { refreshOutlierFlags, refreshOracle } from './oracle.js';
+import { refreshOutlierFlags, refreshOracle, harvestAltFmvMarks } from './oracle.js';
 import { refreshIndexes } from './indexes.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -387,8 +387,8 @@ async function runLive(db, today) {
     db.exec(`DELETE FROM gacha_listings WHERE external_id LIKE 'phyg:%'`); // full snapshot refresh
     const insP = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
-       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, fmv_usd, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
       const prior = prevListedP.get(l.external_id);
@@ -401,7 +401,7 @@ async function runLive(db, today) {
         else listedAt = prior < l.listed_at ? prior : l.listed_at;
       } else listedAt = prior ?? l.listed_at;
       insP.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, listedAt, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, listedAt, l.image, null, l.nft_address, l.slug ?? null, l.cert ?? null, l.fmv_usd ?? null, l.seen_at);
     }
     registerListings(db, listings, matches);
     summary.phygitalsListings = listings.length;
@@ -436,14 +436,14 @@ async function runLive(db, today) {
     db.exec(`DELETE FROM gacha_listings WHERE external_id LIKE 'beezie:%'`); // full snapshot refresh
     const insB = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
-       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, fmv_usd, seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const l of listings) {
       const prior = prevListedB.get(l.external_id);
       const listedAt = prior && l.listed_at ? (prior < l.listed_at ? prior : l.listed_at) : (prior ?? l.listed_at);
       insB.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
-               l.grade, l.price_cents, l.currency, listedAt, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.seen_at);
+               l.grade, l.price_cents, l.currency, listedAt, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.fmv_usd ?? null, l.seen_at);
     }
     summary.beezieListings = listings.length;
     summary.beezieMatched = matches.size;
@@ -525,6 +525,14 @@ export async function ingest({ db = null, dates = null } = {}) {
     || Boolean(process.env.PRICECHARTING_API_KEY || process.env.POKEMONTCG_API_KEY || process.env.EBAY_CLIENT_ID);
 
   const sourceSummary = live ? await runLive(database, today) : await runDemo(database);
+
+  // Distill the ALT fair-market values riding today's listing snapshots
+  // (Phygitals/Beezie carry them) into 'altfmv' external marks BEFORE the
+  // oracle refresh — a respected sales-derived source we were already
+  // collecting and dropping (Kaleb, 2026-07-22: "pull the most respected
+  // sources and blend them in").
+  const altFmv = harvestAltFmvMarks(database, today);
+  if (altFmv.marks) console.log(`[ingest] altfmv marks: ${JSON.stringify(altFmv)}`);
 
   const outliers = refreshOutlierFlags(database);
 
