@@ -66,6 +66,46 @@ console.log(`\n== REPORT CARD == aligned-or-over: ${okOrOver.length} · SHORT: $
 const missingTotal = short.reduce((a, r) => a + (r.theirCount - r.have), 0) + unknown.reduce((a, r) => a + r.theirCount, 0);
 console.log(`   missing cards implied: ~${missingTotal.toLocaleString()} (short sets ${short.reduce((a, r) => a + r.theirCount - r.have, 0).toLocaleString()} + unknown sets ${unknown.reduce((a, r) => a + r.theirCount, 0).toLocaleString()})`);
 
+// The other direction (Kaleb, 2026-07-23: "make sure we have the correct
+// number AND no duplicates"): sets where we hold MORE than the reference.
+// Bracketed variants legitimately exceed a base checklist, so the overage
+// compare uses our UNBRACKETED rows only.
+console.log('\n== OVERAGES (more unbracketed rows than their count — duplicate fingerprints) ==');
+const over = rows.filter(r => r.key).map(r => {
+  const pool = ours[r.jp ? 'jp' : 'en'].get(r.key) ?? [];
+  const base = pool.filter(c => !/\[/.test(c.name ?? '')).length;
+  return { ...r, base, overBy: base - r.theirCount };
+}).filter(r => r.overBy > 0).sort((a, b) => b.overBy - a.overBy);
+for (const r of over.slice(0, 15)) console.log(`  +${String(r.overBy).padStart(4)} over  ${r.jp ? 'JP' : 'EN'}  ${r.name} (${r.theirCount} expected, ${r.base} unbracketed rows)`);
+if (!over.length) console.log('  none — no set holds more base rows than the reference expects.');
+
+// Internal dupe census — needs no external reference at all: multiple
+// UNBRACKETED rows sharing (set, number, name) are the canonical+satellite
+// pairs the mop-up exists to absorb. Zero here = the lookup page is clean.
+console.log('\n== INTERNAL DUPLICATE SUSPECTS (same set + number + name, >1 unbracketed row) ==');
+let dupeGroups = 0, dupeRows = 0;
+const dupeSamples = [];
+for (const bucket of ['en', 'jp']) {
+  for (const [setKey, pool] of ours[bucket]) {
+    const groups = new Map();
+    for (const c of pool) {
+      if (/\[/.test(c.name ?? '')) continue;
+      const num = String(c.number ?? '').toUpperCase().split('/')[0].replace(/^0+(?=\w)/, '');
+      if (!num) continue;
+      const k = `${num}|${(c.name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+      (groups.get(k) ?? groups.set(k, []).get(k)).push(c);
+    }
+    for (const [, g] of groups) {
+      if (g.length > 1) {
+        dupeGroups++; dupeRows += g.length - 1;
+        if (dupeSamples.length < 12) dupeSamples.push(`${g[0].name} — ${g.map(c => c.set_name).join(' vs ')} (${bucket.toUpperCase()} ${setKey})`);
+      }
+    }
+  }
+}
+console.log(`  groups: ${dupeGroups} · surplus rows: ${dupeRows}${dupeGroups ? '' : ' — CLEAN'}`);
+for (const s of dupeSamples) console.log(`    ${s}`);
+
 console.log('\n== WORST SHORTFALLS (their count vs ours) ==');
 for (const r of short.slice(0, 25)) console.log(`  ${String(r.theirCount - r.have).padStart(5)} short  ${r.jp ? 'JP' : 'EN'}  ${r.name} (${r.theirCount} vs ${r.have})  → matched '${r.key}'`);
 console.log('\n== SETS UNKNOWN TO US (no set-key match at all) ==');
