@@ -98,7 +98,7 @@ export function MoversTable({ movers, onSelect }) {
     <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
       <thead><tr>
         <th style={thL}>Card</th><th style={thL}>Grade</th><th style={th} title={ORACLE_HINT}>Oracle</th>
-        <th style={th}>Δ1D</th><th style={th}>Sales/7D</th><th style={th}>Conf</th>
+        <th style={th}>Δ1D</th><th style={th}>Sales/7D</th>
       </tr></thead>
       <tbody>
         {movers.map(m => (
@@ -108,7 +108,6 @@ export function MoversTable({ movers, onSelect }) {
             <td style={td}>{fmtUsd(m.price_now)}</td>
             <td style={td}><Delta pct={m.change_pct} /></td>
             <td style={td}>{m.sales_7d}</td>
-            <td style={td}><Conf c={m.confidence} /></td>
           </tr>
         ))}
       </tbody>
@@ -135,8 +134,11 @@ export function BasketTable({ basket, onSelect, maxHeight = 440 }) {
     <div style={{ ...(maxHeight ? { maxHeight, overflowY: 'auto' } : {}), border: `1px solid ${tokens.color.border}`, borderRadius: 6 }}>
       <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
         <thead><tr>
+          {/* Δ30D + Conf pulled (earn-your-pixels, Kaleb 2026-07-22): all
+              dashes-and-70s while history builds. What remains explains the
+              index: weight, Oracle, sales, $Vol/wk, Δ1D. */}
           <th style={thSL}>#</th><th style={thSL}>Card</th><th style={thSL}>Grade</th><th style={thS}>Weight</th><th style={thS} title={ORACLE_HINT}>Oracle</th>
-          <th style={thS}>Sales/7D</th><th style={thS}>$Vol/wk</th><th style={thS}>Δ1D</th><th style={thS}>Δ30D</th><th style={thS}>Conf</th>
+          <th style={thS}>Sales/7D</th><th style={thS}>$Vol/wk</th><th style={thS}>Δ1D</th>
         </tr></thead>
         <tbody>
           {basket.map((b, i) => (
@@ -156,8 +158,6 @@ export function BasketTable({ basket, onSelect, maxHeight = 440 }) {
               <td style={td}>{b.sales_7d ?? '—'}</td>
               <td style={td}>{b.price_cents != null && b.sales_7d != null ? fmtUsd(b.price_cents * b.sales_7d) : '—'}</td>
               <td style={td}><Delta pct={b.change_1d_pct} /></td>
-              <td style={td}><Delta pct={b.change_30d_pct} /></td>
-              <td style={td}><Conf c={b.confidence ?? 0} /></td>
             </tr>
           ))}
         </tbody>
