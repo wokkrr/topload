@@ -88,6 +88,22 @@ export function Binder({ onSelect }) {
   }, [positions, marks]);
 
   const removePos = (p) => setPositions(prev => prev.filter(x => posKey(x) !== posKey(p)));
+  // Binder-order flat list (pages by set, richest first) — the pop-out's
+  // ‹ › / arrow keys page through it like turning sleeves.
+  const flat = useMemo(() => {
+    const bySet = new Map();
+    for (const p of positions) {
+      const set = (marks[posKey(p)]?.set_name ?? p.set_name) || 'Other';
+      (bySet.get(set) ?? bySet.set(set, []).get(set)).push(p);
+    }
+    const value = (ps) => ps.reduce((a, p) => a + (marks[posKey(p)]?.price_cents ?? 0) * p.qty, 0);
+    return [...bySet.values()].map(ps => ({ ps, v: value(ps) })).sort((a, b) => b.v - a.v).flatMap(x => x.ps);
+  }, [positions, marks]);
+  const navInspect = (dir) => setInspect(cur => {
+    if (!cur || !flat.length) return cur;
+    const i = flat.findIndex(x => posKey(x) === posKey(cur));
+    return flat[(i + dir + flat.length) % flat.length] ?? cur;
+  });
   const addPosition = (pos) => {
     setPositions(prev => {
       const i = prev.findIndex(p => posKey(p) === posKey(pos));
@@ -155,15 +171,17 @@ export function Binder({ onSelect }) {
         )}
 
         {positions.length > 0 && view === 'grid' && (
-          <BinderGrid positions={positions} marks={marks} onSelect={setInspect} onRemove={removePos} />
+          <BinderGrid positions={positions} marks={marks} onSelect={setInspect} />
         )}
         {positions.length > 0 && view === 'list' && (
-          <BinderTable positions={positions} marks={marks} onSelect={setInspect} onRemove={removePos} />
+          <BinderTable positions={positions} marks={marks} onSelect={setInspect} />
         )}
 
         {inspect && (
           <BinderCardModal
             p={inspect} m={marks[posKey(inspect)]}
+            idx={flat.findIndex(x => posKey(x) === posKey(inspect))} total={flat.length}
+            onNav={navInspect}
             onClose={() => setInspect(null)}
             onFull={() => { const id = inspect.card_id; setInspect(null); onSelect?.(id); }}
             onRemove={() => { removePos(inspect); setInspect(null); }}
@@ -191,12 +209,26 @@ const MODAL_CSS = `
 .tl-binder-pop { animation: tl-pop .22s ease-out; }
 `;
 
-function BinderCardModal({ p, m, onClose, onFull, onRemove }) {
+function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onRemove }) {
+  // Two-step remove (Kaleb, 2026-07-22: "too easy to remove a card
+  // accidentally") — REMOVE arms a red confirm that disarms itself.
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  useEffect(() => { setConfirmRemove(false); }, [p]);
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    if (!confirmRemove) return;
+    const t = setTimeout(() => setConfirmRemove(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmRemove]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight') onNav?.(1);
+      if (e.key === 'ArrowLeft') onNav?.(-1);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, onNav]);
 
   const val = m?.price_cents != null ? m.price_cents * p.qty : null;
   const pnl = val != null && p.cost_cents != null ? val - p.cost_cents * p.qty : null;
@@ -229,7 +261,16 @@ function BinderCardModal({ p, m, onClose, onFull, onRemove }) {
         <div style={{ flex: '1 1 54%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
             <div style={{ font: `19px ${tokens.font.display}`, color: tokens.color.ink }}>{m?.name ?? p.name}</div>
-            <span onClick={onClose} title="Close (Esc)" style={{ cursor: 'pointer', color: tokens.color.inkMuted, font: `13px ${tokens.font.mono}` }}>✕</span>
+            <span style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexShrink: 0 }}>
+              {total > 1 && (
+                <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkMuted, textTransform: 'uppercase' }}>
+                  <span onClick={() => onNav?.(-1)} title="Previous card (←)" style={{ cursor: 'pointer', padding: '0 4px' }}>‹</span>
+                  {idx + 1} / {total}
+                  <span onClick={() => onNav?.(1)} title="Next card (→)" style={{ cursor: 'pointer', padding: '0 4px' }}>›</span>
+                </span>
+              )}
+              <span onClick={onClose} title="Close (Esc)" style={{ cursor: 'pointer', color: tokens.color.inkMuted, font: `13px ${tokens.font.mono}` }}>✕</span>
+            </span>
           </div>
           <div style={{ font: `11px ${tokens.font.body}`, color: tokens.color.inkMuted, marginBottom: 14 }}>
             {m?.set_name ?? p.set_name} {m?.number ?? p.number}{langCode(m?.language ?? p.language) !== 'EN' ? ` · ${langCode(m?.language ?? p.language)}` : ''}
@@ -248,11 +289,18 @@ function BinderCardModal({ p, m, onClose, onFull, onRemove }) {
           <div style={row}><span style={k}>Today</span><span style={{ ...v, color: pnlColor(d1) }}>{fmtPct(d1)}</span></div>
           <div style={row}><span style={k}>Added</span><span style={v}>{p.added_at ?? '—'}</span></div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 18, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 18, flexWrap: 'wrap', alignItems: 'center' }}>
             <Chip active onClick={onFull}>Full Research →</Chip>
-            <Chip onClick={onClose}>Close</Chip>
-            <span style={{ marginLeft: 'auto' }}>
-              <Chip onClick={onRemove}>Remove</Chip>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+              {!confirmRemove ? (
+                <Chip onClick={() => setConfirmRemove(true)}>Remove…</Chip>
+              ) : (
+                <>
+                  <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>take it out of the binder?</span>
+                  <Chip active color={tokens.color.down} onClick={onRemove}>Yes, Remove</Chip>
+                  <Chip onClick={() => setConfirmRemove(false)}>Keep</Chip>
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -324,8 +372,6 @@ function BinderChart({ series, costCents }) {
 const GRID_CSS = `
 .tl-binder-card { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; position: relative; }
 .tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.brass}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
-.tl-binder-card .tl-remove { opacity: 0; transition: opacity .12s ease; }
-.tl-binder-card:hover .tl-remove { opacity: 1; }
 .tl-binder-card .tl-shine { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .tl-binder-card .tl-shine::after {
   content: ''; position: absolute; inset: -20%;
@@ -340,7 +386,7 @@ const GRID_CSS = `
  * people would enjoy looking at and organizing") — cards group by set like
  * a real binder's pages, richest page first, each with its own subtotal.
  */
-function BinderGrid({ positions, marks, onSelect, onRemove }) {
+function BinderGrid({ positions, marks, onSelect }) {
   const pages = useMemo(() => {
     const bySet = new Map();
     for (const p of positions) {
@@ -368,14 +414,14 @@ function BinderGrid({ positions, marks, onSelect, onRemove }) {
               {subtotal > 0 ? fmtUsd(subtotal) : ''}
             </span>
           </div>
-          <PageGrid ps={ps} marks={marks} onSelect={onSelect} onRemove={onRemove} />
+          <PageGrid ps={ps} marks={marks} onSelect={onSelect} />
         </div>
       ))}
     </div>
   );
 }
 
-function PageGrid({ ps, marks, onSelect, onRemove }) {
+function PageGrid({ ps, marks, onSelect }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 22 }}>
       {ps.map(p => {
@@ -399,13 +445,6 @@ function PageGrid({ ps, marks, onSelect, onRemove }) {
                 color: tokens.color.ink, background: tokens.color.overlay, borderRadius: 3, padding: '2px 6px',
               }}>{p.grade}{p.qty > 1 ? ` ×${p.qty}` : ''}{langCode(m?.language ?? p.language) !== 'EN' ? ` · ${langCode(m?.language ?? p.language)}` : ''}</span>
               <span className="tl-shine" aria-hidden />
-              <span className="tl-remove" onClick={(e) => { e.stopPropagation(); onRemove(p); }}
-                    title="Remove from Binder"
-                    style={{
-                      position: 'absolute', top: 6, right: 6, font: `11px ${tokens.font.mono}`,
-                      color: tokens.color.ink, background: tokens.color.overlay, borderRadius: 3,
-                      padding: '2px 7px', cursor: 'pointer',
-                    }}>✕</span>
             </div>
             <div style={{ padding: '8px 10px 9px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
@@ -428,7 +467,7 @@ function PageGrid({ ps, marks, onSelect, onRemove }) {
   );
 }
 
-function BinderTable({ positions, marks, onSelect, onRemove }) {
+function BinderTable({ positions, marks, onSelect }) {
   return (
     <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
       <thead><tr>
@@ -436,7 +475,6 @@ function BinderTable({ positions, marks, onSelect, onRemove }) {
         <th style={th}>Qty</th><th style={th}>Cost/ea</th>
         <th style={th} title={ORACLE_HINT}>Oracle/ea</th>
         <th style={th}>Value</th><th style={th}>P&L</th><th style={th}>P&L%</th><th style={th}>Δ1D</th>
-        <th style={th} />
       </tr></thead>
       <tbody>
         {positions.map(p => {
@@ -464,9 +502,6 @@ function BinderTable({ positions, marks, onSelect, onRemove }) {
               <td style={{ ...td, color: pnlColor(pnl) }}>{fmtUsd(pnl)}</td>
               <td style={{ ...td, color: pnlColor(pnl) }}>{fmtPct(pnlPct)}</td>
               <td style={{ ...td, color: pnlColor(d1) }}>{fmtPct(d1)}</td>
-              <td style={{ ...td, width: 24 }} onClick={(e) => { e.stopPropagation(); onRemove(p); }} title="Remove from Binder">
-                <span style={{ color: tokens.color.inkMuted, cursor: 'pointer' }}>✕</span>
-              </td>
             </tr>
           );
         })}
