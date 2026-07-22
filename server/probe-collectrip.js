@@ -71,4 +71,40 @@ for (const src of scripts.slice(0, 3)) {
     }
   } catch (e) { console.log(`  bundle fetch failed: ${e.message}`); }
 }
+// 4. v3 (2026-07-22): the bundle exposed https://api.collect.rip + /all-sets.
+//    Hit it, learn the set shape, then find/guess the per-set cards route.
+const api = async (path) => {
+  const r = await timedFetch(`https://api.collect.rip${path}`, { headers: { 'User-Agent': 'Mozilla/5.0', accept: 'application/json', origin: HOST, referer: `${HOST}/` } });
+  return { status: r.status, text: r.ok ? await r.text() : '' };
+};
+await new Promise(r => setTimeout(r, 600));
+const all = await api('/all-sets');
+console.log(`\n[collectrip] GET api.collect.rip/all-sets → ${all.status} · ${all.text.length} bytes`);
+if (all.text) {
+  console.log('  head:', all.text.slice(0, 400).replace(/\s+/g, ' '));
+  try {
+    const j = JSON.parse(all.text);
+    const arr = Array.isArray(j) ? j : j.sets ?? j.data ?? [];
+    console.log(`  entries: ${arr.length} · first entry keys: ${Object.keys(arr[0] ?? {}).join(', ')}`);
+    console.log('  first entry:', JSON.stringify(arr[0]).slice(0, 300));
+    // Guess per-set card routes from the first entry's identifiers.
+    const s0 = arr.find(s => /base.?set/i.test(JSON.stringify(s))) ?? arr[0];
+    const idents = [s0?.slug, s0?.id, s0?.set_id].filter(Boolean);
+    for (const idn of idents) {
+      for (const shape of [`/set/${idn}`, `/sets/${idn}`, `/set-cards/${idn}`, `/cards?set=${idn}`, `/setlist/${idn}`]) {
+        await new Promise(r => setTimeout(r, 500));
+        const t = await api(shape);
+        console.log(`  ${shape} → ${t.status}${t.text ? ` · ${t.text.slice(0, 160).replace(/\s+/g, ' ')}` : ''}`);
+        if (t.status === 200) break;
+      }
+      if (idents.length) break;
+    }
+  } catch { console.log('  (not JSON)'); }
+}
+// Bundle context around the all-sets literal — how the app builds sibling URLs.
+try {
+  const js = await get(scripts[0]);
+  const i = js.indexOf('all-sets');
+  if (i >= 0) console.log('\n[collectrip] bundle context @all-sets:', js.slice(Math.max(0, i - 250), i + 350).replace(/\s+/g, ' '));
+} catch { /* fine */ }
 console.log('\n[collectrip] probe done — read-only.');
