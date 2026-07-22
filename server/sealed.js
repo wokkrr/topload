@@ -98,6 +98,24 @@ export function buildSealedBook(db) {
   return out.sort((a, b) => (b.discount ?? -9) - (a.discount ?? -9) || a.best.price_cents - b.best.price_cents);
 }
 
+/**
+ * Daily tape (tcgquant study, 2026-07-23): snapshot the book into
+ * sealed_book_log — units live, best ask, market — one row per (day,
+ * product). Supply signals (inventory-days, contraction, CAGR) are just
+ * time-series over this, and history can't be backfilled: the tape rolls
+ * from day one even though nothing surfaces it yet.
+ */
+export function logSealedBook(db, asOf) {
+  const book = buildSealedBook(db);
+  const ins = db.prepare(
+    `INSERT OR REPLACE INTO sealed_book_log (as_of, product_id, units, best_ask_cents, market_cents)
+     VALUES (?, ?, ?, ?, ?)`);
+  db.exec('BEGIN');
+  for (const b of book) ins.run(asOf, b.product_id, b.units, b.best.price_cents ?? null, b.market_cents);
+  db.exec('COMMIT');
+  return { logged: book.length };
+}
+
 /** Ingest pass: (re)attribute today's sealed listings to the product shelf. */
 export function attributeSealedListings(db, { isSealedFn }) {
   const listings = db.prepare(

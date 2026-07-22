@@ -60,3 +60,18 @@ describe('the sealed book — mint dedupe is the double-spend guard', () => {
     expect(buildSealedBook(db).length).toBe(1);
   });
 });
+
+describe('sealed tape — history rolls from day one (tcgquant study)', () => {
+  it('logs one row per (day, product); idempotent per day', async () => {
+    const { logSealedBook } = await import('../sealed.js');
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO products (id, ip, name) VALUES ('pkmn-tp1', 'PKMN', 'Prismatic Evolutions Elite Trainer Box')`).run();
+    db.prepare(`INSERT INTO gacha_listings (platform, external_id, item_name, grade, price_cents, currency, nft_address, product_id, seen_at)
+                VALUES ('collectorcrypt', 'cc1', 'PE ETB', 'raw', 8999, 'USDC', 'mintA', 'pkmn-tp1', '2026-07-23')`).run();
+    expect(logSealedBook(db, '2026-07-23')).toEqual({ logged: 1 });
+    logSealedBook(db, '2026-07-23');
+    expect(db.prepare(`SELECT COUNT(*) n FROM sealed_book_log`).get().n).toBe(1);
+    const row = db.prepare(`SELECT units, best_ask_cents FROM sealed_book_log WHERE product_id = 'pkmn-tp1'`).get();
+    expect(row).toEqual({ units: 1, best_ask_cents: 8999 });
+  });
+});

@@ -241,3 +241,17 @@ CREATE TABLE IF NOT EXISTS psa_certs (
   raw        TEXT,                       -- full API response JSON (provenance)
   fetched_at TEXT NOT NULL
 );
+
+-- Sealed book daily tape (2026-07-23, tcgquant study): supply/price history
+-- per product — units available, best ask, market. The signal layer
+-- (inventory-days, supply contraction, CAGR) is just time-series over this;
+-- history can't be backfilled, so the tape starts rolling the day the shelf
+-- exists. One row per (day, product), idempotent.
+CREATE TABLE IF NOT EXISTS sealed_book_log (
+  as_of          TEXT NOT NULL,
+  product_id     TEXT NOT NULL,
+  units          INTEGER NOT NULL,            -- mint-deduped physical units live
+  best_ask_cents INTEGER,
+  market_cents   INTEGER,
+  PRIMARY KEY (as_of, product_id)
+);

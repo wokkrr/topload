@@ -572,7 +572,10 @@ export async function ingest({ db = null, dates = null } = {}) {
       l.platform === 'mnstr' ||
       /\b(booster|packs?|box|etb|elite trainer|display|blister|tins?|case)\b/i.test(l.item_name ?? ''));
     const sb = attributeSealedListings(database, { isSealedFn });
-    if (sb.sealedListings) console.log(`[ingest] sealed book: ${JSON.stringify(sb)}`);
+    // Tape the book daily — supply/price history for the future signal layer.
+    const { logSealedBook } = await import('./sealed.js');
+    const tape = logSealedBook(database, today);
+    if (sb.sealedListings) console.log(`[ingest] sealed book: ${JSON.stringify({ ...sb, ...tape })}`);
   } catch (e) { console.warn(`[ingest] sealed attribution failed: ${e.message}`); }
 
   // Distill the ALT fair-market values riding today's listing snapshots
