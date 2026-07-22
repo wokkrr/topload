@@ -234,7 +234,10 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
         </tbody>
       </table>
 
-      {/* ── Breakdown / sales / listings / catalysts ── */}
+      {/* ── Breakdown / sales / listings ──
+          'News & catalysts' panel removed (Kaleb, 2026-07-22) — it was a
+          placeholder with no data source; the grid reflows to three panels.
+          If a "why it moved" feed ever lands, it earns its way back. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 20, marginTop: 28 }}>
         <Panel title="Recent sales">
           {!sales?.length ? (
@@ -289,15 +292,6 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
             </div>
           </div>
         </Panel>
-        {!embedded && (
-          <Panel title="News & catalysts">
-            <div style={placeholderStyle}>
-              Reprints, set rotations, tournament results, grading-pop changes —
-              the "why it moved" column. Data source TBD; on the backlog after
-              live pricing.
-            </div>
-          </Panel>
-        )}
       </div>
     </div>
   );
