@@ -51,6 +51,8 @@ function migrate(db) {
   ensureColumn(db, 'gacha_listings', 'cert', 'TEXT');
   ensureColumn(db, 'latest_marks', 'is_top', 'INTEGER');        // per-card top-grade flag (lookup dedup)
   ensureColumn(db, 'latest_marks', 'grades_tracked', 'INTEGER');
+  ensureColumn(db, 'latest_marks', 'price_7d', 'INTEGER');      // movers 7D window (Kaleb, 2026-07-22)
+  ensureColumn(db, 'latest_marks', 'prov_7d', 'TEXT');
 }
 
 function ensureColumn(db, table, column, ddl) {

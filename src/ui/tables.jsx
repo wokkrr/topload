@@ -92,28 +92,8 @@ export const Thumb = ({ src, size = 34, badge = null }) => {
   );
 };
 
-export function MoversTable({ movers, onSelect }) {
-  if (!movers?.length) return <Empty label="movers" />;
-  return (
-    <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%' }}>
-      <thead><tr>
-        <th style={thL}>Card</th><th style={thL}>Grade</th><th style={th} title={ORACLE_HINT}>Oracle</th>
-        <th style={th}>Δ1D</th><th style={th}>Sales/7D</th>
-      </tr></thead>
-      <tbody>
-        {movers.map(m => (
-          <tr key={`${m.card_id}|${m.grade}`} onClick={() => onSelect?.(m.card_id)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
-            <td style={tdL}><IpDot ip={m.ip} />{m.name} <span style={{ color: tokens.color.inkMuted }}>· {m.set_name}</span></td>
-            <td style={tdL}>{m.grade}</td>
-            <td style={td}>{fmtUsd(m.price_now)}</td>
-            <td style={td}><Delta pct={m.change_pct} /></td>
-            <td style={td}>{m.sales_7d}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
+// (MoversTable removed 2026-07-22 — dead code; the Terminal renders movers
+//  via MoverRow. Earn-your-pixels applies to exports too.)
 
 /**
  * Index constituents. 400-row baskets live inside a fixed-height scroll box

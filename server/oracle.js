@@ -241,11 +241,20 @@ export function refreshLatestMarks(db) {
   db.exec('DELETE FROM latest_marks');
   db.exec(`
     INSERT INTO latest_marks (card_id, grade, as_of, price_cents, confidence, basis, source,
-                              sales_7d, sales_30d, price_1d, price_30d)
+                              sales_7d, sales_30d, price_1d, price_7d, prov_7d, price_30d)
     SELECT o.card_id, o.grade, o.as_of, o.price_cents, o.confidence, o.basis, o.source,
            o.sales_7d, o.sales_30d,
            (SELECT p.price_cents FROM oracle_prices p
              WHERE p.card_id = o.card_id AND p.grade = o.grade AND p.as_of = date(o.as_of, '-1 day')),
+           -- 7D lookback = NEAREST mark at-or-before 7 days ago (daily rows can
+           -- have gaps); prov_7d carries that mark's basis|source so movers can
+           -- refuse cross-stream deltas (data events, not market moves).
+           (SELECT p.price_cents FROM oracle_prices p
+             WHERE p.card_id = o.card_id AND p.grade = o.grade AND p.as_of <= date(o.as_of, '-7 day')
+             ORDER BY p.as_of DESC LIMIT 1),
+           (SELECT p.basis || '|' || COALESCE(p.source, '') FROM oracle_prices p
+             WHERE p.card_id = o.card_id AND p.grade = o.grade AND p.as_of <= date(o.as_of, '-7 day')
+             ORDER BY p.as_of DESC LIMIT 1),
            (SELECT p.price_cents FROM oracle_prices p
              WHERE p.card_id = o.card_id AND p.grade = o.grade AND p.as_of = date(o.as_of, '-30 day'))
     FROM oracle_prices o

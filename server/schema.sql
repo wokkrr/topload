@@ -118,6 +118,8 @@ CREATE TABLE IF NOT EXISTS latest_marks (
   sales_7d    INTEGER NOT NULL,
   sales_30d   INTEGER NOT NULL,
   price_1d    INTEGER,
+  price_7d    INTEGER,                      -- nearest mark ≥7 days back (movers window)
+  prov_7d     TEXT,                         -- that mark's basis|source — movers only trust same-stream deltas
   price_30d   INTEGER,
   PRIMARY KEY (card_id, grade)
 );

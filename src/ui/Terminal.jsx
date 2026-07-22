@@ -231,7 +231,9 @@ export function Terminal({ indexes, days, setDays, movers, onSelect, onOpenListi
         </div>
         <div style={{ flex: '1 1 300px', minWidth: 0 }}>
       <div style={{ ...panel, height: '100%' }}>
-        <SectionHead title="Movers · 24h" hint="biggest one-day moves among cards with live marks" />
+        {/* 7D window (Kaleb, 2026-07-22): cards trade weekly, not tick-by-
+            tick — 24h was structurally quiet for this asset class. */}
+        <SectionHead title="Movers · 7D" hint="biggest seven-day moves among cards with live marks" />
         {movers?.length
           ? movers.slice(0, 8).map(m => <MoverRow key={`${m.card_id}|${m.grade}`} m={m} onSelect={onSelect} />)
           : <div style={{ color: tokens.color.inkMuted, font: `12px ${tokens.font.body}`, padding: '8px 2px' }}>no movers yet — marks refresh with each ingest</div>}
