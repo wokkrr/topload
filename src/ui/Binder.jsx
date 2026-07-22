@@ -332,15 +332,13 @@ function BinderCardModal({ p, m, idx = 0, total = 1, onNav, onClose, onFull, onR
       }}>
         {/* The card itself, as big as the room allows. */}
         <div onMouseMove={glossMove} onMouseLeave={glossLeave}
-             className="tl-binder-card"
-             style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8, transition: 'transform .45s cubic-bezier(0.68, -0.55, 0.265, 1.35)', position: 'relative', overflow: 'hidden' }}>
+             style={{ flex: '1 1 46%', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.color.surfaceRaised, borderRadius: 8, transition: 'transform .45s cubic-bezier(0.68, -0.55, 0.265, 1.35)', position: 'relative' }}>
           {m?.image
             ? <img src={m.image} alt="" onError={imgFallback}
                    style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', display: 'block', padding: 12, boxSizing: 'border-box',
                             filter: 'drop-shadow(0 12px 26px rgba(30,22,10,0.30))' }} />
             : <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, padding: 40 }}>no image yet</div>}
           <span className="tl-gloss" aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 8, pointerEvents: 'none' }} />
-          <span className="tl-ambient" aria-hidden style={{ '--d': '0.6s' }} />
         </div>
 
         {/* Your numbers. */}
@@ -465,20 +463,6 @@ const GRID_CSS = `
 .tl-binder-card { transition: transform .38s cubic-bezier(0.68, -0.55, 0.265, 1.35), box-shadow .15s ease, border-color .15s ease; position: relative; }
 .tl-binder-card:hover { transform: translateY(-2px); border-color: ${tokens.color.brass}; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
 .tl-binder-card .tl-shine { position: absolute; inset: 0; pointer-events: none; }
-/* Ambient shimmer — pokemon.com's mechanism verbatim: a soft white band on
-   mix-blend-mode:luminosity drifting through on a slow loop, staggered per
-   card so the binder twinkles out of sync. Not hover-driven — it's the
-   card's own life; the cursor adds tilt + counter-glare on top. */
-.tl-binder-card .tl-ambient { position: absolute; inset: 0; pointer-events: none; overflow: hidden; mix-blend-mode: luminosity; }
-.tl-binder-card .tl-ambient::after {
-  content: ''; position: absolute; left: -40%; width: 180%; height: 22%; top: -30%;
-  background: linear-gradient(rgba(255,255,255,0), rgba(255,255,255,0.5), rgba(255,255,255,0));
-  transform: rotate(9deg);
-  animation: tl-ambient-sweep 5.6s linear infinite;
-  animation-delay: var(--d, 0s);
-}
-@keyframes tl-ambient-sweep { 0% { top: -32%; } 42% { top: 128%; } 100% { top: 128%; } }
-@media (prefers-reduced-motion: reduce) { .tl-binder-card .tl-ambient::after { animation: none; } }
 @keyframes tl-added-pulse { 0% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 100% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
 .tl-just-added { border-color: ${tokens.color.brass}; animation: tl-added-pulse 1.4s ease-out; }
 `;
@@ -536,8 +520,6 @@ function PageGrid({ ps, marks, onSelect, lastAdded }) {
                 color: tokens.color.ink, background: tokens.color.overlay, borderRadius: 3, padding: '2px 6px',
               }}>{p.grade}{p.qty > 1 ? ` ×${p.qty}` : ''}{langCode(m?.language ?? p.language) !== 'EN' ? ` · ${langCode(m?.language ?? p.language)}` : ''}</span>
               <span className="tl-shine" aria-hidden />
-              <span className="tl-ambient" aria-hidden
-                    style={{ '--d': `${([...posKey(p)].reduce((a, c) => a + c.charCodeAt(0), 0) % 7) * 0.8}s` }} />
               {p.fav && (
                 <span style={{
                   position: 'absolute', top: 6, right: 6, font: `12px ${tokens.font.mono}`,
