@@ -117,20 +117,22 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           {cur && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
               <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(cur.price_cents)}</span>
-              <DeltaChip label="1D" pct={cur.change_1d_pct} />
-              <DeltaChip label="7D" pct={range?.d7} />
-              <DeltaChip label="30D" pct={cur.change_30d_pct} />
+              {/* Zero-information chips don't render (Kaleb, 2026-07-23):
+                  a 0.00% delta on a card with no sales history is noise. */}
+              {(cur.sales_30d > 0 || cur.change_1d_pct) ? <DeltaChip label="1D" pct={cur.change_1d_pct} /> : null}
+              {range?.d7 ? <DeltaChip label="7D" pct={range.d7} /> : null}
+              {(cur.sales_30d > 0 || cur.change_30d_pct) ? <DeltaChip label="30D" pct={cur.change_30d_pct} /> : null}
               <span style={{ font: `10px ${tokens.font.mono}`, color: cur.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary,
                              border: `1px solid ${tokens.color.border}`, borderRadius: 3, padding: '2px 7px' }}>
-                {cur.basis === 'solds' ? 'VERIFIED SALES' : `ESTIMATE · ${(cur.source ?? 'src').toUpperCase().slice(0, 8)}`} · CONF {(cur.confidence * 100).toFixed(0)}
+                {cur.basis === 'solds' ? 'VERIFIED SALES' : `ESTIMATE · ${(cur.source ?? 'src').toUpperCase().slice(0, 8)}`}
               </span>
             </div>
           )}
           <div style={{ display: 'flex', gap: 24, marginTop: 12, flexWrap: 'wrap' }}>
-            {range && <Stat label={`${days}D high`} value={fmtUsd(range.hi)} />}
-            {range && <Stat label={`${days}D low`} value={fmtUsd(range.lo)} />}
-            {cur && <Stat label="Sales 7D / 30D" value={`${cur.sales_7d} / ${cur.sales_30d}`} />}
-            {range && <Stat label={`${days}D return`} value={fmtPct(range.window)} color={deltaColor(range.window)} />}
+            {range && range.hi !== range.lo && <Stat label={`${days}D high`} value={fmtUsd(range.hi)} />}
+            {range && range.hi !== range.lo && <Stat label={`${days}D low`} value={fmtUsd(range.lo)} />}
+            {cur && cur.sales_30d > 0 && <Stat label="Sales 7D / 30D" value={`${cur.sales_7d} / ${cur.sales_30d}`} />}
+            {range && range.window !== 0 && <Stat label={`${days}D return`} value={fmtPct(range.window)} color={deltaColor(range.window)} />}
           </div>
 
           {/* ── TCGplayer reference (daily snapshot): their market number +
@@ -175,7 +177,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                   <span>{s.language}</span>
                   {s.price_cents != null
                     ? <span style={{ color: tokens.color.inkSecondary }}>{s.grade} {fmtUsd(s.price_cents)}</span>
-                    : <span style={{ color: tokens.color.inkMuted }}>tracked · no Oracle price yet</span>}
+                    : null}
                 </button>
               ))}
             </div>
@@ -201,8 +203,10 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
             ))}
           </div>
 
-          <MarkChart series={series} color={seriesColor}
-                     dots={sales?.filter(s => s.grade === grade)} />
+          {(series?.length >= 3 && new Set(series.map(p => p.price_cents)).size >= 2)
+            ? <MarkChart series={series} color={seriesColor}
+                         dots={sales?.filter(s => s.grade === grade)} />
+            : null}
         </div>
       </div>
 
@@ -211,17 +215,16 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           {/* 'Oracle' = the mark, renamed terminal-wide (Kaleb, 2026-07-21).
               Δ30D/Conf/Basis stay HERE — the card page is the deep dive. */}
           <th style={thL}>Grade</th><th style={th} title="The Topload price oracle — one fair-value mark per card + grade, blended from recorded sales and external market data">Oracle</th><th style={th}>Δ1D</th><th style={th}>Δ30D</th>
-          <th style={th}>Sales/7D</th><th style={th}>Conf</th><th style={thL} title="What this grade's Oracle value is based on">Priced From</th>
+          <th style={th}>Sales/7D</th><th style={thL} title="What this grade's Oracle value is based on">Priced From</th>
         </tr></thead>
         <tbody>
           {card.grades.map(g => (
             <tr key={g.grade} onClick={() => setGrade(g.grade)} style={{ cursor: 'pointer', background: g.grade === grade ? tokens.color.surface : 'none' }}>
               <td style={tdL}>{g.grade}</td>
               <td style={td}>{fmtUsd(g.price_cents)}</td>
-              <td style={{ ...td, color: deltaColor(g.change_1d_pct) }}>{fmtPct(g.change_1d_pct)}</td>
-              <td style={{ ...td, color: deltaColor(g.change_30d_pct) }}>{fmtPct(g.change_30d_pct)}</td>
-              <td style={td}>{g.sales_7d}</td>
-              <td style={td}>{(g.confidence * 100).toFixed(0)}</td>
+              <td style={{ ...td, color: g.sales_30d > 0 || g.change_1d_pct ? deltaColor(g.change_1d_pct) : tokens.color.inkMuted }}>{g.sales_30d > 0 || g.change_1d_pct ? fmtPct(g.change_1d_pct) : '—'}</td>
+              <td style={{ ...td, color: g.sales_30d > 0 || g.change_30d_pct ? deltaColor(g.change_30d_pct) : tokens.color.inkMuted }}>{g.sales_30d > 0 || g.change_30d_pct ? fmtPct(g.change_30d_pct) : '—'}</td>
+              <td style={{ ...td, color: g.sales_7d ? tokens.color.ink : tokens.color.inkMuted }}>{g.sales_7d || '—'}</td>
               {/* No source names on the surface — which feeds power the
                   oracle stays our business (Kaleb, 2026-07-22). Real sales
                   vs estimate is the only provenance a user needs, in words
@@ -240,13 +243,8 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           placeholder with no data source; the grid reflows to three panels.
           If a "why it moved" feed ever lands, it earns its way back. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 20, marginTop: 28 }}>
-        <Panel title="Recent sales">
-          {!sales?.length ? (
-            <div style={placeholderStyle}>
-              No recorded sales for this card yet — sales land here first-hand
-              as our indexers walk the marketplaces' history.
-            </div>
-          ) : (
+        {sales?.length > 0 && <Panel title="Recent sales">
+          {(
             <div>
               {sales.slice(0, 8).map((s, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', font: `11px ${tokens.font.mono}`, textTransform: 'uppercase', opacity: s.is_outlier ? 0.45 : 1 }}
@@ -265,7 +263,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
               </div>
             </div>
           )}
-        </Panel>
+        </Panel>}
         <Panel title="About this card">
           {/* Collector-first facts (Kaleb, 2026-07-23): release date replaces
               the internal-sounding "Marked as of" — a collector cares when
@@ -290,10 +288,6 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                 <span style={{ color: tokens.color.inkMuted, font: `10px ${tokens.font.mono}`, textTransform: 'uppercase' }}>{l.note} ↗</span>
               </a>
             ))}
-            <div style={{ ...placeholderStyle, fontSize: 10, marginTop: 2 }}>
-              Search links routed by exact card + set + number. In-app gacha
-              listings appear on the Gacha Desk when this card is live there.
-            </div>
           </div>
         </Panel>
       </div>
