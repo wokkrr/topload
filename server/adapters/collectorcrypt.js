@@ -124,5 +124,12 @@ export function gradeFromTitle(title) {
   if (!m) return 'raw';
   const n = parseFloat(m[2]);
   if (!(n > 0 && n <= 10)) return 'raw';
+  // CGC PRISTINE 10 is a REAL TIER above Gem Mint 10 (tiny pops, big
+  // premiums) — venues' structured data already lands it as CGC10.5, but the
+  // title path was collapsing it into plain CGC10, welding two price
+  // populations together (found via the Salazzle $3000-vs-$41 "CGC10" pair,
+  // 2026-07-23). BGS 'Pristine 10' stays BGS10 — that's just Beckett's name
+  // for their regular 10.
+  if (/^cgc$/i.test(m[1]) && n === 10 && /\bPRISTINE\b/i.test(title)) return 'CGC10.5';
   return normalizeGrade(m[1], n);
 }
