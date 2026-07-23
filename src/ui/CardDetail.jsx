@@ -267,12 +267,15 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           )}
         </Panel>
         <Panel title="About this card">
+          {/* Collector-first facts (Kaleb, 2026-07-23): release date replaces
+              the internal-sounding "Marked as of" — a collector cares when
+              the card came out, not when our oracle last wrote a row. */}
           <Row k="IP" v={tokens.series[card.ip]?.label ?? card.ip} />
           <Row k="Set" v={card.set_name ?? '—'} />
+          {card.released_at && <Row k="Released" v={card.released_at} />}
           <Row k="Number" v={card.number ?? '—'} />
           <Row k="Rarity / variant" v={card.variant || '—'} />
           <Row k="Grades tracked" v={card.grades.map(g => g.grade).join(', ')} />
-          <Row k="Marked as of" v={cur?.as_of ?? '—'} />
         </Panel>
         <Panel title="Where to buy">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

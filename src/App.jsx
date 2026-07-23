@@ -26,7 +26,9 @@ import { Binder } from './ui/Binder.jsx';
 // its own CARDS tab — the database gets a home; the Terminal page is the
 // market-strength snapshot + deal radar.
 // BINDER (2026-07-22): major build #1 — the portfolio tracker gets a tab.
-const TABS = [['Terminal', '/'], ['Cards', '/cards'], ['Listings', '/desk'], ['Binder', '/binder']];
+// DESK not TERMINAL (Kaleb, 2026-07-23): "make this less intimidating…
+// the word Terminal may lean too hard into the analytics side."
+const TABS = [['Desk', '/'], ['Cards', '/cards'], ['Listings', '/desk'], ['Binder', '/binder']];
 
 const parseRoute = (path) => {
   if (path === '/desk') return { page: 'desk' };

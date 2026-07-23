@@ -304,7 +304,7 @@ app.get('/api/cards', (req, res) => {
 /** GET /api/cards/:id → card meta + latest mark per grade (with provenance) */
 app.get('/api/cards/:id', (req, res) => {
   const card = db.prepare(`
-    SELECT id, ip, name, set_name, number, variant, language,
+    SELECT id, ip, name, set_name, number, variant, language, released_at,
            image AS card_image, image_kind AS card_kind,
            (SELECT g.image FROM gacha_listings g WHERE g.card_id = cards.id AND g.image IS NOT NULL LIMIT 1) AS listing_photo
     FROM cards WHERE id = ?`).get(req.params.id);
