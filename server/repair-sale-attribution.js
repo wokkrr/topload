@@ -43,14 +43,30 @@ export function repairSaleAttribution(db, { live = false, ratio = 5, floorCents 
   const candidates = db.prepare(
     `SELECT id, card_id, grade, price_cents, external_id, source FROM sales
      WHERE external_id LIKE '0x%:%'`).all();
-  const qMint = db.prepare(`SELECT card_id, grade, item_name FROM nft_registry WHERE mint LIKE ? || '%' LIMIT 2`);
+  // In-memory registry index. A per-sale SQL prefix LIKE cannot use the mint
+  // PK index (SQLite LIKE is case-insensitive vs the column's BINARY
+  // collation), so it full-scanned 176k registry rows PER SALE — the dry run
+  // sat for ages on the droplet (live, 2026-07-23). Exact map + 18-char
+  // prefix buckets (courtyard fragments are exactly 18) make it O(1).
+  const regRows = db.prepare(`SELECT mint, card_id, grade, item_name FROM nft_registry`).all();
+  const byMint = new Map(regRows.map(r => [r.mint, r]));
+  const byPrefix = new Map();
+  for (const r of regRows) {
+    const p = r.mint.slice(0, 18);
+    (byPrefix.get(p) ?? byPrefix.set(p, []).get(p)).push(r);
+  }
+  const lookupMint = (frag) => {
+    if (byMint.has(frag)) return [byMint.get(frag)];
+    if (frag.length >= 18) return (byPrefix.get(frag.slice(0, 18)) ?? []).filter(r => r.mint.startsWith(frag));
+    return regRows.filter(r => r.mint.startsWith(frag));   // sub-18 fragment: rare, linear is fine
+  };
   const updSale = db.prepare(`UPDATE sales SET card_id = ?, grade = ? WHERE id = ?`);
   const moved = new Map();   // saleId → new home; lets the DRY run judge phase 2 post-repoint, same as live
   if (live) db.exec('BEGIN');
   for (const s of candidates) {
     const frag = /^0x[0-9a-fA-F]+:(.+)$/.exec(s.external_id)?.[1];
     if (!frag) continue;
-    const hits = qMint.all(frag);
+    const hits = lookupMint(frag);
     if (hits.length !== 1) { res[hits.length ? 'ambiguous' : 'unresolvable']++; continue; }
     const reg = hits[0];
     if (!reg.card_id) { res.unresolvable++; continue; }
@@ -66,11 +82,14 @@ export function repairSaleAttribution(db, { live = false, ratio = 5, floorCents 
 
   // ---- PHASE 2: QUARANTINE price-implausible sales ----
   // External same-grade anchors (whale-proof): pricecharting > tcgplayer.
+  // GROUP BY + MAX(as_of): SQLite's bare-column rule returns price_cents from
+  // the max-as_of row — one index pass instead of a correlated subquery per
+  // row (external_marks now carries the 5.5yr history backfill; the old shape
+  // was the dry run's second stall).
   const extRows = db.prepare(
-    `SELECT card_id, grade, source, price_cents FROM external_marks e
+    `SELECT card_id, grade, source, price_cents, MAX(as_of) AS as_of FROM external_marks
      WHERE source IN ('pricecharting', 'tcgplayer')
-       AND as_of = (SELECT MAX(as_of) FROM external_marks e2
-                    WHERE e2.card_id = e.card_id AND e2.grade = e.grade AND e2.source = e.source)`).all();
+     GROUP BY source, card_id, grade`).all();
   const ext = new Map();
   for (const r of extRows) {
     const k = `${r.card_id}|${r.grade}`;
