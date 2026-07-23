@@ -31,6 +31,7 @@
  */
 import { openDb } from './db.js';
 import { timedFetch } from './net.js';
+import { extractChartData, storeChartHistory } from './pc-history.js';
 import { latestCsvs } from './repair-variant-marks.js';
 import { parseCsv } from './import-pricecharting-csv.js';
 
@@ -111,12 +112,18 @@ export async function fillPageArt(db, { ips = ['PKMN', 'OP'], limit = 500, delay
       const r = await fetchImpl(url, { headers: { 'User-Agent': 'Mozilla/5.0', accept: 'text/html' } });
       if (!r.ok) { res.httpErr++; }
       else {
-        const img = extractCardImage(await r.text());
+        const html = await r.text();
+        const img = extractCardImage(html);
         if (!img) res.noImage++;
         else {
           res.filled += Number(upd.run(img, card.id).changes);
           if (res.samples.length < 15) res.samples.push(`$${Math.round((card.value_cents ?? 0) / 100)} ${card.id} ← ${img.slice(0, 80)}`);
         }
+        // PASSIVE HISTORY HARVEST (2026-07-23): the page is already in hand —
+        // extract its embedded 5.5-year monthly chart_data at zero extra
+        // request cost. See pc-history.js for posture + bucket mapping.
+        const chart = extractChartData(html);
+        if (chart) res.historyPoints = (res.historyPoints ?? 0) + storeChartHistory(db, card.id, chart);
       }
     } catch { res.httpErr++; }
     // Unattended-safety: if the first dozen pages yield nothing, the URL form

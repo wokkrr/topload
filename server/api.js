@@ -364,16 +364,30 @@ app.get('/api/sales/recent', (req, res) => {
   res.json(rows);
 });
 
-/** GET /api/cards/:id/series?grade=PSA10&days=90 → oracle mark history (with provenance) */
+/** GET /api/cards/:id/series?grade=PSA10&days=90 → oracle price history (with provenance).
+ * HISTORY BACKFILL (2026-07-23): harvested PriceCharting monthly points
+ * (external_marks, back to 2021) fill the window BEFORE our oracle series
+ * begins — they merge in as basis 'external', which the chart already
+ * renders dashed. Kaleb's two-line read: dashed MARKET history flowing into
+ * the solid VERIFIED era as our own tape takes over. */
 app.get('/api/cards/:id/series', (req, res) => {
   const grade = req.query.grade ?? 'raw';
-  const days = Math.min(365, parseInt(req.query.days ?? '90', 10));
+  const days = Math.min(2400, parseInt(req.query.days ?? '90', 10));
   const rows = db.prepare(`
     SELECT as_of, price_cents, confidence, basis, sales_7d FROM oracle_prices
     WHERE card_id = ? AND grade = ?
       AND as_of >= date((SELECT MAX(as_of) FROM oracle_prices), ?)
     ORDER BY as_of`).all(req.params.id, grade, `-${days} day`);
-  res.json(rows);
+  const oracleMin = rows[0]?.as_of ?? '9999-12-31';
+  const hist = db.prepare(`
+    SELECT as_of, price_cents FROM external_marks
+    WHERE source = 'pricecharting' AND card_id = ? AND grade = ?
+      AND as_of < ? AND as_of >= date('now', ?)
+    ORDER BY as_of`).all(req.params.id, grade, oracleMin, `-${days} day`);
+  res.json([
+    ...hist.map(h => ({ as_of: h.as_of, price_cents: h.price_cents, confidence: 0.5, basis: 'external', sales_7d: 0 })),
+    ...rows,
+  ]);
 });
 
 /** GET /api/platforms → aggregator coverage map */

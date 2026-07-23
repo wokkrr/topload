@@ -193,13 +193,13 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
               }}>{g.grade}</button>
             ))}
             <span style={{ flex: 1 }} />
-            {[30, 90, 180].map(r => (
+            {[30, 90, 180, 365, 1825].map(r => (
               <button key={r} onClick={() => setDays(r)} style={{
                 background: days === r ? tokens.color.surfaceRaised : 'none',
                 border: `1px solid ${days === r ? tokens.color.inkMuted : tokens.color.border}`,
                 color: days === r ? tokens.color.ink : tokens.color.inkSecondary,
                 borderRadius: 4, padding: '3px 10px', font: `11px ${tokens.font.mono}`, cursor: 'pointer',
-              }}>{r}D</button>
+              }}>{r === 365 ? '1Y' : r === 1825 ? '5Y' : `${r}D`}</button>
             ))}
           </div>
 
