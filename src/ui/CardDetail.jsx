@@ -111,7 +111,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           )}
           {embedded && (
             <div style={{ color: tokens.color.inkSecondary, font: `12px ${tokens.font.body}` }}>
-              Tracked as <span style={{ color: tokens.color.ink }}>{card.name}</span> · {card.set_name} {card.number} — oracle mark by grade:
+              Tracked as <span style={{ color: tokens.color.ink }}>{card.name}</span> · {card.set_name} {card.number} — Oracle price by grade:
             </div>
           )}
           {cur && (
@@ -122,7 +122,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
               <DeltaChip label="30D" pct={cur.change_30d_pct} />
               <span style={{ font: `10px ${tokens.font.mono}`, color: cur.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary,
                              border: `1px solid ${tokens.color.border}`, borderRadius: 3, padding: '2px 7px' }}>
-                {cur.basis === 'solds' ? 'RAW SOLDS' : `EXT · ${(cur.source ?? 'src').toUpperCase().slice(0, 8)}`} · CONF {(cur.confidence * 100).toFixed(0)}
+                {cur.basis === 'solds' ? 'VERIFIED SALES' : `ESTIMATE · ${(cur.source ?? 'src').toUpperCase().slice(0, 8)}`} · CONF {(cur.confidence * 100).toFixed(0)}
               </span>
             </div>
           )}
@@ -175,7 +175,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                   <span>{s.language}</span>
                   {s.price_cents != null
                     ? <span style={{ color: tokens.color.inkSecondary }}>{s.grade} {fmtUsd(s.price_cents)}</span>
-                    : <span style={{ color: tokens.color.inkMuted }}>tracked · no mark yet</span>}
+                    : <span style={{ color: tokens.color.inkMuted }}>tracked · no Oracle price yet</span>}
                 </button>
               ))}
             </div>
@@ -227,8 +227,8 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                   vs estimate is the only provenance a user needs, in words
                   a terminal user actually understands. */}
               <td style={{ ...tdL, color: g.basis === 'solds' ? tokens.color.up : tokens.color.inkSecondary, font: `11px ${tokens.font.mono}`, textTransform: 'uppercase' }}
-                  title={g.basis === 'solds' ? 'Value computed from recorded sales' : 'Value estimated from market data — no recorded sales yet'}>
-                {g.basis === 'solds' ? 'real sales' : 'estimate'}
+                  title={g.basis === 'solds' ? 'Value computed from verified sales' : 'Value estimated from market data — no verified sales yet'}>
+                {g.basis === 'solds' ? 'verified sales' : 'estimate'}
               </td>
             </tr>
           ))}
@@ -250,7 +250,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
             <div>
               {sales.slice(0, 8).map((s, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '3px 0', font: `11px ${tokens.font.mono}`, textTransform: 'uppercase', opacity: s.is_outlier ? 0.45 : 1 }}
-                     title={s.is_outlier ? 'Flagged as outlier — excluded from oracle marks' : undefined}>
+                     title={s.is_outlier ? 'Flagged as outlier — excluded from the Oracle price' : undefined}>
                   <span style={{ color: tokens.color.inkMuted, minWidth: 62 }}>{s.sold_at?.slice(0, 10)}</span>
                   <span style={{ color: tokens.color.inkSecondary, minWidth: 46 }}>{s.grade}</span>
                   <span style={{ color: tokens.color.inkMuted, font: `9px ${tokens.font.body}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -261,7 +261,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
                 </div>
               ))}
               <div style={{ font: `9px ${tokens.font.body}`, color: tokens.color.inkMuted, marginTop: 6 }}>
-                first-hand solds, straight from the marketplaces
+                verified sales, straight from the marketplaces
               </div>
             </div>
           )}
@@ -376,7 +376,7 @@ function MarkChart({ series, color, dots }) {
   }, [series, dots]);
 
   if (!series) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>Loading…</div>;
-  if (!series.length) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>No oracle marks for this grade yet.</div>;
+  if (!series.length) return <div style={{ color: tokens.color.inkMuted, padding: 24 }}>No Oracle price history for this grade yet.</div>;
   const { x, y, gridVals, pts } = model;
 
   // Split into provenance runs so external stretches render dashed.
@@ -401,7 +401,7 @@ function MarkChart({ series, color, dots }) {
 
   return (
     <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}
-         onMouseMove={onMove} onMouseLeave={() => setHover(null)} role="img" aria-label="Oracle mark history">
+         onMouseMove={onMove} onMouseLeave={() => setHover(null)} role="img" aria-label="Oracle price history">
       {gridVals.map(v => (
         <g key={v}>
           <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} stroke={tokens.color.border} strokeWidth="1" />
@@ -481,7 +481,7 @@ function HoverBox({ x, p }) {
       <text x="10" y="16" fill={tokens.color.inkSecondary} style={{ font: `10px ${tokens.font.mono}` }}>{p.as_of}</text>
       <text x="10" y="34" fill={tokens.color.ink} style={{ font: `12px ${tokens.font.mono}` }}>{fmtUsd(p.price_cents)}</text>
       <text x="10" y="50" fill={tokens.color.inkMuted} style={{ font: `10px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
-        conf {(p.confidence * 100).toFixed(0)} · {p.basis === 'external' ? 'external' : `solds · ${p.sales_7d}/wk`}
+        conf {(p.confidence * 100).toFixed(0)} · {p.basis === 'external' ? 'estimate' : `verified · ${p.sales_7d}/wk`}
       </text>
     </g>
   );

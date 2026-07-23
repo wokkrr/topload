@@ -166,11 +166,11 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                 font: `600 13px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 9px', textTransform: 'uppercase',
                 color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down,
                 border: `1px solid ${tokens.color.border}`,
-              }}>{fmtPct(l.delta_pct)} vs mark</span>
+              }}>{fmtPct(l.delta_pct)} vs Oracle</span>
             )}
             {hasComp && (
               <span style={{ font: `13px ${tokens.font.mono}`, color: tokens.color.inkSecondary, textTransform: 'uppercase' }}>
-                oracle mark {fmtUsd(l.comp_cents)}
+                Oracle price {fmtUsd(l.comp_cents)}
               </span>
             )}
           </div>
@@ -180,8 +180,8 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
               ? `New ${platform} inventory in intake — no firm ask yet. The number above is ${platform}'s own value estimate; the final price is settled through their inquiry desk.`
               : hasComp
                 ? l.delta_pct <= 0
-                  ? `Asking ${fmtPct(Math.abs(l.delta_pct)).replace('+', '')} below our latest grade-matched oracle mark.`
-                  : `Asking ${fmtPct(l.delta_pct)} above our latest grade-matched oracle mark.`
+                  ? `Asking ${fmtPct(Math.abs(l.delta_pct)).replace('+', '')} below our Oracle price for this grade.`
+                  : `Asking ${fmtPct(l.delta_pct)} above our Oracle price for this grade.`
                 : l.comp_suspect
                   ? 'A comp exists but is wildly out of line with this ask — we don’t show numbers we don’t trust.'
                   : 'No grade-matched oracle comp for this card yet — comps appear as our sales history deepens.'}
@@ -269,7 +269,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
       <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 16 }}>
         {l.card_id && (
           <Panel title="Price History & Comps"
-                 hint="the tracked card behind this listing — oracle marks by grade, real solds plotted">
+                 hint="the tracked card behind this listing — Oracle price by grade, verified sales plotted">
             <CardResearch cardId={l.card_id} initialGrade={l.grade} embedded onOpenCard={onSelectCard} />
           </Panel>
         )}
