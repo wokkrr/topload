@@ -13,7 +13,7 @@ import { Binder } from './ui/Binder.jsx';
  * Dashboard to be one page and the Gacha Desk a separate page?" — yes):
  *
  *   /                     Terminal dashboard (indexes + movers + lookup)
- *   /desk                 Gacha Desk (the ~11k-listing payload loads ONLY here)
+ *   /listings             Listings (the ~11k-listing payload loads ONLY here; /desk redirects)
  *   /card/<id>            card research page  — deep-linkable/shareable
  *   /listing/<platform>/<external_id>  listing page — deep-linkable/shareable
  *
@@ -28,10 +28,12 @@ import { Binder } from './ui/Binder.jsx';
 // BINDER (2026-07-22): major build #1 — the portfolio tracker gets a tab.
 // DESK not TERMINAL (Kaleb, 2026-07-23): "make this less intimidating…
 // the word Terminal may lean too hard into the analytics side."
-const TABS = [['Desk', '/'], ['Cards', '/cards'], ['Listings', '/desk'], ['Binder', '/binder']];
+const TABS = [['Desk', '/'], ['Cards', '/cards'], ['Listings', '/listings'], ['Binder', '/binder']];
 
 const parseRoute = (path) => {
-  if (path === '/desk') return { page: 'desk' };
+  // '/desk' was the Listings URL before the front tab became Desk
+  // (2026-07-23) — old links land on the same page at its new address.
+  if (path === '/listings' || path === '/desk') return { page: 'desk' };
   if (path === '/cards') return { page: 'cards' };
   if (path === '/binder') return { page: 'binder' };
   const card = /^\/card\/(.+)$/.exec(path);
@@ -141,9 +143,9 @@ export default function App() {
         </a>
         <nav style={{ display: 'flex', gap: 2, marginLeft: 'auto', alignItems: 'center' }}>
           {TABS.map(([label, to]) => {
-            const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/desk') || (route.page === 'cards' && to === '/cards') || (route.page === 'binder' && to === '/binder');
+            const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/listings') || (route.page === 'cards' && to === '/cards') || (route.page === 'binder' && to === '/binder');
             return (
-              <button key={to} onClick={() => { setOrigin(to === '/desk' ? 'desk' : to === '/cards' ? 'cards' : 'terminal'); navigate(to); }}
+              <button key={to} onClick={() => { setOrigin(to === '/listings' ? 'desk' : to === '/cards' ? 'cards' : 'terminal'); navigate(to); }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.color = tokens.color.ink; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.color = tokens.color.inkSecondary; }}
                 style={{
@@ -171,7 +173,7 @@ export default function App() {
         {err && <div style={{ color: tokens.color.down, font: `12px ${tokens.font.mono}`, marginBottom: 12, textTransform: 'uppercase' }}>{err}</div>}
 
         {route.page === 'card' && (
-          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/desk' : origin === 'cards' ? '/cards' : origin === 'binder' ? '/binder' : '/')} onOpenCard={openCard} />
+          <CardDetail cardId={route.cardId} onBack={() => goBack(origin === 'desk' ? '/listings' : origin === 'cards' ? '/cards' : origin === 'binder' ? '/binder' : '/')} onOpenCard={openCard} />
         )}
 
         {route.page === 'listing' && (
@@ -180,7 +182,7 @@ export default function App() {
               listing={selectedListing}
               listings={gacha}
               navListings={navListings ?? gacha}
-              onBack={() => goBack('/desk')}
+              onBack={() => goBack('/listings')}
               onOpenListing={openListing}
               onSelectCard={openCard}
             />
