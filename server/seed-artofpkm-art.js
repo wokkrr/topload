@@ -261,15 +261,22 @@ export async function importArtofpkm(db, { sets = null, dry = false, deep = fals
 }
 
 // CLI
+// OPS NOTE: flags also readable from env (APK_DEEP=1, APK_SEED_MISSING=1, APK_DRY=1).
+// The literal flag `--seed-missing` contains the guard token `seed-`, so a unit
+// launched with it on the command line matches every guard loop's pgrep —
+// including its OWN — and self-deadlocks in guard-wait (topload-jpart2,
+// 2026-07-22). Guard-shaped text must never ride in argv; env vars are
+// invisible to pgrep -f.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const arg = (k) => process.argv.find(a => a.startsWith(`--${k}=`))?.slice(k.length + 3);
+  const envOn = (k) => process.env[k] === '1';
   const res = await importArtofpkm(openDb(), {
-    sets: arg('sets')?.split(','),
-    dry: process.argv.includes('--dry'),
-    deep: process.argv.includes('--deep'),
-    seedMissing: process.argv.includes('--seed-missing'),
-    limit: Number(arg('limit') ?? Infinity),
+    sets: (arg('sets') ?? process.env.APK_SETS)?.split(','),
+    dry: process.argv.includes('--dry') || envOn('APK_DRY'),
+    deep: process.argv.includes('--deep') || envOn('APK_DEEP'),
+    seedMissing: process.argv.includes('--seed-missing') || envOn('APK_SEED_MISSING'),
+    limit: Number(arg('limit') ?? process.env.APK_LIMIT ?? Infinity),
   });
-  console.log(`[artofpkm]${process.argv.includes('--dry') ? ' DRY RUN' : ''}`, JSON.stringify(res, null, 1));
+  console.log(`[artofpkm]${process.argv.includes('--dry') || envOn('APK_DRY') ? ' DRY RUN' : ''}`, JSON.stringify(res, null, 1));
   if (res.unaliased.length) console.log('[artofpkm] unaliased sets (extend OVERRIDES as needed):', res.unaliased.join(' · '));
 }
