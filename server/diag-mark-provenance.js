@@ -79,7 +79,10 @@ export function markProvenance(db, cardIds, { guide } = {}) {
       const prodLabel = labelOf(row['product-name']);
       const cardLabel = labelOf(card.name);
       if (row.__ip && row.__ip !== card.ip) verdicts.push(`WRONG-IP ATTACH: product is in the ${row.__ip} guide, card is ${card.ip}`);
-      if (prod.number && card.number && prod.number.toLowerCase() !== card.number.toLowerCase()) {
+      // Compare numerators: PC writes '#123', our catalog '123/94' — same card.
+      // (First live run flagged every /-denominated number as a false MISMATCH.)
+      const num = (s) => String(s ?? '').split('/')[0].trim().toLowerCase();
+      if (prod.number && card.number && num(prod.number) !== num(card.number)) {
         verdicts.push(`NUMBER MISMATCH: product "#${prod.number}" vs card "#${card.number}" — wrong-product attach`);
       }
       const a = prod.name.toLowerCase(), b = (card.name ?? '').replace(/\[[^\]]*\]/g, '').trim().toLowerCase();
