@@ -22,27 +22,34 @@
   --brass:#A87E2A; --up:#1F7A4D; --down:#B3402E;
   --serif:'Libre Caslon Text',Georgia,serif; --body:Inter,system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
 }
+body.dark{
+  --bg:#16130E; --raised:#221E16; --overlay:rgba(26,22,15,.88);
+  --ink:#EDE7D9; --ink2:#B3AA96; --ink3:#7C7464; --border:#332D21;
+  --brass:#C79E48; --up:#57AC82; --down:#D3705B;
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);overscroll-behavior:none}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);overscroll-behavior:none;transition:background .25s,color .25s}
 button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;padding:0}
 
 /* ── Shell ── */
-#screen{padding:0 18px calc(86px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;min-height:100vh}
+#screen{padding:0 18px calc(112px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;min-height:100vh}
 header.top{display:flex;align-items:center;gap:9px;padding:calc(14px + env(safe-area-inset-top)) 0 4px}
 .sleeve{width:20px;height:26px;border:1.5px solid var(--brass);border-radius:3px;display:inline-flex;align-items:center;justify-content:center}
 .sleeve i{width:12px;height:16px;background:var(--brass);border-radius:2px;opacity:.85}
 .word{font:600 15px var(--serif);letter-spacing:2.5px}
 .word small{display:block;font:8px var(--mono);letter-spacing:2.5px;color:var(--ink3);margin-top:2px}
 
-/* ── Tab bar: one-handed, thumb-native ── */
-nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--overlay);
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--border);
-  padding-bottom:env(safe-area-inset-bottom);z-index:40}
-nav.tabs button{flex:1;padding:11px 0 9px;display:flex;flex-direction:column;align-items:center;gap:3px;
-  font:10px var(--mono);letter-spacing:1.5px;color:var(--ink3)}
-nav.tabs button.on{color:var(--ink)}
-nav.tabs .ic{font-size:19px;line-height:1;font-family:var(--body)}
-nav.tabs .badge{position:absolute;transform:translate(14px,-3px);background:var(--brass);color:var(--bg);
+/* ── Tab bar: floating pill, icon-only, thumb-native ── */
+nav.tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));
+  display:flex;gap:4px;align-items:center;background:var(--overlay);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid var(--border);
+  border-radius:28px;padding:7px;z-index:40;box-shadow:0 8px 28px rgba(0,0,0,.16);transition:background .25s,border-color .25s}
+nav.tabs button{position:relative;width:50px;height:42px;display:flex;align-items:center;justify-content:center;
+  color:var(--ink3);border-radius:21px;transition:background .18s,color .18s,transform .12s}
+nav.tabs button:active{transform:scale(.92)}
+nav.tabs button.on{background:var(--ink);color:var(--bg)}
+nav.tabs svg{display:block}
+nav.tabs .badge{position:absolute;top:2px;right:5px;background:var(--brass);color:var(--bg);
   font:600 9px var(--mono);border-radius:8px;padding:1px 5px;opacity:0;transition:opacity .25s}
 nav.tabs .badge.show{opacity:1}
 
@@ -176,11 +183,16 @@ h2.cname{font:700 20px var(--serif);text-align:center;margin:0 0 3px;line-height
 .setrow{display:flex;align-items:center;justify-content:space-between;padding:13px 2px;border-bottom:1px solid var(--border);font:13.5px var(--body);color:var(--ink2)}
 .setrow span:last-child{color:var(--ink3)}
 
+/* theme toggle chips */
+.modechips{display:flex;gap:5px}
+.modechips button{font:600 10px var(--mono);letter-spacing:1px;border:1px solid var(--border);border-radius:14px;padding:5px 12px;color:var(--ink3)}
+.modechips button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
 /* scan chip */
 .scanbtn{display:flex;align-items:center;gap:6px;font:11px var(--mono);letter-spacing:1px;color:var(--ink2);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
 
 /* toast */
-#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
+#toast{position:fixed;left:50%;bottom:calc(126px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
   background:var(--ink);color:var(--bg);font:500 12.5px var(--body);border-radius:9px;padding:11px 18px;
   opacity:0;transition:all .3s;z-index:60;white-space:nowrap}
 #toast.show{opacity:1;transform:translate(-50%,0)}
@@ -244,7 +256,8 @@ const LISTINGS = [
 ];
 
 /* ── State + utils ── */
-let tab = 'home', query = '', seg = 'all', newInBinder = null;
+let tab = 'home', query = '', seg = 'all', newInBinder = null, theme = 'light';
+function setTheme(t){ theme = t; document.body.classList.toggle('dark', t === 'dark'); render(); }
 const $ = s => document.querySelector(s);
 const usd = c => '$' + (c/100).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 });
 const usd0 = c => '$' + Math.round(c/100).toLocaleString('en-US');
@@ -253,12 +266,20 @@ const cost = b => b.lots.reduce((s,l) => s + l.paid, 0);
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2200); }
 
 /* ── Tab bar ── */
-/* v2 IA (Kaleb, 2026-07-23, FOMO-inspired never copied): HOME overview ·
-   LOOKUP database · ACTIVITY tape · MARKET buy flow · BINDER collection+profile */
-const TABS = [['home','⌂','HOME'], ['lookup','⌕','LOOKUP'], ['activity','◷','ACTIVITY'], ['market','▤','MARKET'], ['binder','☐','BINDER']];
+/* v3 IA (Kaleb): floating pill, icon-only, active = filled. Icons are
+   inline SVG (crisp at any density; unicode glyphs render inconsistently). */
+const SVG = (d) => `<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONS = {
+  home:     SVG('<path d="M3 10.8 12 3.5l9 7.3"/><path d="M5.4 9.5V20h13.2V9.5"/>'),
+  lookup:   SVG('<circle cx="11" cy="11" r="6.2"/><path d="m20.4 20.4-4.6-4.6"/>'),
+  activity: SVG('<path d="M2.8 12h4l2.7-6.5 4.6 13 2.7-6.5h4.4"/>'),
+  market:   SVG('<path d="M20.6 13.4 11 3.4H4.4v6.6L14 20.4a2 2 0 0 0 2.9 0l3.7-3.7a2 2 0 0 0 0-2.9Z"/><circle cx="7.9" cy="7.9" r="1.15" fill="currentColor" stroke="none"/>'),
+  binder:   SVG('<rect x="6" y="3.2" width="12" height="17.6" rx="2.6"/><rect x="9" y="6.4" width="6" height="8.6" rx="1" stroke-width="1.5"/>'),
+};
+const TABS = ['home','lookup','activity','market','binder'];
 function renderTabs(){
-  $('#tabs').innerHTML = TABS.map(([k,ic,lb]) =>
-    `<button class="${tab===k?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${lb}
+  $('#tabs').innerHTML = TABS.map(k =>
+    `<button class="${tab===k?'on':''}" onclick="go('${k}')" aria-label="${k}">${ICONS[k]}
      ${k==='binder' ? `<span class="badge${newInBinder?' show':''}">+1</span>` : ''}</button>`).join('');
 }
 function go(t){ tab = t; if (t === 'binder') newInBinder = null; render(); window.scrollTo(0,0); }
@@ -372,7 +393,11 @@ function binderScreen(){
   <div style="margin-top:10px">
     <div class="setrow" onclick="toast('Social connections — future build')"><span>Connect socials</span><span>›</span></div>
     <div class="setrow" onclick="toast('Alerts land with the real app')"><span>Notifications</span><span>›</span></div>
-    <div class="setrow" onclick="toast('Prototype — one theme for now')"><span>Appearance</span><span>›</span></div>
+    <div class="setrow"><span>Appearance</span>
+      <span class="modechips">
+        <button class="${theme==='light'?'on':''}" onclick="setTheme('light')">☀ LIGHT</button>
+        <button class="${theme==='dark'?'on':''}" onclick="setTheme('dark')">☾ DARK</button>
+      </span></div>
     <div class="setrow"><span>About TOPLOAD</span><span>v0.1</span></div>
   </div>`;
 }
