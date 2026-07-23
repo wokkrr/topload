@@ -141,6 +141,44 @@ h2.cname{font:700 20px var(--serif);text-align:center;margin:0 0 3px;line-height
 .field label{font:11px var(--mono);letter-spacing:1px;color:var(--ink3)}
 .field input{border:none;background:none;font:600 14px var(--mono);color:var(--ink);text-align:right;width:110px;outline:none}
 
+/* ── Home: market pulse + movers ── */
+.idxrow{display:flex;align-items:center;padding:9px 0;border-top:1px solid var(--border);font:12.5px var(--body)}
+.idxrow:first-of-type{border-top:none}
+.idxrow .n{font:600 11px var(--mono);letter-spacing:1px}
+.idxrow .v{margin-left:auto;font:600 12px var(--mono)}
+.idxrow .d{width:64px;text-align:right;font:600 11px var(--mono)}
+.homehero{background:var(--raised);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:14px}
+.homehero .lbl{font:9.5px var(--mono);letter-spacing:2px;color:var(--ink3)}
+.homehero .val{font:500 30px var(--mono);letter-spacing:-.5px;margin:3px 0 7px}
+
+/* ── Activity ── */
+.act{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)}
+.act img{width:32px;height:45px;object-fit:cover;border-radius:3px;background:var(--raised)}
+.act .nm{flex:1;min-width:0;font:500 12.5px var(--body)}
+.act .nm b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.act .nm small{font:10px var(--mono);color:var(--ink3)}
+.act .pr{text-align:right}
+.act .pr b{font:600 12.5px var(--mono);display:block}
+.act .pr small{font:9.5px var(--mono);color:var(--ink3)}
+.act .sold{color:var(--brass);font:600 9px var(--mono);letter-spacing:1px;margin-right:4px}
+.trend{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+.trend::-webkit-scrollbar{display:none}
+.trend .tcard{flex:0 0 96px}
+.trend .tcard img{width:96px;border-radius:6px;aspect-ratio:5/7;object-fit:cover;background:var(--raised);filter:drop-shadow(0 4px 8px rgba(26,26,26,.18))}
+.trend .tcard b{display:block;font:500 10.5px var(--body);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trend .tcard span{font:600 10px var(--mono)}
+
+/* ── Binder profile block ── */
+.profile{display:flex;align-items:center;gap:13px;background:var(--raised);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:8px}
+.avatar{width:44px;height:44px;border-radius:50%;background:var(--brass);color:var(--bg);display:flex;align-items:center;justify-content:center;font:600 16px var(--serif)}
+.profile .who b{font:600 14px var(--body);display:block}
+.profile .who small{font:10.5px var(--mono);color:var(--ink3)}
+.setrow{display:flex;align-items:center;justify-content:space-between;padding:13px 2px;border-bottom:1px solid var(--border);font:13.5px var(--body);color:var(--ink2)}
+.setrow span:last-child{color:var(--ink3)}
+
+/* scan chip */
+.scanbtn{display:flex;align-items:center;gap:6px;font:11px var(--mono);letter-spacing:1px;color:var(--ink2);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
+
 /* toast */
 #toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
   background:var(--ink);color:var(--bg);font:500 12.5px var(--body);border-radius:9px;padding:11px 18px;
@@ -206,7 +244,7 @@ const LISTINGS = [
 ];
 
 /* ── State + utils ── */
-let tab = 'binder', query = '', seg = 'all', newInBinder = null;
+let tab = 'home', query = '', seg = 'all', newInBinder = null;
 const $ = s => document.querySelector(s);
 const usd = c => '$' + (c/100).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 });
 const usd0 = c => '$' + Math.round(c/100).toLocaleString('en-US');
@@ -215,13 +253,87 @@ const cost = b => b.lots.reduce((s,l) => s + l.paid, 0);
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2200); }
 
 /* ── Tab bar ── */
-const TABS = [['binder','☐','BINDER'], ['search','⌕','SEARCH'], ['market','▤','MARKET']];
+/* v2 IA (Kaleb, 2026-07-23, FOMO-inspired never copied): HOME overview ·
+   LOOKUP database · ACTIVITY tape · MARKET buy flow · BINDER collection+profile */
+const TABS = [['home','⌂','HOME'], ['lookup','⌕','LOOKUP'], ['activity','◷','ACTIVITY'], ['market','▤','MARKET'], ['binder','☐','BINDER']];
 function renderTabs(){
   $('#tabs').innerHTML = TABS.map(([k,ic,lb]) =>
     `<button class="${tab===k?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${lb}
      ${k==='binder' ? `<span class="badge${newInBinder?' show':''}">+1</span>` : ''}</button>`).join('');
 }
 function go(t){ tab = t; if (t === 'binder') newInBinder = null; render(); window.scrollTo(0,0); }
+
+/* ── Extra canned data for HOME + ACTIVITY ── */
+const INDEXES = [
+  { n:'POKÉMON',  v:'95.6',  d:-4.4 },
+  { n:'ONE PIECE',v:'100.0', d:+0.0 },
+  { n:'YU-GI-OH', v:'100.9', d:+0.9 },
+];
+const TAPE = [
+  { card:'moon',    grade:'PSA 10', price:159000, plat:'COLLECTOR CRYPT', ago:'2m'  },
+  { card:'pika58',  grade:'RAW',    price:410,    plat:'PHYGITALS',       ago:'9m'  },
+  { card:'zardV',   grade:'PSA 10', price:9350,   plat:'MNSTR',           ago:'14m' },
+  { card:'blueeyes',grade:'PSA 9',  price:203000, plat:'COURTYARD',       ago:'41m' },
+  { card:'giratina',grade:'CGC 9.5',price:53100,  plat:'PHYGITALS',       ago:'1h'  },
+  { card:'blast',   grade:'PSA 9',  price:76500,  plat:'COURTYARD',       ago:'2h'  },
+  { card:'ray',     grade:'PSA 10', price:102000, plat:'COLLECTOR CRYPT', ago:'3h'  },
+];
+const TRENDING = [
+  { card:'moon',  note:'+2.6% · 34 sales/wk' },
+  { card:'zardV', note:'-4.2% · 21 sales/wk' },
+  { card:'stardust', note:'+8.1% · 6 sales/wk' },
+  { card:'base4', note:'+1.1% · 12 sales/wk' },
+];
+
+/* ── HOME: the daily open — your number + the market's pulse ── */
+function homeScreen(){
+  const total = binder.reduce((s,b) => s + val(b), 0);
+  const day = MOVED.reduce((s,m) => s + m.d, 0);
+  return `
+  <div class="homehero" onclick="go('binder')">
+    <div class="lbl">MY BINDER</div>
+    <div class="val">${usd(total)}</div>
+    <span class="chip ${day>=0?'up':'down'}">${day>=0?'+':'-'}${usd(Math.abs(day))} TODAY</span>
+    <span class="chip dim">VIEW BINDER →</span>
+  </div>
+  <div class="sec">MARKET PULSE <span>90 DAYS</span></div>
+  ${INDEXES.map(i => `
+    <div class="idxrow"><span class="n">${i.n}</span><span class="v">${i.v}</span>
+      <span class="d" style="color:var(--${i.d>=0?'up':'down'})">${i.d>=0?'▲':'▼'} ${Math.abs(i.d).toFixed(1)}%</span></div>`).join('')}
+  <div class="sec">TRENDING NOW</div>
+  <div class="trend">${TRENDING.map(t => { const c = C[t.card]; return `
+    <div class="tcard" onclick="openCard('${t.card}',null,true)">
+      <img src="${c.img}" alt="" loading="lazy" />
+      <b>${c.name}</b><span style="color:var(--${t.note.startsWith('+')?'up':'down'})">${t.note.split(' · ')[0]}</span>
+    </div>`; }).join('')}</div>
+  <div class="sec">BEST DEALS LIVE</div>
+  ${LISTINGS.filter(l => 1 - l.price/l.oracle > 0.05).slice(0,2).map(l => `
+    <div class="act" onclick="openListing('${l.id}')">
+      <img src="${l.photo}" alt="" loading="lazy" />
+      <div class="nm"><b>${l.title}</b><small>${l.grade} · ${l.platform}</small></div>
+      <div class="pr"><b>${usd(l.price)}</b><small style="color:var(--up)">${Math.round((1-l.price/l.oracle)*100)}% UNDER</small></div>
+    </div>`).join('')}
+  <div class="smallnote" style="margin-top:14px">The whole market, one glance. Tap anything to go deeper.</div>`;
+}
+
+/* ── ACTIVITY: the tape — what's actually selling, right now ── */
+function activityScreen(){
+  return `
+  <div class="sec" style="margin-top:18px">TRENDING CARDS <span>7 DAYS</span></div>
+  <div class="trend">${TRENDING.map(t => { const c = C[t.card]; return `
+    <div class="tcard" onclick="openCard('${t.card}',null,true)">
+      <img src="${c.img}" alt="" loading="lazy" />
+      <b>${c.name}</b><span style="color:var(--ink3)">${t.note.split(' · ')[1]}</span>
+    </div>`; }).join('')}</div>
+  <div class="sec">LIVE SALES TAPE</div>
+  ${TAPE.map(t => { const c = C[t.card]; return `
+    <div class="act" onclick="openCard('${t.card}',null,true)">
+      <img src="${c.img}" alt="" loading="lazy" />
+      <div class="nm"><b><span class="sold">SOLD</span>${c.name}</b><small>${t.grade} · ${t.plat}</small></div>
+      <div class="pr"><b>${usd(t.price)}</b><small>${t.ago} ago</small></div>
+    </div>`; }).join('')}
+  <div class="smallnote">Verified sales, straight from the marketplaces. This is what feeds the Oracle.</div>`;
+}
 
 /* ── BINDER (home = the daily open) ── */
 function binderScreen(){
@@ -253,20 +365,38 @@ function binderScreen(){
       ${newInBinder === b.card ? '<span class="new">NEW</span>' : ''}
       <div class="cap"><b>${c.name}${b.lots.length>1 ? ` ×${b.lots.length}` : ''}</b><span>${usd0(val(b))}</span></div>
     </div>`; }).join('')}
+  </div>
+  <div class="sec" style="margin-top:28px">PROFILE</div>
+  <div class="profile"><div class="avatar">K</div>
+    <div class="who"><b>Kaleb</b><small>COLLECTING SINCE 2019 · ${binder.reduce((s,b)=>s+b.lots.length,0)} CARDS</small></div></div>
+  <div style="margin-top:10px">
+    <div class="setrow" onclick="toast('Social connections — future build')"><span>Connect socials</span><span>›</span></div>
+    <div class="setrow" onclick="toast('Alerts land with the real app')"><span>Notifications</span><span>›</span></div>
+    <div class="setrow" onclick="toast('Prototype — one theme for now')"><span>Appearance</span><span>›</span></div>
+    <div class="setrow"><span>About TOPLOAD</span><span>v0.1</span></div>
   </div>`;
 }
 
-/* ── SEARCH ── */
+/* ── LOOKUP: the spine, pocketable — card-shop-counter fast ── */
 function searchScreen(){
   const q = query.trim().toLowerCase();
   const hits = q ? CARDS.filter(c => (c.name + ' ' + c.set).toLowerCase().includes(q)) : [];
   return `
-  <div class="searchbox"><span style="color:var(--ink3)">⌕</span>
-    <input id="q" placeholder="Any card, any set, any era" value="${query.replace(/"/g,'&quot;')}"
-      oninput="query=this.value;renderKeepFocus()" autocomplete="off" /></div>
+  <div style="display:flex;gap:8px;margin-top:14px;align-items:stretch">
+    <div class="searchbox" style="flex:1;margin-top:0"><span style="color:var(--ink3)">⌕</span>
+      <input id="q" placeholder="Any card, any set, any era" value="${query.replace(/"/g,'&quot;')}"
+        oninput="query=this.value;renderKeepFocus()" autocomplete="off" /></div>
+    <button class="scanbtn" onclick="toast('Card scanner — coming with the real app 📷')">▣ SCAN</button>
+  </div>
   ${!q ? `<div class="try">${['Charizard','Umbreon','Base Set','Blue-Eyes'].map(t =>
       `<button onclick="query='${t}';render();">${t}</button>`).join('')}</div>
-    <div class="smallnote" style="margin-top:26px">Every card ever printed — priced or not.<br />The database is the spine.</div>`
+    <div class="sec" style="margin-top:24px">TRENDING LOOKUPS</div>
+    <div class="trend">${TRENDING.map(t => { const c = C[t.card]; return `
+      <div class="tcard" onclick="openCard('${t.card}',null,true)">
+        <img src="${c.img}" alt="" loading="lazy" />
+        <b>${c.name}</b><span style="color:var(--${t.note.startsWith('+')?'up':'down'})">${t.note.split(' · ')[0]}</span>
+      </div>`; }).join('')}</div>
+    <div class="smallnote" style="margin-top:22px">Every card ever printed — priced or not.<br />The database is the spine.</div>`
   : hits.length ? hits.map(c => `
     <div class="res" onclick="openCard('${c.id}',null,true)">
       <img src="${c.img}" alt="" loading="lazy" />
@@ -413,7 +543,8 @@ function render(){
   $('#screen').innerHTML = `
     <header class="top"><span class="sleeve"><i></i></span>
       <span class="word">TOPLOAD<small>CARD DESK</small></span></header>
-    ${tab === 'binder' ? binderScreen() : tab === 'search' ? searchScreen() : marketScreen()}`;
+    ${tab === 'home' ? homeScreen() : tab === 'binder' ? binderScreen()
+      : tab === 'lookup' ? searchScreen() : tab === 'activity' ? activityScreen() : marketScreen()}`;
 }
 render();
 </script>
