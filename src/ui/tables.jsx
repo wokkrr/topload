@@ -583,7 +583,8 @@ export function listingUrl(l) {
   if (l.platform === 'beezie' && l.proof) {    // proof = '<chain>:<page-slug>'
     const i = l.proof.indexOf(':');
     const chain = l.proof.slice(0, i), slug = l.proof.slice(i + 1);
-    return `${chain === 'flow' ? 'https://flow.beezie.com' : 'https://beezie.com'}/marketplace/collectible/${slug}`;
+    const site = { flow: 'https://flow.beezie.com', solana: 'https://solana.beezie.com' }[chain] ?? 'https://beezie.com';
+    return `${site}/marketplace/collectible/${slug}`;
   }
   return null;
 }

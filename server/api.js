@@ -145,7 +145,7 @@ const BEEZIE_IMG_CACHE = join(__dirname, '..', 'data', 'imgcache-beezie');
 mkdirSync(BEEZIE_IMG_CACHE, { recursive: true });
 app.get('/api/beezie-img/:chain/:token/:idx', async (req, res) => {
   const { chain, token, idx } = req.params;
-  if (!/^(base|flow)$/.test(chain) || !/^\d{1,10}$/.test(token) || !/^[0-3]$/.test(idx)) return res.status(400).end();
+  if (!/^(base|flow|solana)$/.test(chain) || !/^(?:\d{1,10}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(token) || !/^\d$/.test(idx)) return res.status(400).end();
   const file = join(BEEZIE_IMG_CACHE, `${chain}-${token}-${idx}.jpg`);
   if (existsSync(file)) return res.sendFile(file, { maxAge: '30d' });
   try {
@@ -154,9 +154,13 @@ app.get('/api/beezie-img/:chain/:token/:idx', async (req, res) => {
     // Requested index first; white → dark fallback (2→0, 3→1) for the
     // ~1-in-12 items that only shot the dark set.
     const tries = [idx, ...(idx === '2' ? ['0'] : idx === '3' ? ['1'] : [])];
-    for (const i of tries) {
-      const r = await timedFetch(`https://images.beezie.com/${chain}/${token}/${i}/original.jpg`);
-      if (r.ok) { buf = Buffer.from(await r.arrayBuffer()); break; }
+    // Base/Flow shoot .jpg; Solana publishes .webp (probe 2026-07-23).
+    const exts = chain === 'solana' ? ['webp', 'jpg'] : ['jpg', 'webp'];
+    outer: for (const i of tries) {
+      for (const ext of exts) {
+        const r = await timedFetch(`https://images.beezie.com/${chain}/${token}/${i}/original.${ext}`);
+        if (r.ok) { buf = Buffer.from(await r.arrayBuffer()); break outer; }
+      }
     }
     if (!buf) return res.status(404).end();
     const out = await sharp(buf).trim({ threshold: 25 }).jpeg({ quality: 88 }).toBuffer();

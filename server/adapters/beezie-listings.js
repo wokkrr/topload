@@ -28,6 +28,14 @@ import { timedFetch } from '../net.js';
 export const CHAINS = [
   { chain: 'base', api: 'https://api.beezie.com', site: 'https://beezie.com' },
   { chain: 'flow', api: 'https://flow-api.beezie.com', site: 'https://flow.beezie.com' },
+  // SOLANA (2026-07-23, Kaleb: "just added… would take priority over Base
+  // and Flow"): same Hono backend, same dropItems shape, no auth — probed
+  // live day-one (3 PKMN listings). tokenId here is the SOLANA MINT (base58);
+  // images live at images.beezie.com/solana/<mint>/<idx>/original.webp with
+  // idx 4/5 (not Base's 0-3) — mapItem derives idx from metadata URLs.
+  // creatorAddress (DVNnFArZavoagFdyHyEYH9gmRRoma2vLW5dsy8Y2q9WR on the
+  // probe item) = collection authority — the future Helius sales-indexer key.
+  { chain: 'solana', api: 'https://solana-api.beezie.com', site: 'https://solana.beezie.com' },
 ];
 export const CATEGORY_IDS = { PKMN: '1', OP: '2' };
 const IP_LABEL = { PKMN: 'Pokemon', OP: 'One Piece' };
@@ -63,7 +71,13 @@ export function mapItem(item, ip, chain, site, seenAt) {
   // slab floating in padding (Kaleb: "we need the cropped images"). Serve
   // through OUR slab-crop proxy (/api/beezie-img — sharp.trim to the slab
   // edges, disk-cached, white→dark fallback server-side).
-  const img = (idx) => item.tokenId != null ? `/api/beezie-img/${chain}/${item.tokenId}/${idx}` : null;
+  // Solana items publish their photo indexes in metadata (4 = primary,
+  // 5 = back on the probe item) instead of Base's fixed 0-3 white/dark
+  // grid — trust their URLs, fall back to the direct image if unparseable.
+  const idxOf = (u) => /\/(\d+)\/original\.\w+$/.exec(u ?? '')?.[1] ?? null;
+  const front = chain === 'solana' ? idxOf(item.metadata?.image) : '2';
+  const back  = chain === 'solana' ? idxOf(item.metadata?.additional_images?.[0]) : '3';
+  const img = (idx) => idx != null && item.tokenId != null ? `/api/beezie-img/${chain}/${item.tokenId}/${idx}` : null;
   return {
     platform: 'beezie',
     external_id: `beezie:${chain}:${item.id}`,
@@ -74,9 +88,14 @@ export function mapItem(item, ip, chain, site, seenAt) {
     price_cents: cents,
     currency: 'USDC',
     listed_at: Number.isFinite(listedMs) && listedMs > 0 ? new Date(listedMs).toISOString() : seenAt ?? null,
-    image: img(2) ?? item.metadata?.image ?? null,
-    image_back: img(3),
-    nft_address: item.tokenId != null ? `${chain}:${item.tokenId}` : null,
+    image: img(front) ?? item.metadata?.image ?? null,
+    image_back: img(back),
+    // Solana stores the RAW mint — the cross-venue double-spend guard keys
+    // on it, so a Beezie-vaulted box mirrored on another Solana venue
+    // collapses to one physical unit. Base/Flow keep the chain prefix
+    // (numeric tokenIds would collide across chains).
+    nft_address: item.tokenId == null ? null
+      : chain === 'solana' ? String(item.tokenId) : `${chain}:${item.tokenId}`,
     cert: a.serial != null && String(a.serial).trim() !== '' ? String(a.serial).trim() : null,
     // proof carries chain + site slug → listingUrl() rebuilds the exact page.
     // Their collectible URLs key on the TOKEN id, not the item id (item.id

@@ -63,7 +63,7 @@ describe('beezie mapItem', () => {
 });
 
 describe('beezie adapter pagination', () => {
-  it('walks both chains and categories, stops on short page', async () => {
+  it('walks all chains and categories, stops on short page', async () => {
     const calls = [];
     const stub = async (url, opts) => {
       const body = JSON.parse(opts.body);
@@ -74,9 +74,61 @@ describe('beezie adapter pagination', () => {
     };
     const a = makeBeezieListingsAdapter({ fetchImpl: stub, perPage: 2, chains: CHAINS });
     const rows = await a.fetchListings({ seenAt: '2026-07-22' });
-    expect(rows.length).toBe(8);                                   // 2 chains × 2 cats × 2 items
+    expect(rows.length).toBe(12);                                  // 3 chains × 2 cats × 2 items (solana joined 07-23)
     expect(calls).toContain('api.beezie.com|cat1|p0');
     expect(calls).toContain('flow-api.beezie.com|cat2|p1');        // paged past the full page
-    expect(new Set(rows.map(r => r.external_id)).size).toBe(4);    // ids chain-prefixed, distinct per chain
+    expect(calls).toContain('solana-api.beezie.com|cat1|p0');
+    expect(new Set(rows.map(r => r.external_id)).size).toBe(6);    // ids chain-prefixed, distinct per chain
+  });
+});
+
+describe('SOLANA chain (probed live 2026-07-23, day-one launch)', () => {
+  const solItem = {
+    id: 502,
+    tokenId: 'HWfLvZpriwYfmdHDwaXCKoFACLRfnoBFH6SPXZi3GiMT',
+    creatorAddress: 'DVNnFArZavoagFdyHyEYH9gmRRoma2vLW5dsy8Y2q9WR',
+    owner: '2KD1RkqJ52aHt49k7rsG7vwaiVP6DQ7XG9rsuY2WKp69',
+    metadata: {
+      name: '2025 Japanese Mega Dream EX Numel #198 PSA 10',
+      image: 'https://images.beezie.com/solana/HWfLvZpriwYfmdHDwaXCKoFACLRfnoBFH6SPXZi3GiMT/4/original.webp',
+      additional_images: ['https://images.beezie.com/solana/HWfLvZpriwYfmdHDwaXCKoFACLRfnoBFH6SPXZi3GiMT/5/original.webp'],
+      attributes: [
+        { trait_type: 'year', trait_value: '2025' },
+        { trait_type: 'grader', trait_value: 'PSA' },
+        { trait_type: 'grade', trait_value: '10' },
+        { trait_type: 'language', trait_value: 'Japanese' },
+        { trait_type: 'set name', trait_value: 'Mega Dream EX' },
+      ],
+      external_url: 'solana.beezie.com',
+    },
+    categoryId: 1,
+    altFmv: '39.71',
+    SellOrder: { amountUSDC: '36.00', createdAt: 1784813312862 },
+  };
+  it('maps the live probe item: raw mint, metadata-derived photo indexes, altFmv', () => {
+    const r = mapItem(solItem, 'PKMN', 'solana', 'https://solana.beezie.com', '2026-07-23');
+    expect(r.platform).toBe('beezie');
+    expect(r.external_id).toBe('beezie:solana:502');
+    expect(r.grade).toBe('PSA10');
+    expect(r.price_cents).toBe(3600);
+    expect(r.fmv_usd).toBe(39.71);
+    expect(r.language).toBe('Japanese');
+    // RAW mint — no chain prefix: the cross-venue double-spend guard keys on it.
+    expect(r.nft_address).toBe('HWfLvZpriwYfmdHDwaXCKoFACLRfnoBFH6SPXZi3GiMT');
+    // Photo indexes come from THEIR metadata (4/5), not Base's fixed 2/3.
+    expect(r.image).toBe('/api/beezie-img/solana/HWfLvZpriwYfmdHDwaXCKoFACLRfnoBFH6SPXZi3GiMT/4');
+    expect(r.image_back).toBe('/api/beezie-img/solana/HWfLvZpriwYfmdHDwaXCKoFACLRfnoBFH6SPXZi3GiMT/5');
+    expect(r.slug.startsWith('solana:')).toBe(true);
+  });
+  it('Base items keep the chain-prefixed token (numeric ids collide across chains)', () => {
+    const base = { id: 9, tokenId: 15343, metadata: { name: 'Eevee PSA 10', attributes: [] }, altFmv: null,
+                   SellOrder: { amountUSDC: '50.00', createdAt: 1753200000000 } };
+    const r = mapItem(base, 'PKMN', 'base', 'https://beezie.com', '2026-07-23');
+    expect(r.nft_address).toBe('base:15343');
+    expect(r.image).toBe('/api/beezie-img/base/15343/2');
+  });
+  it('CHAINS carries all three deployments', () => {
+    expect(CHAINS.map(c => c.chain)).toEqual(['base', 'flow', 'solana']);
+    expect(CHAINS.find(c => c.chain === 'solana').api).toBe('https://solana-api.beezie.com');
   });
 });
