@@ -554,7 +554,7 @@ export function SealedBook({ children, onOpen }) {
                 </div>
               )}
               {url && (
-                <a href={url} target="_blank" rel="noreferrer" onClick={() => onOpen?.(p)}
+                <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => onOpen?.(p)}
                    style={{ marginTop: 8, alignSelf: 'flex-start', font: `10px ${tokens.font.mono}`, textTransform: 'uppercase', color: tokens.color.ink, border: `1px solid ${tokens.color.brass}`, borderRadius: 3, padding: '3px 12px', textDecoration: 'none', background: tokens.color.surface }}>
                   Buy · {PLATFORM_LABELS[p.best.platform] ?? p.best.platform}
                 </a>
