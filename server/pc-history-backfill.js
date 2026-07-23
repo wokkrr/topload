@@ -21,10 +21,7 @@
  */
 import { openDb } from './db.js';
 import { timedFetch } from './net.js';
-import { pageUrl } from './seed-pc-page-art.js';
-import { latestCsvs } from './repair-variant-marks.js';
-import { parseCsv } from './import-pricecharting-csv.js';
-import { readFileSync } from 'node:fs';
+import { pageUrl, pcNameMap } from './seed-pc-page-art.js';
 import { extractChartData, storeChartHistory } from './pc-history.js';
 
 const WWW = 'https://www.pricecharting.com';
@@ -35,13 +32,10 @@ export async function backfillHistory(db, { ips = ['PKMN', 'OP', 'YGO'], limit =
   if (robots.split('\n').some(l => /^disallow:\s*\/game\b/i.test(l.trim()))) {
     log('[pc-history] robots.txt disallows /game/ — refusing.'); return { refused: true };
   }
-  // Names come from the daily CSVs on disk (same as the art pass).
-  const names = new Map();
-  for (const file of latestCsvs()) {
-    for (const row of parseCsv(readFileSync(file, 'utf8'))) {
-      names.set(String(row.id), { console: row['console-name'], product: row['product-name'] });
-    }
-  }
+  // Names come from the daily CSVs on disk — same loader the art pass uses
+  // (latestCsvs returns {text,ip,file} objects, NOT paths — the ERR_INVALID_
+  // ARG_TYPE crash on first launch was reimplementing this wrongly).
+  const names = pcNameMap();
   const rows = db.prepare(
     `SELECT c.id, c.external_ids, v.v value_cents,
             (SELECT COUNT(DISTINCT as_of) FROM external_marks m
