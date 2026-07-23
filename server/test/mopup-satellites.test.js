@@ -63,3 +63,31 @@ describe('mopupSatellites', () => {
     expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE id='pkmn-pc11069012'`).get().n).toBe(1);
   });
 });
+
+describe('set-name dialects (2026-07-23 full-spine mint after-photo)', () => {
+  it("absorbs a PC '&'-dialect satellite into the seeded 'and'-dialect canonical", async () => {
+    const { openDb } = await import('../db.js');
+    const { mopupSatellites } = await import('../mopup-satellites.js');
+    const db = openDb(':memory:');
+    const ins = db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, variant, external_ids) VALUES (?, 'PKMN', ?, ?, ?, '', '{}')`);
+    ins.run('pkmn-dp-99', 'Azumarill', 'Diamond and Pearl', '99');           // seeded canonical
+    ins.run('pkmn-pc777', 'Azumarill', 'Pokemon Diamond & Pearl', '99');     // the mint's dialect twin
+    db.prepare(`INSERT INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES ('pricecharting', 'pkmn-pc777', 'raw', '2026-07-23', 500)`).run();
+    const res = mopupSatellites(db, { ip: 'PKMN' });
+    expect(res.matched).toBe(1);
+    expect(res.retired).toBe(1);
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards WHERE name = 'Azumarill'`).get().n).toBe(1);
+    expect(db.prepare(`SELECT card_id FROM external_marks`).get().card_id).toBe('pkmn-dp-99');
+  });
+  it('length-ratio guard: a Chinese promo satellite never courts the EN promo canonical', async () => {
+    const { openDb } = await import('../db.js');
+    const { mopupSatellites } = await import('../mopup-satellites.js');
+    const db = openDb(':memory:');
+    const ins = db.prepare(`INSERT INTO cards (id, ip, name, set_name, number, variant, external_ids) VALUES (?, 'PKMN', ?, ?, ?, '', '{}')`);
+    ins.run('pkmn-promo-1', 'Pikachu', 'Pokemon Promo', '001');
+    ins.run('pkmn-pc888',   'Pikachu', 'Pokemon Chinese Promo', '001');      // distinct product, stays
+    const res = mopupSatellites(db, { ip: 'PKMN' });
+    expect(res.matched).toBe(0);
+    expect(db.prepare(`SELECT COUNT(*) n FROM cards`).get().n).toBe(2);
+  });
+});

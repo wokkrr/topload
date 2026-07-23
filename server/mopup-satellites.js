@@ -38,7 +38,13 @@ import { matchListing } from './match.js';
 import { numberKey } from './import-tcgcsv.js';
 
 const isSat = (id) => /-(?:pc|tp)\d+$/.test(id);   // -tp: tcgplayer-seeded stubs (2026-07-22)
-const normSet = (s) => (s ?? '').toLowerCase().replace(/^\s*(pokemon|yugioh)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim();
+// SET-NAME DIALECTS (2026-07-23 full-spine mint after-photo): PC spells sets
+// 'Diamond & Pearl' where our seeded catalog says 'Diamond and Pearl' — the
+// '&' squashes to a space but the word 'and' survived, so normSet saw two
+// different sets and the mint created 1,240 parallel-row groups. 'and'/'the'
+// are dropped as standalone words: '&'≡'and', dialects converge.
+const normSet = (s) => (s ?? '').toLowerCase().replace(/^\s*(pokemon|yugioh)\s+/, '')
+  .replace(/[^a-z0-9]+/g, ' ').replace(/\b(?:and|the)\b/g, ' ').replace(/\s+/g, ' ').trim();
 
 export function mopupSatellites(db, { ip, dry = false } = {}) {
   const all = db.prepare(`SELECT id, name, number, set_name, language, external_ids FROM cards WHERE ip = ?`).all(ip);
@@ -87,7 +93,14 @@ export function mopupSatellites(db, { ip, dry = false } = {}) {
     // matcher below still has to confirm the name).
     const candidates = (k ? byNum.get(k) ?? [] : []).filter(c => {
       const cs = normSet(c.set_name);
-      return cs && satSet && (cs === satSet || cs.includes(satSet) || satSet.includes(cs));
+      if (!cs || !satSet) return false;
+      if (cs === satSet) return true;
+      // Containment covers subtitle drift ('Base Set' ⊂ 'Base Set Shadowless')
+      // but needs the auditor's length-ratio guard (2026-07-23): without it,
+      // 'promo' ⊂ 'chinese promo' would let a Chinese promo court an EN base
+      // promo. Short key must be ≥60% of the long one.
+      const [short, long] = cs.length <= satSet.length ? [cs, satSet] : [satSet, cs];
+      return long.includes(short) && short.length / long.length >= 0.6;
     });
     if (!candidates.length) { res.keptUnmatched++; continue; }
     // Gate 4: conservative matcher (name + language routing) on the gated set.
