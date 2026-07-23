@@ -41,7 +41,10 @@ const canRoute = (l) =>
   (l.platform === 'phygitals' && !!l.proof) ||
   (l.platform === 'beezie' && !!l.proof && l.proof.includes(':'));
 
-const GRADE_OK = /^(?:raw|G9\.5|(?:PSA|BGS|CGC|TAG|SGC|AGS|ACE)(?:\d{1,2}(?:\.5)?|Auth))$/;
+// PCA (French grader, Beezie-carried) + CSG (CGC's sports arm) recognized
+// 2026-07-23 — the first audit run flagged them as odd; they're real
+// companies with distinct grade populations, not dialects to alias away.
+const GRADE_OK = /^(?:raw|G9\.5|(?:PSA|BGS|CGC|TAG|SGC|AGS|ACE|PCA|CSG)(?:\d{1,2}(?:\.5)?|Auth))$/;
 
 console.log(`== LISTINGS QUALITY AUDIT · ${all.length} live rows · ${plats.length} platforms ==\n`);
 

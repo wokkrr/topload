@@ -50,6 +50,12 @@ describe('collectorcrypt adapter (fixtures)', () => {
     expect(gradeFromTitle('2002 Neo Destiny Unown Z TAG 8.5')).toBe('TAG8.5');
     expect(gradeFromTitle('Sabo ACE 9 One Piece')).toBe('ACE9');
     expect(gradeFromTitle('PSA 2019 Pokemon Promo')).toBe('raw');       // year, not a grade
+    // 2026-07-23 listings audit: PCA (French grader, NOT a PSA typo) and
+    // CSG (CGC's sports arm) are real companies — distinct series, no alias.
+    expect(gradeFromTitle('Dracaufeu PCA 10 Ecarlate et Violet')).toBe('PCA10');
+    expect(gradeFromTitle('Ken Griffey Jr CSG 9.5 Upper Deck')).toBe('CSG9.5');
+    expect(normalizeGrade('PCA', 8)).toBe('PCA8');
+    expect(normalizeGrade('CSG', '9.5')).toBe('CSG9.5');
   });
 
   it('title-grade fallback applies when structured fields are missing', async () => {

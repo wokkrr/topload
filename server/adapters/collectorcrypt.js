@@ -113,9 +113,14 @@ export function normalizeGrade(company, gradeNum) {
  *   'Black Label', 'Mint') no longer break the parse — those titles were
  *   silently landing in the 'raw' series, splitting the card's comps.
  * - Grades must be ≤ 10: 'PSA 2019 …' can never mint a phantom grade.
+ * - PCA/CSG added 2026-07-23 (listings audit): PCA = Professional Card
+ *   Authenticator, the dominant French grader (Beezie carries PCA slabs —
+ *   NOT a PSA typo; keep the series distinct, a PCA 10 is not a PSA 10).
+ *   CSG = Certified Sports Guaranty, CGC's sports arm (slabs still say CSG
+ *   post-merger — kept distinct rather than aliased, same honesty rule).
  */
 export function gradeFromTitle(title) {
-  const m = /\b(PSA|BGS|CGC|SGC|BECKETT|TAG|ACE|AGS)\s*(?:GEM\s*(?:MINT|MT)|PRISTINE|BLACK\s*LABEL|MINT)?\s*([0-9]{1,2}(?:\.[05])?)\b/i.exec(title ?? '');
+  const m = /\b(PSA|BGS|CGC|SGC|BECKETT|TAG|ACE|AGS|PCA|CSG)\s*(?:GEM\s*(?:MINT|MT)|PRISTINE|BLACK\s*LABEL|MINT)?\s*([0-9]{1,2}(?:\.[05])?)\b/i.exec(title ?? '');
   if (!m) return 'raw';
   const n = parseFloat(m[2]);
   if (!(n > 0 && n <= 10)) return 'raw';
