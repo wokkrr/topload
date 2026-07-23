@@ -262,6 +262,27 @@ async function runLive(db, today) {
     }
   }
 
+  // 5c. PC HISTORY backfill — nightly self-feeding (Kaleb, 2026-07-23:
+  //     "hopefully it continues to backfill more data to work with").
+  //     Walks the value ladder 250 pages/night behind the same politeness
+  //     contract; skips already-harvested cards, so it steadily works down
+  //     the catalog and goes quiet when PC's history is fully banked (or a
+  //     sanctioned bulk export from their team lands and finishes the job
+  //     in one file). PC_HISTORY_NIGHTLY=0 off; _LIMIT tunes the cap.
+  if (!freshSkip && process.env.PC_HISTORY_NIGHTLY !== '0') {
+    try {
+      const { backfillHistory } = await import('./pc-history-backfill.js');
+      summary.pcHistory = await backfillHistory(db, {
+        limit: Number(process.env.PC_HISTORY_LIMIT ?? 250),
+        delayMs: Number(process.env.PC_HISTORY_DELAY_MS ?? 1500),
+      });
+      console.log(`[ingest] pc history: ${JSON.stringify({ ...summary.pcHistory, samples: undefined })}`);
+    } catch (e) {
+      rollback();
+      console.warn(`[ingest] pc history failed: ${e.message}`);
+    }
+  }
+
   // 3. Gacha listings: Collector Crypt current listings (asking prices → aggregator only).
   try {
     const cc = makeCollectorCryptAdapter();
@@ -630,7 +651,21 @@ export async function ingest({ db = null, dates = null } = {}) {
     pulse = { pulseLogged: logPulse(database, getDeals(database, { limit: 50 }), today) };
   } catch (e) { console.warn(`[ingest] pulse log skipped: ${e.message}`); }
 
-  const summary = { ...sourceSummary, ...outliers, ...oracle, ...indexes, ...pulse };
+  // Weekly Oracle report card (Kaleb, 2026-07-23: "make sure we continue to
+  // monitor for accuracy") — Mondays, the 30d backtest headline goes into
+  // the ingest log so the trend accumulates with zero extra cron plumbing.
+  // The venue slice keeps the administered-price honesty visible every week.
+  let accuracy = {};
+  if (new Date().getUTCDay() === 1 && process.env.ORACLE_ACCURACY_WEEKLY !== '0') {
+    try {
+      const { oracleAccuracy } = await import('./diag-oracle-accuracy.js');
+      const a = oracleAccuracy(database, { days: 30 });
+      accuracy = { accuracy30d: a.all ? { mdape: a.all.mdape, bias: a.all.bias, within25: a.all.within25, scored: a.all.scored, coverage: a.coveragePct } : null };
+      console.log(`[ingest] ORACLE WEEKLY (30d): MdAPE ${a.all?.mdape}% · bias ${a.all?.bias}% · ≤25% ${a.all?.within25}% · scored ${a.all?.scored} · coverage ${a.coveragePct}% · byVenue ${JSON.stringify(Object.fromEntries(Object.entries(a.bySource ?? {}).map(([k, v]) => [k, `${v.mdape}%`])))}`);
+    } catch (e) { console.warn(`[ingest] weekly accuracy skipped: ${e.message}`); }
+  }
+
+  const summary = { ...sourceSummary, ...outliers, ...oracle, ...indexes, ...pulse, ...accuracy };
   console.log('[ingest]', JSON.stringify(summary));
   return summary;
 }

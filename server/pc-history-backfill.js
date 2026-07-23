@@ -21,7 +21,7 @@
  */
 import { openDb } from './db.js';
 import { timedFetch } from './net.js';
-import { pageUrl, pcNameMap } from './seed-pc-page-art.js';
+import { pageUrl, pcNameMap, extractCardImage } from './seed-pc-page-art.js';
 import { extractChartData, storeChartHistory } from './pc-history.js';
 
 const WWW = 'https://www.pricecharting.com';
@@ -37,7 +37,7 @@ export async function backfillHistory(db, { ips = ['PKMN', 'OP', 'YGO'], limit =
   // ARG_TYPE crash on first launch was reimplementing this wrongly).
   const names = pcNameMap();
   const rows = db.prepare(
-    `SELECT c.id, c.external_ids, v.v value_cents,
+    `SELECT c.id, c.external_ids, c.image, v.v value_cents,
             (SELECT COUNT(DISTINCT as_of) FROM external_marks m
               WHERE m.card_id = c.id AND m.source = 'pricecharting') history_days
      FROM cards c
@@ -45,7 +45,13 @@ export async function backfillHistory(db, { ips = ['PKMN', 'OP', 'YGO'], limit =
      WHERE c.ip IN (${ips.map(() => '?').join(',')})
      ORDER BY v.v DESC`).all(...ips);
 
-  const res = { scanned: 0, skippedDone: 0, noPcId: 0, noCsvRow: 0, harvested: 0, points: 0, empty: 0, httpErr: 0, samples: [] };
+  // BIDIRECTIONAL FREEBIE (2026-07-23): the art pass harvests history from
+  // pages it fetches; this walker returns the favor — a page fetched for
+  // history also fills the card's art when it has none. Same bytes, both
+  // harvests, zero extra requests either direction.
+  const updArt = db.prepare(`UPDATE cards SET image = ?, image_kind = 'pricecharting' WHERE id = ? AND image IS NULL`);
+
+  const res = { scanned: 0, skippedDone: 0, noPcId: 0, noCsvRow: 0, harvested: 0, points: 0, artFilled: 0, empty: 0, httpErr: 0, samples: [] };
   for (const card of rows) {
     if (res.scanned >= limit) break;
     if (card.history_days >= 12) { res.skippedDone++; continue; }   // already harvested
@@ -60,13 +66,18 @@ export async function backfillHistory(db, { ips = ['PKMN', 'OP', 'YGO'], limit =
       const r = await fetchImpl(url, { headers: { 'User-Agent': 'Mozilla/5.0', accept: 'text/html' } });
       if (!r.ok) res.httpErr++;
       else {
-        const chart = extractChartData(await r.text());
+        const html = await r.text();
+        const chart = extractChartData(html);
         if (!chart) res.empty++;
         else {
           const pts = storeChartHistory(db, card.id, chart);
           res.points += pts;
           if (pts) res.harvested++;
           if (res.samples.length < 10) res.samples.push(`$${Math.round((card.value_cents ?? 0) / 100)} ${card.id} ← ${pts} points`);
+        }
+        if (card.image == null) {
+          const img = extractCardImage(html);
+          if (img) res.artFilled += Number(updArt.run(img, card.id).changes);
         }
       }
     } catch { res.httpErr++; }
