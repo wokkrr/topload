@@ -255,3 +255,18 @@ CREATE TABLE IF NOT EXISTS sealed_book_log (
   market_cents   INTEGER,
   PRIMARY KEY (as_of, product_id)
 );
+
+-- MNSTR INTAKE MONITOR (Kaleb, 2026-07-23): inquiry-stage listings (canBeSold
+-- false — negotiate-only, 24h response, usually pre-photography) are HIDDEN
+-- from the desk ("I don't really care to have the listings up if they aren't
+-- instant buy now listings") but tracked here so we learn the pipeline: how
+-- long intake takes, and how the price moves when a card graduates to
+-- instant buy. One row per vault serial; graduation stamps it.
+CREATE TABLE IF NOT EXISTS mnstr_intake_log (
+  serial             TEXT PRIMARY KEY,        -- MNSTR vault serial (= slab cert when numeric)
+  first_seen         TEXT NOT NULL,           -- first ingest cycle that saw it in intake
+  graduated_at       TEXT,                    -- cycle it flipped to instant buy (NULL = still in intake / delisted)
+  intake_price_cents INTEGER,                 -- feed listPriceUsd while in intake (their pre-negotiation number)
+  intake_fmv_cents   INTEGER,                 -- their public estimate while in intake
+  buy_price_cents    INTEGER                  -- the ask it graduated at
+);

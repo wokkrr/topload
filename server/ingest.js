@@ -12,6 +12,7 @@
  */
 import { mkdirSync } from 'node:fs';
 import { fetchPcCsv } from './import-pc-retry.js';
+import { recordIntakeTransitions } from './mnstr-intake.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openDb } from './db.js';
@@ -371,18 +372,26 @@ async function runLive(db, today) {
     ).all().map(r => [r.external_id, r.listed_at]));
     const nowIso = new Date().toISOString();
     db.exec(`DELETE FROM gacha_listings WHERE platform = 'mnstr'`); // full snapshot refresh
+    // INTAKE POLICY (Kaleb, 2026-07-23): inquiry-stage rows never enter the
+    // desk — not instant buy = not our buy flow. They're recorded in the
+    // intake monitor instead; when MNSTR graduates one to instant buy, the
+    // next snapshot inserts it here as a normal listing automatically.
+    const intake = recordIntakeTransitions(db, listings, nowIso.slice(0, 10));
+    if (intake.intake || intake.graduated) console.log(`[ingest] mnstr intake monitor: ${JSON.stringify(intake)}`);
+    const buyable = listings.filter(l => l.listing_type !== 'inquiry');
     const insM = db.prepare(
       `INSERT OR REPLACE INTO gacha_listings
        (platform, external_id, card_id, item_name, category, grade, price_cents, currency, listed_at, image, image_back, nft_address, proof, cert, fmv_usd, listing_type, seen_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
-    for (const l of listings) {
+    for (const l of buyable) {
       insM.run(l.platform, l.external_id, matches.get(l.external_id) ?? null, l.item_name, l.category,
                l.grade, l.price_cents, l.currency, prevListed.get(l.external_id) ?? nowIso, l.image, l.image_back ?? null, l.nft_address, l.slug ?? null, l.cert ?? null, l.fmv_usd ?? null, l.listing_type ?? null, l.seen_at);
     }
-    summary.mnstrListings = listings.length;
+    summary.mnstrListings = buyable.length;
     summary.mnstrMatched = matches.size;
-    console.log(`[ingest] mnstr listings: ${listings.length} (${matches.size} matched to tracked cards)`);
+    summary.mnstrIntake = intake;
+    console.log(`[ingest] mnstr listings: ${buyable.length} buyable (${matches.size} matched, ${listings.length - buyable.length} in intake — hidden)`);
   } catch (e) {
     rollback();
     console.warn(`[ingest] mnstr listings fetch failed: ${e.message}`);
