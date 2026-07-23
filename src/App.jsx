@@ -62,6 +62,21 @@ export default function App() {
 
   const route = parseRoute(path);
 
+  // Boot mark dismissal: fade the inline splash once the app is mounted.
+  // 600ms minimum display (measured from the splash's own paint) so fast
+  // loads read as an intentional beat, never a blink; slow loads simply
+  // stay covered until we're actually here. It never ADDS wait beyond that.
+  useEffect(() => {
+    const boot = document.getElementById('boot');
+    if (!boot) return;
+    const elapsed = performance.now() - (window.__bootT0 ?? 0);
+    const t = setTimeout(() => {
+      boot.classList.add('done');
+      setTimeout(() => boot.remove(), 450);
+    }, Math.max(0, 600 - elapsed));
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     const onPop = () => setPath(window.location.pathname);
     window.addEventListener('popstate', onPop);

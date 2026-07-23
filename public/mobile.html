@@ -206,6 +206,15 @@ h2.cname{font:700 20px var(--serif);text-align:center;margin:0 0 3px;line-height
 /* scan chip */
 .scanbtn{display:flex;align-items:center;gap:6px;font:11px var(--mono);letter-spacing:1px;color:var(--ink2);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
 
+/* boot mark */
+#boot{position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:var(--bg);transition:opacity .38s ease}
+#boot.done{opacity:0;pointer-events:none}
+#boot .wm{font:600 16px var(--serif);letter-spacing:5px;color:var(--ink);opacity:0;animation:tl-wm .5s ease .4s forwards}
+@keyframes tl-wm{to{opacity:1}}
+#boot .bcard{animation:tl-slide .85s cubic-bezier(.3,.7,.3,1) .08s both}
+@keyframes tl-slide{from{transform:translateY(-24px);opacity:0}40%{opacity:1}to{transform:translateY(0);opacity:.85}}
+@media (prefers-reduced-motion: reduce){#boot .bcard{animation:none;opacity:.85}#boot .wm{animation:none;opacity:1}}
+
 /* toast */
 #toast{position:fixed;left:50%;bottom:calc(126px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
   background:var(--ink);color:var(--bg);font:500 12.5px var(--body);border-radius:9px;padding:11px 18px;
@@ -221,6 +230,13 @@ h2.cname{font:700 20px var(--serif);text-align:center;margin:0 0 3px;line-height
 </style>
 </head>
 <body>
+<div id="boot">
+  <svg width="44" height="58" viewBox="0 0 32 42" aria-hidden="true">
+    <rect x="3" y="5" width="26" height="34" rx="5" fill="none" stroke="var(--brass)" stroke-width="2.4"/>
+    <rect class="bcard" x="9" y="11" width="14" height="22" rx="2.5" fill="var(--brass)"/>
+  </svg>
+  <div class="wm">TOPLOAD</div>
+</div>
 <div id="screen"></div>
 
 <nav class="tabs" id="tabs"></nav>
@@ -640,6 +656,7 @@ function render(){
   document.querySelectorAll('.cardt').forEach((el,i) => { el.style.animationDelay = `${Math.min(i*45, 300)}ms`; });
 }
 render();
+setTimeout(() => { const b = $('#boot'); b.classList.add('done'); setTimeout(() => b.remove(), 450); }, 700);
 </script>
 </body>
 </html>
