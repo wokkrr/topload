@@ -421,14 +421,14 @@ export function GachaDesk({ listings, platforms, sales, onSelect, onOpenListing 
         </span>
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-        <span style={{ display: 'flex', gap: 4 }}>
+        <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {IP_FILTERS.map(([id, label]) => (
             <Chip key={id || 'all-ip'} active={ipFilter === id} onClick={() => setIpFilter(id)}
                   color={id ? tokens.series[id]?.data : undefined}>{label}</Chip>
           ))}
         </span>
         <span style={{ width: 1, height: 18, background: tokens.color.border }} />
-        <span style={{ display: 'flex', gap: 4 }}>
+        <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {GRADER_FILTERS.map(([id, label]) => (
             <Chip key={id || 'all-gr'} active={graderFilter === id} onClick={() => setGraderFilter(id)}>{label}</Chip>
           ))}

@@ -210,7 +210,8 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
         </div>
       </div>
 
-      <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%', marginTop: 24 }}>
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop: 24 }}>
+      <table style={{ borderCollapse: 'collapse', color: tokens.color.ink, width: '100%', minWidth: 430 }}>
         <thead><tr>
           {/* 'Oracle' = the mark, renamed terminal-wide (Kaleb, 2026-07-21).
               Δ30D/Conf/Basis stay HERE — the card page is the deep dive. */}
@@ -237,6 +238,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           ))}
         </tbody>
       </table>
+      </div>
 
       {/* ── Breakdown / sales / listings ──
           'News & catalysts' panel removed (Kaleb, 2026-07-22) — it was a

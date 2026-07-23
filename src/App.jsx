@@ -126,7 +126,7 @@ export default function App() {
       {/* ── Header, terminal aesthetic (Kaleb, 2026-07-21: logo + tabs felt
           off-brand). Brass slab mark + spaced wordmark; tabs speak the same
           uppercase-mono language as every section head. ── */}
-      <header style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '16px 28px 12px' }}>
+      <header style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 24px', padding: '16px clamp(12px, 3vw, 28px) 12px' }}>
         <a href="/" onClick={e => { e.preventDefault(); setOrigin('terminal'); navigate('/'); }}
            style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'inherit' }}>
           {/* The mark: a toploader sleeve — brass frame, card inside. */}
@@ -141,7 +141,7 @@ export default function App() {
             <span style={{ display: 'block', font: `9px ${tokens.font.mono}`, letterSpacing: '3.5px', color: tokens.color.inkMuted, marginTop: 3 }}>CARD DESK</span>
           </span>
         </a>
-        <nav style={{ display: 'flex', gap: 2, marginLeft: 'auto', alignItems: 'center' }}>
+        <nav style={{ display: 'flex', gap: 2, marginLeft: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
           {TABS.map(([label, to]) => {
             const active = (route.page === 'terminal' && to === '/') || (route.page === 'desk' && to === '/listings') || (route.page === 'cards' && to === '/cards') || (route.page === 'binder' && to === '/binder');
             return (
@@ -152,14 +152,14 @@ export default function App() {
                   background: 'none',
                   border: 'none', borderBottom: active ? `2px solid ${tokens.color.brass}` : '2px solid transparent',
                   color: active ? tokens.color.ink : tokens.color.inkSecondary,
-                  padding: '10px 16px', font: `11px ${tokens.font.mono}`, textTransform: 'uppercase',
+                  padding: '10px clamp(8px, 1.8vw, 16px)', font: `11px ${tokens.font.mono}`, textTransform: 'uppercase',
                   letterSpacing: '1.5px', cursor: 'pointer', transition: 'color .12s ease',
                 }}>{label}</button>
             );
           })}
           <button onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} style={{
             background: 'none', border: `1px solid ${tokens.color.border}`, color: tokens.color.inkSecondary,
-            borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, cursor: 'pointer', marginLeft: 18,
+            borderRadius: 4, padding: '4px 10px', font: `12px ${tokens.font.body}`, cursor: 'pointer', marginLeft: 'clamp(6px, 1.5vw, 18px)',
           }}>{theme === 'dark' ? '☀' : '☾'}</button>
         </nav>
       </header>
