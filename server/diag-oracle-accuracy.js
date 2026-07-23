@@ -21,7 +21,7 @@ import { openDb } from './db.js';
 
 export function oracleAccuracy(db, { days = 60 } = {}) {
   const rows = db.prepare(`
-    SELECT s.card_id, s.grade, s.price_cents AS sale_cents, date(s.sold_at) AS sold_on, c.ip,
+    SELECT s.card_id, s.grade, s.price_cents AS sale_cents, date(s.sold_at) AS sold_on, s.source, c.ip,
            (SELECT o.price_cents FROM oracle_prices o
              WHERE o.card_id = s.card_id AND o.grade = s.grade AND o.as_of < date(s.sold_at)
              ORDER BY o.as_of DESC LIMIT 1) AS oracle_cents,
@@ -66,6 +66,13 @@ export function oracleAccuracy(db, { days = 60 } = {}) {
     all: stat(scored),
     byIp: groupBy(r => r.ip),
     byBasis: groupBy(r => r.basis ?? '?'),
+    // THE VENUE QUESTION (Kaleb, 2026-07-23): "what others are valuing the
+    // slab as vs what the realistic market value would be if you tried to
+    // sell on open market." Our solds are venue sales; our externals are
+    // largely eBay-derived. Positive bias on a venue = that venue realizes
+    // ABOVE our blended mark (venue premium); the spread between venue
+    // slices IS the appraisal-vs-realizable gap, measured.
+    bySource: groupBy(r => r.source ?? '?'),
     byPriceBand: groupBy(r => band(r.sale_cents)),
     worstMisses: [...scored].sort((a, b) => Math.abs(b.err) - Math.abs(a.err)).slice(0, 8)
       .map(r => ({ card: r.card_id, grade: r.grade, sold: `$${(r.sale_cents/100).toFixed(0)}`,
@@ -85,6 +92,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const [k, v] of Object.entries(r.byIp)) console.log(`  ${k.padEnd(5)} scored ${String(v.scored).padStart(5)} · MdAPE ${v.mdape}% · bias ${v.bias > 0 ? '+' : ''}${v.bias}% · ≤10%: ${v.within10}% · ≤25%: ${v.within25}%`);
     console.log('BY BASIS (solds-backed vs external estimate):');
     for (const [k, v] of Object.entries(r.byBasis)) console.log(`  ${k.padEnd(9)} scored ${String(v.scored).padStart(5)} · MdAPE ${v.mdape}% · bias ${v.bias > 0 ? '+' : ''}${v.bias}%`);
+    console.log('BY SALES VENUE (bias here = venue premium/discount vs the blended mark):');
+    for (const [k, v] of Object.entries(r.bySource)) console.log(`  ${k.padEnd(14)} scored ${String(v.scored).padStart(5)} · MdAPE ${v.mdape}% · bias ${v.bias > 0 ? '+' : ''}${v.bias}%`);
     console.log('BY PRICE BAND:');
     for (const [k, v] of Object.entries(r.byPriceBand)) console.log(`  ${k.padEnd(8)} scored ${String(v.scored).padStart(5)} · MdAPE ${v.mdape}% · bias ${v.bias > 0 ? '+' : ''}${v.bias}%`);
     console.log('\nWORST MISSES (investigate — bad match? variant? stale mark?):');
