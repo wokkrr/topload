@@ -305,16 +305,31 @@ const SHAPES = {
   'ALL': [0.520,0.560,0.610,0.585,0.660,0.720,0.700,0.790,0.830,0.815,0.905,0.960,1.000],
 };
 let range = '30D';
-function spark(pts, h, uid, color){
+function spark(pts, h, uid, color, eraSplit){
   const w = 340, min = Math.min(...pts), max = Math.max(...pts), rng = (max - min) || 1;
   const X = i => (i / (pts.length - 1)) * w, Y = v => (h - 6) - ((v - min) / rng) * (h - 16);
-  const d = pts.map((v,i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const seg = (a, b) => pts.slice(a, b + 1).map((v,j) => `${j ? 'L' : 'M'}${X(a + j).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const full = seg(0, pts.length - 1);
+  /* eraSplit: index where dashed MARKET history hands off to the solid
+     VERIFIED era — the two-line story, one path, honest seam. */
+  const cut = eraSplit != null ? Math.max(1, Math.min(pts.length - 2, eraSplit)) : null;
   return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" class="spark">
     <defs><linearGradient id="g${uid}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="${color}" stop-opacity=".20"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
-    <path d="${d} L${w},${h} L0,${h} Z" fill="url(#g${uid})" stroke="none"/>
-    <path d="${d}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="sparkline"/>
+    <path d="${full} L${w},${h} L0,${h} Z" fill="url(#g${uid})" stroke="none"/>
+    ${cut != null
+      ? `<path d="${seg(0, cut)}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="5 5" stroke-linecap="round" class="sparkline"/>
+         <path d="${seg(cut, pts.length - 1)}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="sparkline"/>`
+      : `<path d="${full}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="sparkline"/>`}
     <circle cx="${X(pts.length-1)}" cy="${Y(pts[pts.length-1])}" r="3.4" fill="${color}"/></svg>`;
+}
+/* Deterministic per-card 5Y-ish shape (no randomness — repeatable design lab). */
+function cardShape(id){
+  let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 997;
+  const pts = []; let v = 0.55 + (h % 20) / 100;
+  for (let i = 0; i < 22; i++) { v = Math.max(0.35, v + Math.sin(i * 0.9 + h) * 0.055 + 0.02); pts.push(v); }
+  pts.push(1.0);
+  return pts;
 }
 const rangeChips = () => `<div class="rangechips">${Object.keys(SHAPES).map(r =>
   `<button class="${range===r?'on':''}" onclick="range='${r}';render()">${r}</button>`).join('')}</div>`;
@@ -372,7 +387,7 @@ function homeScreen(){
       <div class="nm"><b>${l.title}</b><small>${l.grade} · ${l.platform}</small></div>
       <div class="pr"><b>${usd(l.price)}</b><small style="color:var(--up)">${Math.round((1-l.price/l.oracle)*100)}% UNDER</small></div>
     </div>`).join('')}
-  <div class="smallnote" style="margin-top:14px">The whole market, one glance. Tap anything to go deeper.</div>`;
+`;
 }
 
 /* ── ACTIVITY: the tape — what's actually selling, right now ── */
@@ -391,7 +406,7 @@ function activityScreen(){
       <div class="nm"><b><span class="sold">SOLD</span>${c.name}</b><small>${t.grade} · ${t.plat}</small></div>
       <div class="pr"><b>${usd(t.price)}</b><small>${t.ago} ago</small></div>
     </div>`; }).join('')}
-  <div class="smallnote">Verified sales, straight from the marketplaces. This is what feeds the Oracle.</div>`;
+`;
 }
 
 /* ── BINDER (home = the daily open) ── */
@@ -466,7 +481,7 @@ function searchScreen(){
         <img src="${c.img}" alt="" loading="lazy" />
         <b>${c.name}</b><span style="color:var(--${t.note.startsWith('+')?'up':'down'})">${t.note.split(' · ')[0]}</span>
       </div>`; }).join('')}</div>
-    <div class="smallnote" style="margin-top:22px">Every card ever printed — priced or not.<br />The database is the spine.</div>`
+`
   : hits.length ? hits.map(c => `
     <div class="res" onclick="openCard('${c.id}',null,true)">
       <img src="${c.img}" alt="" loading="lazy" />
@@ -496,7 +511,7 @@ function marketScreen(){
     <div class="pr"><b>${usd(l.price)}</b>
       <span class="deal" style="color:var(--${under>0?'up':'down'})">${under>0?Math.round(under*100)+'% UNDER':'AT MARKET'}</span></div>
   </div>`; }).join('')}
-  <div class="smallnote">Every marketplace, one book. Fees live in the price.</div>`;
+`;
 }
 
 /* ── Sheets ── */
@@ -520,6 +535,8 @@ function openCard(id, grade, fromSearch = false){
       `<button class="${k===g?'on':''}" onclick="openCard('${id}','${k}',${fromSearch})">${k.replace('PSA','PSA ')}</button>`).join('')}</div>
     <div class="bigprice">${usd(c.grades[g])}</div>
     <div class="basis ${c.basis==='ESTIMATE'?'est':''}">${c.basis} · ORACLE PRICE</div>
+    ${spark(cardShape(id + g).map(m => m * c.grades[g]), 64, 's' + id, getComputedStyle(document.body).getPropertyValue('--brass').trim() || '#A87E2A', 16)}
+    <div style="display:flex;justify-content:space-between;font:9.5px var(--mono);letter-spacing:1px;color:var(--ink3);margin-top:4px"><span>2021</span><span>MARKET ┈ VERIFIED —</span><span>NOW</span></div>
     ${lots.length ? `
     <div class="panelbox"><div class="h">YOUR COPIES · ${held.grade.replace('PSA','PSA ')}</div>
       ${lots.map(l => `<div class="lot"><span>Added ${l.date}</span><b>paid ${usd(l.paid)}</b></div>`).join('')}
@@ -530,7 +547,7 @@ function openCard(id, grade, fromSearch = false){
       ? `<button class="btn" onclick="addFlow('${id}','${g}')"><span>＋ Add to Binder</span><span class="amt">${usd(c.grades[g])}</span></button>`
       : ''}
     <button class="btn ghost" onclick="closeSheet();seg='all';go('market')"><span>Find live listings</span><span>→</span></button>
-    <div class="smallnote">Oracle price blends verified sales across every marketplace we track. Asking prices never feed it.</div>
+
   `);
 }
 

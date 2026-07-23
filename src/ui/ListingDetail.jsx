@@ -175,6 +175,9 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             )}
           </div>
 
+          {/* Caption renders only when it carries information (Kaleb,
+              2026-07-23: no explainer paragraphs for absent data). */}
+          {(l.listing_type === 'inquiry' || hasComp || l.comp_suspect) && (
           <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginTop: 10, lineHeight: 1.6, maxWidth: 460 }}>
             {l.listing_type === 'inquiry'
               ? `New ${platform} inventory in intake — no firm ask yet. The number above is ${platform}'s own value estimate; the final price is settled through their inquiry desk.`
@@ -182,11 +185,9 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                 ? l.delta_pct <= 0
                   ? `Asking ${fmtPct(Math.abs(l.delta_pct)).replace('+', '')} below our Oracle price for this grade.`
                   : `Asking ${fmtPct(l.delta_pct)} above our Oracle price for this grade.`
-                : l.comp_suspect
-                  ? 'A comp exists but is wildly out of line with this ask — we don’t show numbers we don’t trust.'
-                  : 'No grade-matched oracle comp for this card yet — comps appear as our sales history deepens.'}
+                : 'A comp exists but is wildly out of line with this ask — we don’t show numbers we don’t trust.'}
             {' '}Asking prices never feed the oracle.
-          </div>
+          </div>)}
 
           {/* ── Purchase block, native-checkout shape (Kaleb, 2026-07-21):
               price ON the button, full-width primary, quiet provenance line.
@@ -257,7 +258,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
               {l.card_id
                 ? <Row k="Tracked card" v={l.card_name ?? l.card_id} />
                 : <Row k="Tracked card" v="not matched yet" />}
-              <Row k="Photo" v={l.image_kind === 'art' ? 'reference art (not the item)' : l.image ? 'actual item' : '—'} />
+              {l.image && l.image_kind !== 'art' && <Row k="Photo" v="actual item" />}
               {l.nft_address && <Row k="Vault ID" v={`${l.nft_address.slice(0, 6)}…${l.nft_address.slice(-4)}`} />}
             </div>
           </div>

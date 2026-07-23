@@ -446,12 +446,12 @@ function MarkChart({ series, color, dots }) {
                 fill={color} opacity={p.outlier ? 0.18 : 0.45}
                 stroke={tokens.color.bg} strokeWidth="0.6" />
       ))}
-      {pts.length > 0 && (
-        <text x={W - PAD.r} y={PAD.t - 2} textAnchor="end" fill={tokens.color.inkMuted}
-              style={{ font: `9px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
-          ● individual sales · — oracle mark
-        </text>
-      )}
+      <text x={W - PAD.r} y={PAD.t - 2} textAnchor="end" fill={tokens.color.inkMuted}
+            style={{ font: `9px ${tokens.font.mono}`, textTransform: 'uppercase' }}>
+        {(series.some(p => (p.basis ?? 'solds') === 'external') ? '-- market history · ' : '') +
+         (series.some(p => (p.basis ?? 'solds') !== 'external') ? '— verified era · ' : '') +
+         (pts.length ? '● sales' : '')}
+      </text>
 
       {hover != null && (
         <g pointerEvents="none">
