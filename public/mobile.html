@@ -82,8 +82,9 @@ nav.tabs .badge.show{opacity:1}
 
 /* ── Search ── */
 .searchbox{display:flex;align-items:center;gap:8px;background:var(--raised);border:1px solid var(--border);
-  border-radius:10px;padding:12px 14px;margin-top:14px}
-.searchbox input{flex:1;border:none;background:none;font:15px var(--body);color:var(--ink);outline:none}
+  border-radius:10px;padding:12px 14px;margin-top:14px;min-width:0}
+.searchbox input{flex:1;min-width:0;width:100%;border:none;background:none;font:15px var(--body);color:var(--ink);outline:none}
+.scanbtn{flex-shrink:0;white-space:nowrap}
 .try{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
 .try button{font:12px var(--body);color:var(--ink2);border:1px solid var(--border);border-radius:16px;padding:6px 13px}
 .res{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
