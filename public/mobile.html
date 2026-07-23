@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#F5F2EB" />
+<title>TOPLOAD — app prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Libre+Caslon+Text:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+/* ─────────────────────────────────────────────────────────────────────────
+   TOPLOAD mobile design lab · v1 (2026-07-23)
+   One spine, two faces: this is the APP face — Binder-focused, easy Search,
+   Buy Flow from Market. Simple is best; everything earns its place.
+   Pure prototype: in-memory state, canned-but-real data, no backend.
+   ───────────────────────────────────────────────────────────────────────── */
+:root{
+  --bg:#F5F2EB; --raised:#EDE9DE; --overlay:rgba(245,242,235,.92);
+  --ink:#1A1A1A; --ink2:#5C574C; --ink3:#98917F; --border:#DFD9C9;
+  --brass:#A87E2A; --up:#1F7A4D; --down:#B3402E;
+  --serif:'Libre Caslon Text',Georgia,serif; --body:Inter,system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);overscroll-behavior:none}
+button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;padding:0}
+
+/* ── Shell ── */
+#screen{padding:0 18px calc(86px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;min-height:100vh}
+header.top{display:flex;align-items:center;gap:9px;padding:calc(14px + env(safe-area-inset-top)) 0 4px}
+.sleeve{width:20px;height:26px;border:1.5px solid var(--brass);border-radius:3px;display:inline-flex;align-items:center;justify-content:center}
+.sleeve i{width:12px;height:16px;background:var(--brass);border-radius:2px;opacity:.85}
+.word{font:600 15px var(--serif);letter-spacing:2.5px}
+.word small{display:block;font:8px var(--mono);letter-spacing:2.5px;color:var(--ink3);margin-top:2px}
+
+/* ── Tab bar: one-handed, thumb-native ── */
+nav.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--overlay);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--border);
+  padding-bottom:env(safe-area-inset-bottom);z-index:40}
+nav.tabs button{flex:1;padding:11px 0 9px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  font:10px var(--mono);letter-spacing:1.5px;color:var(--ink3)}
+nav.tabs button.on{color:var(--ink)}
+nav.tabs .ic{font-size:19px;line-height:1;font-family:var(--body)}
+nav.tabs .badge{position:absolute;transform:translate(14px,-3px);background:var(--brass);color:var(--bg);
+  font:600 9px var(--mono);border-radius:8px;padding:1px 5px;opacity:0;transition:opacity .25s}
+nav.tabs .badge.show{opacity:1}
+
+/* ── Binder home ── */
+.hero{margin-top:14px}
+.hero .lbl{font:10px var(--mono);letter-spacing:2px;color:var(--ink3)}
+.hero .val{font:500 38px var(--mono);letter-spacing:-1px;margin:2px 0 6px}
+.chip{display:inline-block;font:600 11px var(--mono);border:1px solid var(--border);border-radius:4px;padding:3px 8px;margin-right:6px}
+.chip.up{color:var(--up)} .chip.down{color:var(--down)} .chip.dim{color:var(--ink2);font-weight:400}
+.moved{margin:20px 0 4px}
+.moved .row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)}
+.moved .row:first-of-type{border-top:none}
+.moved img{width:30px;height:42px;object-fit:cover;border-radius:3px;background:var(--raised)}
+.moved .nm{font:500 13px var(--body);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.moved .nm small{display:block;font:10px var(--mono);color:var(--ink3);font-weight:400;margin-top:1px}
+.moved .d{font:600 12px var(--mono);text-align:right}
+.sec{font:10px var(--mono);letter-spacing:2px;color:var(--ink3);margin:22px 0 10px;display:flex;align-items:baseline}
+.sec span{margin-left:auto;font:10px var(--mono);color:var(--ink3);letter-spacing:0}
+
+/* Showcase: art first and foremost — frameless, floating */
+.shelf{display:grid;grid-template-columns:1fr 1fr;gap:20px 16px}
+.cardt{position:relative;transition:transform .12s}
+.cardt:active{transform:scale(.97)}
+.cardt img{width:100%;border-radius:8px;display:block;filter:drop-shadow(0 7px 14px rgba(26,26,26,.22));background:var(--raised);aspect-ratio:5/7;object-fit:cover}
+.cardt .cap{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-top:7px}
+.cardt .cap b{font:500 11.5px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cardt .cap span{font:600 11px var(--mono);color:var(--ink2)}
+.cardt .new{position:absolute;top:7px;left:7px;background:var(--brass);color:var(--bg);font:600 9px var(--mono);letter-spacing:1px;border-radius:3px;padding:2px 6px}
+.cardt .fav{position:absolute;top:6px;right:8px;color:var(--brass);font-size:14px;text-shadow:0 1px 3px rgba(0,0,0,.35)}
+
+/* ── Search ── */
+.searchbox{display:flex;align-items:center;gap:8px;background:var(--raised);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-top:14px}
+.searchbox input{flex:1;border:none;background:none;font:15px var(--body);color:var(--ink);outline:none}
+.try{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.try button{font:12px var(--body);color:var(--ink2);border:1px solid var(--border);border-radius:16px;padding:6px 13px}
+.res{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.res img{width:40px;height:56px;object-fit:cover;border-radius:4px;background:var(--raised)}
+.res .nm{flex:1;min-width:0}
+.res .nm b{font:500 14px var(--body);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res .nm small{font:10.5px var(--mono);color:var(--ink3)}
+.res .pr{text-align:right}
+.res .pr b{font:600 13px var(--mono);display:block}
+.res .pr small{font:9px var(--mono);color:var(--ink3);letter-spacing:.5px}
+
+/* ── Market ── */
+.seg{display:flex;gap:6px;margin-top:14px}
+.seg button{font:11px var(--mono);letter-spacing:1px;border:1px solid var(--border);border-radius:16px;padding:6px 14px;color:var(--ink2)}
+.seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.mrow{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid var(--border);align-items:center}
+.mrow img{width:64px;height:88px;object-fit:cover;border-radius:5px;background:var(--raised)}
+.mrow .info{flex:1;min-width:0}
+.mrow .t{font:500 13.5px var(--body);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mrow .tags{margin-top:5px;display:flex;gap:5px;flex-wrap:wrap}
+.tag{font:600 9.5px var(--mono);letter-spacing:.5px;border:1px solid var(--border);border-radius:3px;padding:2px 6px;color:var(--ink2)}
+.tag.grade{color:var(--ink);border-color:var(--ink3)}
+.mrow .pr{text-align:right;flex-shrink:0}
+.mrow .pr b{font:600 15px var(--mono);display:block}
+.mrow .pr .deal{font:600 10px var(--mono);margin-top:3px;display:block}
+
+/* ── Sheets (card / listing / add / buy) ── */
+#sheet{position:fixed;inset:0;z-index:50;pointer-events:none}
+#sheet .scrim{position:absolute;inset:0;background:rgba(26,26,26,.35);opacity:0;transition:opacity .22s}
+#sheet .panel{position:absolute;left:0;right:0;bottom:0;top:max(30px,env(safe-area-inset-top));background:var(--bg);
+  border-radius:18px 18px 0 0;transform:translateY(103%);transition:transform .28s cubic-bezier(.32,.72,.28,1);
+  overflow-y:auto;padding:10px 20px calc(30px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto}
+#sheet.open{pointer-events:auto} #sheet.open .scrim{opacity:1} #sheet.open .panel{transform:translateY(0)}
+.grab{width:38px;height:4px;background:var(--border);border-radius:2px;margin:2px auto 14px}
+.sheetart{width:62%;max-width:230px;margin:4px auto 14px;display:block;border-radius:10px;
+  filter:drop-shadow(0 12px 24px rgba(26,26,26,.28));background:var(--raised)}
+.sheetart.photo{width:70%;max-width:260px;border:1px solid var(--border);filter:none}
+h2.cname{font:700 20px var(--serif);text-align:center;margin:0 0 3px;line-height:1.3}
+.csub{font:11px var(--mono);color:var(--ink3);text-align:center;letter-spacing:.5px;margin-bottom:14px}
+.grades{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-bottom:6px}
+.grades button{font:600 11px var(--mono);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--ink2)}
+.grades button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.bigprice{font:500 30px var(--mono);text-align:center;margin:8px 0 2px}
+.basis{font:9.5px var(--mono);letter-spacing:1px;color:var(--up);text-align:center;margin-bottom:14px}
+.basis.est{color:var(--ink2)}
+.panelbox{border-top:1px solid var(--border);padding:13px 0 3px;margin-top:8px}
+.panelbox .h{font:10px var(--mono);letter-spacing:2px;color:var(--ink3);margin-bottom:9px}
+.lot{display:flex;justify-content:space-between;font:12.5px var(--body);color:var(--ink2);padding:5px 0}
+.lot b{font:600 12px var(--mono);color:var(--ink)}
+.pl{display:flex;justify-content:space-between;padding:8px 0 0;font:600 12px var(--mono)}
+.btn{display:flex;align-items:center;justify-content:space-between;width:100%;background:var(--brass);color:var(--bg);
+  border-radius:10px;padding:15px 18px;font:600 14px var(--body);margin-top:14px;transition:transform .1s}
+.btn:active{transform:scale(.98)}
+.btn .amt{font:600 15px var(--mono)}
+.btn.ghost{background:none;border:1px solid var(--border);color:var(--ink)}
+.btn.inkbtn{background:var(--ink)}
+.smallnote{font:10.5px var(--body);color:var(--ink3);text-align:center;margin-top:9px;line-height:1.5}
+.xclose{position:sticky;top:0;margin-left:auto;display:block;font-size:17px;color:var(--ink2);padding:6px 0 0;z-index:5;width:34px;text-align:right}
+
+/* add-copy mini form */
+.field{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-top:9px}
+.field label{font:11px var(--mono);letter-spacing:1px;color:var(--ink3)}
+.field input{border:none;background:none;font:600 14px var(--mono);color:var(--ink);text-align:right;width:110px;outline:none}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
+  background:var(--ink);color:var(--bg);font:500 12.5px var(--body);border-radius:9px;padding:11px 18px;
+  opacity:0;transition:all .3s;z-index:60;white-space:nowrap}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* success state */
+.donebox{text-align:center;padding:40px 0 10px}
+.donebox .big{font:700 24px var(--serif);margin:14px 0 6px}
+.donebox .sub{font:13px var(--body);color:var(--ink2);line-height:1.6}
+.checkring{width:64px;height:64px;border:2px solid var(--brass);border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--brass)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div id="screen"></div>
+
+<nav class="tabs" id="tabs"></nav>
+
+<div id="sheet"><div class="scrim" onclick="closeSheet()"></div><div class="panel" id="sheetbody"></div></div>
+<div id="toast"></div>
+
+<script>
+/* ── Canned-but-real data. Art via public TCG image CDNs. ───────────────── */
+const PK = id => `https://images.pokemontcg.io/${id}_hires.png`;
+const YG = id => `https://images.ygoprodeck.com/images/cards/${id}.jpg`;
+
+const CARDS = [
+  { id:'zardV',  name:'Charizard V',        set:'Darkness Ablaze · 019/189', img:PK('swsh3/19'),   grades:{ RAW:2001, PSA9:6100, PSA10:9775 }, basis:'VERIFIED SALES' },
+  { id:'moon',   name:'Umbreon VMAX',       set:'Evolving Skies · 215/203',  img:PK('swsh7/215'),  grades:{ RAW:52100, PSA9:98000, PSA10:161500 }, basis:'VERIFIED SALES' },
+  { id:'base4',  name:'Charizard',          set:'Base Set · 4/102',          img:PK('base1/4'),    grades:{ RAW:32800, PSA9:229000, PSA10:1250000 }, basis:'VERIFIED SALES' },
+  { id:'lugia',  name:'Lugia',              set:'Neo Genesis · 9/111',       img:PK('neo1/9'),     grades:{ RAW:14100, PSA9:96500, PSA10:420000 }, basis:'VERIFIED SALES' },
+  { id:'pika58', name:'Pikachu',            set:'Base Set · 58/102',         img:PK('base1/58'),   grades:{ RAW:390, PSA9:4100, PSA10:19900 }, basis:'VERIFIED SALES' },
+  { id:'blast',  name:'Blastoise',          set:'Base Set · 2/102',          img:PK('base1/2'),    grades:{ RAW:12400, PSA9:81000, PSA10:410000 }, basis:'VERIFIED SALES' },
+  { id:'venu',   name:'Venusaur',           set:'Base Set · 15/102',         img:PK('base1/15'),   grades:{ RAW:9800, PSA9:52000, PSA10:265000 }, basis:'ESTIMATE' },
+  { id:'ray',    name:'Rayquaza VMAX',      set:'Evolving Skies · 218/203',  img:PK('swsh7/218'),  grades:{ RAW:32000, PSA9:61000, PSA10:104000 }, basis:'VERIFIED SALES' },
+  { id:'giratina',name:'Giratina V',        set:'Lost Origin · 186/196',     img:PK('swsh11/186'), grades:{ RAW:21500, PSA9:38000, PSA10:71500 }, basis:'VERIFIED SALES' },
+  { id:'stardust',name:'Stardust Dragon',   set:'The Duelist Genesis · TDGS-EN040', img:YG('44508094'), grades:{ RAW:98000, PSA9:512000, PSA10:3835000 }, basis:'ESTIMATE' },
+  { id:'blueeyes',name:'Blue-Eyes White Dragon', set:'LOB · 001', img:YG('89631139'), grades:{ RAW:41000, PSA9:210000, PSA10:998000 }, basis:'VERIFIED SALES' },
+  { id:'charVstar',name:'Charizard VSTAR',  set:'Brilliant Stars · 018/172', img:PK('swsh9/18'),   grades:{ RAW:2900, PSA9:6900, PSA10:12400 }, basis:'VERIFIED SALES' },
+];
+const C = Object.fromEntries(CARDS.map(c => [c.id, c]));
+
+/* binder = lots model, same as the real thing: every copy is a receipt */
+let binder = [
+  { card:'moon',  grade:'PSA10', fav:true,  lots:[{ paid:139000, date:'Mar 14 2026' }] },
+  { card:'zardV', grade:'PSA10', fav:false, lots:[{ paid:8100, date:'Jun 2 2026' }, { paid:9350, date:'Jul 20 2026' }] },
+  { card:'lugia', grade:'PSA9',  fav:false, lots:[{ paid:88000, date:'Jan 30 2026' }] },
+  { card:'pika58',grade:'RAW',   fav:false, lots:[{ paid:310, date:'Jul 1 2026' }] },
+];
+const MOVED = [
+  { card:'moon',  grade:'PSA10', d:+4100, pct:+2.6 },
+  { card:'lugia', grade:'PSA9',  d:+1200, pct:+1.3 },
+  { card:'zardV', grade:'PSA10', d:-425,  pct:-4.2 },
+];
+const LISTINGS = [
+  { id:'l1', card:'zardV',  title:'2020 Pokemon Darkness Ablaze Charizard V #019 PSA 10', grade:'PSA 10', platform:'MNSTR',      price:9350,  oracle:9775,  photo:PK('swsh3/19') },
+  { id:'l2', card:'moon',   title:'2021 Pokemon Evolving Skies Umbreon VMAX Alt Art PSA 10', grade:'PSA 10', platform:'COLLECTOR CRYPT', price:148500, oracle:161500, photo:PK('swsh7/215') },
+  { id:'l3', card:'blast',  title:'1999 Pokemon Base Set Blastoise Holo PSA 9', grade:'PSA 9', platform:'COURTYARD',  price:74000, oracle:81000, photo:PK('base1/2') },
+  { id:'l4', card:null,     title:'Prismatic Evolutions Elite Trainer Box — Sealed', grade:'SEALED', platform:'3 MARKETPLACES', price:8999, oracle:10200, photo:'https://images.pokemontcg.io/sv8pt5/logo.png', sealed:true, units:3 },
+  { id:'l5', card:'giratina',title:'2022 Pokemon Lost Origin Giratina V Alt Art CGC 9.5', grade:'CGC 9.5', platform:'PHYGITALS', price:52500, oracle:54000, photo:PK('swsh11/186') },
+  { id:'l6', card:'blueeyes',title:'2002 Yu-Gi-Oh LOB Blue-Eyes White Dragon 1st Ed PSA 9', grade:'PSA 9', platform:'COURTYARD', price:196000, oracle:210000, photo:YG('89631139') },
+];
+
+/* ── State + utils ── */
+let tab = 'binder', query = '', seg = 'all', newInBinder = null;
+const $ = s => document.querySelector(s);
+const usd = c => '$' + (c/100).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 });
+const usd0 = c => '$' + Math.round(c/100).toLocaleString('en-US');
+const val = b => b.lots.length * (C[b.card].grades[b.grade] ?? 0);
+const cost = b => b.lots.reduce((s,l) => s + l.paid, 0);
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2200); }
+
+/* ── Tab bar ── */
+const TABS = [['binder','☐','BINDER'], ['search','⌕','SEARCH'], ['market','▤','MARKET']];
+function renderTabs(){
+  $('#tabs').innerHTML = TABS.map(([k,ic,lb]) =>
+    `<button class="${tab===k?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${lb}
+     ${k==='binder' ? `<span class="badge${newInBinder?' show':''}">+1</span>` : ''}</button>`).join('');
+}
+function go(t){ tab = t; if (t === 'binder') newInBinder = null; render(); window.scrollTo(0,0); }
+
+/* ── BINDER (home = the daily open) ── */
+function binderScreen(){
+  const total = binder.reduce((s,b) => s + val(b), 0);
+  const totalCost = binder.reduce((s,b) => s + cost(b), 0);
+  const day = MOVED.reduce((s,m) => s + m.d, 0);
+  const sorted = [...binder].sort((a,b) => (b.fav - a.fav) || (val(b) - val(a)));
+  return `
+  <div class="hero">
+    <div class="lbl">MY BINDER</div>
+    <div class="val">${usd(total)}</div>
+    <span class="chip ${day>=0?'up':'down'}">${day>=0?'+':'-'}${usd(Math.abs(day))} TODAY</span>
+    <span class="chip ${total>=totalCost?'up':'down'}">${total>=totalCost?'+':''}${(((total/totalCost)-1)*100).toFixed(1)}% ALL TIME</span>
+    <span class="chip dim">VS MARKET +0.8%</span>
+  </div>
+  <div class="sec">WHAT MOVED TODAY</div>
+  <div class="moved">${MOVED.map(m => { const c = C[m.card]; return `
+    <div class="row" onclick="openCard('${m.card}','${m.grade}')">
+      <img src="${c.img}" alt="" loading="lazy" />
+      <div class="nm">${c.name}<small>${m.grade} · ${c.set.split('·')[0].trim()}</small></div>
+      <div class="d" style="color:var(--${m.d>=0?'up':'down'})">${m.d>=0?'+':'-'}${usd(Math.abs(m.d))}<br /><span style="font-weight:400;color:var(--ink3)">${m.pct>=0?'+':''}${m.pct}%</span></div>
+    </div>`; }).join('')}
+  </div>
+  <div class="sec">SHOWCASE <span>${binder.reduce((s,b)=>s+b.lots.length,0)} cards</span></div>
+  <div class="shelf">${sorted.map(b => { const c = C[b.card]; return `
+    <div class="cardt" onclick="openCard('${b.card}','${b.grade}')">
+      <img src="${c.img}" alt="${c.name}" loading="lazy" />
+      ${b.fav ? '<span class="fav">★</span>' : ''}
+      ${newInBinder === b.card ? '<span class="new">NEW</span>' : ''}
+      <div class="cap"><b>${c.name}${b.lots.length>1 ? ` ×${b.lots.length}` : ''}</b><span>${usd0(val(b))}</span></div>
+    </div>`; }).join('')}
+  </div>`;
+}
+
+/* ── SEARCH ── */
+function searchScreen(){
+  const q = query.trim().toLowerCase();
+  const hits = q ? CARDS.filter(c => (c.name + ' ' + c.set).toLowerCase().includes(q)) : [];
+  return `
+  <div class="searchbox"><span style="color:var(--ink3)">⌕</span>
+    <input id="q" placeholder="Any card, any set, any era" value="${query.replace(/"/g,'&quot;')}"
+      oninput="query=this.value;renderKeepFocus()" autocomplete="off" /></div>
+  ${!q ? `<div class="try">${['Charizard','Umbreon','Base Set','Blue-Eyes'].map(t =>
+      `<button onclick="query='${t}';render();">${t}</button>`).join('')}</div>
+    <div class="smallnote" style="margin-top:26px">Every card ever printed — priced or not.<br />The database is the spine.</div>`
+  : hits.length ? hits.map(c => `
+    <div class="res" onclick="openCard('${c.id}',null,true)">
+      <img src="${c.img}" alt="" loading="lazy" />
+      <div class="nm"><b>${c.name}</b><small>${c.set}</small></div>
+      <div class="pr"><b>${usd0(c.grades.PSA10 ?? c.grades.RAW)}</b><small>PSA 10 · ORACLE</small></div>
+    </div>`).join('')
+  : `<div class="smallnote" style="margin-top:30px">Nothing yet — the prototype only knows ${CARDS.length} cards.<br />The real spine knows ~200,000.</div>`}`;
+}
+function renderKeepFocus(){
+  const el = $('#q'); const pos = el.selectionStart;
+  render(); const n = $('#q'); n.focus(); n.setSelectionRange(pos,pos);
+}
+
+/* ── MARKET ── */
+function marketScreen(){
+  const rows = LISTINGS.filter(l => seg === 'all' || (seg === 'deals' && l.price < l.oracle * 0.95) || (seg === 'sealed' && l.sealed));
+  return `
+  <div class="seg">${[['all','ALL'],['deals','DEALS'],['sealed','SEALED']].map(([k,lb]) =>
+    `<button class="${seg===k?'on':''}" onclick="seg='${k}';render()">${lb}</button>`).join('')}</div>
+  ${rows.map(l => { const under = 1 - l.price / l.oracle; return `
+  <div class="mrow" onclick="openListing('${l.id}')">
+    <img src="${l.photo}" alt="" loading="lazy" style="${l.sealed?'object-fit:contain;padding:6px':''}" />
+    <div class="info">
+      <div class="t">${l.title}</div>
+      <div class="tags"><span class="tag grade">${l.grade}</span><span class="tag">${l.platform}</span>${l.sealed?`<span class="tag">${l.units} UNITS</span>`:''}</div>
+    </div>
+    <div class="pr"><b>${usd(l.price)}</b>
+      <span class="deal" style="color:var(--${under>0?'up':'down'})">${under>0?Math.round(under*100)+'% UNDER':'AT MARKET'}</span></div>
+  </div>`; }).join('')}
+  <div class="smallnote">Every marketplace, one book. Fees live in the price.</div>`;
+}
+
+/* ── Sheets ── */
+function openSheet(html){ $('#sheetbody').innerHTML = html; $('#sheet').classList.add('open'); }
+function closeSheet(){ $('#sheet').classList.remove('open'); }
+
+function openCard(id, grade, fromSearch = false){
+  const c = C[id];
+  const held = binder.find(b => b.card === id);
+  const g = grade ?? held?.grade ?? (c.grades.PSA10 ? 'PSA10' : 'RAW');
+  const lots = held?.lots ?? [];
+  const worth = lots.length * (c.grades[held?.grade] ?? 0);
+  const paid = lots.reduce((s,l) => s + l.paid, 0);
+  openSheet(`
+    <button class="xclose" onclick="closeSheet()">✕</button>
+    <div class="grab"></div>
+    <img class="sheetart" src="${c.img}" alt="${c.name}" />
+    <h2 class="cname">${c.name}</h2>
+    <div class="csub">${c.set}</div>
+    <div class="grades">${Object.keys(c.grades).map(k =>
+      `<button class="${k===g?'on':''}" onclick="openCard('${id}','${k}',${fromSearch})">${k.replace('PSA','PSA ')}</button>`).join('')}</div>
+    <div class="bigprice">${usd(c.grades[g])}</div>
+    <div class="basis ${c.basis==='ESTIMATE'?'est':''}">${c.basis} · ORACLE PRICE</div>
+    ${lots.length ? `
+    <div class="panelbox"><div class="h">YOUR COPIES · ${held.grade.replace('PSA','PSA ')}</div>
+      ${lots.map(l => `<div class="lot"><span>Added ${l.date}</span><b>paid ${usd(l.paid)}</b></div>`).join('')}
+      <div class="pl"><span style="color:var(--ink3)">P/L</span>
+        <span style="color:var(--${worth>=paid?'up':'down'})">${worth>=paid?'+':''}${usd(worth-paid)}</span></div>
+    </div>` : ''}
+    ${fromSearch || !lots.length
+      ? `<button class="btn" onclick="addFlow('${id}','${g}')"><span>＋ Add to Binder</span><span class="amt">${usd(c.grades[g])}</span></button>`
+      : ''}
+    <button class="btn ghost" onclick="closeSheet();seg='all';go('market')"><span>Find live listings</span><span>→</span></button>
+    <div class="smallnote">Oracle price blends verified sales across every marketplace we track. Asking prices never feed it.</div>
+  `);
+}
+
+function addFlow(id, g){
+  const c = C[id];
+  openSheet(`
+    <button class="xclose" onclick="closeSheet()">✕</button>
+    <div class="grab"></div>
+    <img class="sheetart" src="${c.img}" style="width:38%" alt="" />
+    <h2 class="cname" style="font-size:17px">${c.name} · ${g.replace('PSA','PSA ')}</h2>
+    <div class="csub">New copy — treated with care, like the rest of the collection</div>
+    <div class="field"><label>PRICE PAID</label><input id="paid" inputmode="decimal" value="${(c.grades[g]/100).toFixed(2)}" /></div>
+    <div class="field"><label>DATE ADDED</label><input value="Today" readonly /></div>
+    <button class="btn inkbtn" onclick="confirmAdd('${id}','${g}')"><span>Slide it in</span><span class="amt">☐</span></button>
+    <div class="smallnote">Every copy keeps its own price and date — your receipts, forever.</div>
+  `);
+}
+function confirmAdd(id, g){
+  const paid = Math.round(parseFloat($('#paid').value.replace(/[^0-9.]/g,'')) * 100) || C[id].grades[g];
+  const held = binder.find(b => b.card === id && b.grade === g);
+  if (held) held.lots.push({ paid, date:'Jul 23 2026' });
+  else binder.push({ card:id, grade:g, fav:false, lots:[{ paid, date:'Jul 23 2026' }] });
+  newInBinder = id; closeSheet(); render(); toast('Slid into your binder ☐');
+}
+
+function openListing(id){
+  const l = LISTINGS.find(x => x.id === id);
+  const under = 1 - l.price / l.oracle;
+  openSheet(`
+    <button class="xclose" onclick="closeSheet()">✕</button>
+    <div class="grab"></div>
+    <img class="sheetart photo" src="${l.photo}" alt="" style="${l.sealed?'object-fit:contain;background:var(--raised);padding:12px':''}" />
+    <h2 class="cname" style="font-size:16px">${l.title}</h2>
+    <div class="csub">${l.grade} · ${l.platform}${l.sealed?` · ${l.units} units live`:''}</div>
+    <div class="bigprice">${usd(l.price)}</div>
+    <div class="basis ${under>0?'':'est'}" style="color:var(--${under>0?'up':'ink2'})">
+      ${under>0 ? Math.round(under*100)+'% UNDER ORACLE ('+usd0(l.oracle)+')' : 'ORACLE '+usd0(l.oracle)}</div>
+    <button class="btn" onclick="buyFlow('${l.id}')"><span>Buy Now</span><span class="amt">${usd(l.price)}</span></button>
+    <div class="smallnote">One all-in price. No fees at checkout — ever.</div>
+  `);
+}
+function buyFlow(id){
+  const l = LISTINGS.find(x => x.id === id);
+  openSheet(`
+    <button class="xclose" onclick="closeSheet()">✕</button>
+    <div class="grab"></div>
+    <div class="donebox" style="padding-top:22px">
+      <div style="font:10px var(--mono);letter-spacing:2px;color:var(--ink3)">CONFIRM PURCHASE</div>
+      <div class="big" style="font-size:18px;margin:16px 0 4px">${l.title}</div>
+      <div style="font:500 30px var(--mono);margin:14px 0 4px">${usd(l.price)}</div>
+      <div class="sub">All-in. Delivered vaulted &amp; insured.</div>
+    </div>
+    <button class="btn inkbtn" onclick="buyDone('${l.id}')"><span> Pay</span><span class="amt">${usd(l.price)}</span></button>
+    <div class="smallnote">Prototype — no real checkout. The real thing is one Face ID.</div>
+  `);
+}
+function buyDone(id){
+  const l = LISTINGS.find(x => x.id === id);
+  openSheet(`
+    <div class="donebox">
+      <div class="checkring">✓</div>
+      <div class="big">It's yours.</div>
+      <div class="sub">${l.title}<br />is on its way to your Binder.</div>
+    </div>
+    ${l.card ? `<button class="btn" onclick="closeSheet();buyToBinder('${l.card}','${l.grade.split(' ').join('')}',${l.price})"><span>See it in your Binder</span><span>☐</span></button>`
+             : `<button class="btn" onclick="closeSheet()"><span>Done</span><span>✓</span></button>`}
+  `);
+}
+function buyToBinder(cardId, grade, paid){
+  const g = grade.replace(' ','');
+  const held = binder.find(b => b.card === cardId && b.grade === g);
+  if (held) held.lots.push({ paid, date:'Jul 23 2026' });
+  else binder.push({ card:cardId, grade:g, fav:false, lots:[{ paid, date:'Jul 23 2026' }] });
+  newInBinder = cardId; go('binder'); toast('Added with your purchase receipt ☐');
+}
+
+/* ── Render ── */
+function render(){
+  renderTabs();
+  $('#screen').innerHTML = `
+    <header class="top"><span class="sleeve"><i></i></span>
+      <span class="word">TOPLOAD<small>CARD DESK</small></span></header>
+    ${tab === 'binder' ? binderScreen() : tab === 'search' ? searchScreen() : marketScreen()}`;
+}
+render();
+</script>
+</body>
+</html>
