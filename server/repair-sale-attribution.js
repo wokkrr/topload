@@ -35,7 +35,13 @@ import { openDb } from './db.js';
 
 const usd = (c) => `$${(c / 100).toFixed(c < 1000 ? 2 : 0)}`;
 
-export function repairSaleAttribution(db, { live = false, ratio = 5, floorCents = 2000 } = {}) {
+// Ratio 8x, not 5x (dry-run 2026-07-23): at 5x the quarantine wanted 1,810
+// sales, including clusters of a DOZEN consistent same-grade venue sales
+// sitting 5-7x below a stale guide value. Many real sales agreeing with each
+// other IS the market — the guide is the stale party there. 8x spares those
+// while still catching everything indefensible (Sanji ~60x, Switch ~500x,
+// the 20x pairs).
+export function repairSaleAttribution(db, { live = false, ratio = 8, floorCents = 2000 } = {}) {
   const res = { repointed: 0, regraded: 0, ambiguous: 0, unresolvable: 0,
                 quarantined: 0, repointSamples: [], quarantineSamples: [] };
 
@@ -48,17 +54,21 @@ export function repairSaleAttribution(db, { live = false, ratio = 5, floorCents 
   // collation), so it full-scanned 176k registry rows PER SALE — the dry run
   // sat for ages on the droplet (live, 2026-07-23). Exact map + 18-char
   // prefix buckets (courtyard fragments are exactly 18) make it O(1).
-  const regRows = db.prepare(`SELECT mint, card_id, grade, item_name FROM nft_registry`).all();
+  const regRows = db.prepare(`SELECT mint, platform, card_id, grade, item_name FROM nft_registry`).all();
   const byMint = new Map(regRows.map(r => [r.mint, r]));
   const byPrefix = new Map();
   for (const r of regRows) {
     const p = r.mint.slice(0, 18);
     (byPrefix.get(p) ?? byPrefix.set(p, []).get(p)).push(r);
   }
-  const lookupMint = (frag) => {
-    if (byMint.has(frag)) return [byMint.get(frag)];
-    if (frag.length >= 18) return (byPrefix.get(frag.slice(0, 18)) ?? []).filter(r => r.mint.startsWith(frag));
-    return regRows.filter(r => r.mint.startsWith(frag));   // sub-18 fragment: rare, linear is fine
+  // Platform guard: a courtyard sale may only resolve to a courtyard registry
+  // item (and beezie to beezie) — prefix collisions across venues must never
+  // re-point a sale.
+  const lookupMint = (frag, platform) => {
+    const hits = byMint.has(frag) ? [byMint.get(frag)]
+      : frag.length >= 18 ? (byPrefix.get(frag.slice(0, 18)) ?? []).filter(r => r.mint.startsWith(frag))
+      : regRows.filter(r => r.mint.startsWith(frag));   // sub-18 fragment: rare, linear is fine
+    return hits.filter(r => r.platform === platform);
   };
   const updSale = db.prepare(`UPDATE sales SET card_id = ?, grade = ? WHERE id = ?`);
   const moved = new Map();   // saleId → new home; lets the DRY run judge phase 2 post-repoint, same as live
@@ -66,7 +76,7 @@ export function repairSaleAttribution(db, { live = false, ratio = 5, floorCents 
   for (const s of candidates) {
     const frag = /^0x[0-9a-fA-F]+:(.+)$/.exec(s.external_id)?.[1];
     if (!frag) continue;
-    const hits = lookupMint(frag);
+    const hits = lookupMint(frag, s.source);
     if (hits.length !== 1) { res[hits.length ? 'ambiguous' : 'unresolvable']++; continue; }
     const reg = hits[0];
     if (!reg.card_id) { res.unresolvable++; continue; }

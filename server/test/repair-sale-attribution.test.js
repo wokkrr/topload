@@ -13,9 +13,11 @@ function seed() {
     `INSERT INTO sales (card_id, grade, price_cents, sold_at, source, external_id, is_outlier) VALUES (?, ?, ?, '2026-07-21', ?, ?, 0)`);
   const reg = db.prepare(
     `INSERT INTO nft_registry (mint, platform, card_id, item_name, grade, first_seen, last_seen) VALUES (?, 'courtyard', ?, ?, ?, '2026-07-01', '2026-07-23')`);
+  const regOn = db.prepare(
+    `INSERT INTO nft_registry (mint, platform, card_id, item_name, grade, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, '2026-07-01', '2026-07-23')`);
   const mark = db.prepare(
     `INSERT INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES (?, ?, ?, ?, ?)`);
-  return { db, sale, reg, mark };
+  return { db, sale, reg, regOn, mark };
 }
 
 describe('sale-attribution repair', () => {
@@ -30,6 +32,16 @@ describe('sale-attribution repair', () => {
     expect(res.repointed).toBe(1);
     const row = db.prepare(`SELECT card_id, grade FROM sales`).get();
     expect(row).toEqual({ card_id: 'pkmn-base10', grade: 'PSA5' });
+  });
+
+  it('phase 1 never resolves across platforms (prefix collision on another venue stays untouched)', () => {
+    const { db, sale, regOn } = seed();
+    regOn.run('999000111122223333XYZ', 'phygitals', 'pkmn-base10', 'right prefix, wrong venue', 'PSA9');
+    sale.run('pkmn-sink', 'raw', 4100, 'courtyard', '0xaa:999000111122223333');
+    const res = repairSaleAttribution(db, { live: true });
+    expect(res.repointed).toBe(0);
+    expect(res.unresolvable).toBe(1);
+    expect(db.prepare(`SELECT card_id FROM sales`).get().card_id).toBe('pkmn-sink');
   });
 
   it('phase 1 leaves ambiguous mint prefixes and null-card registry rows untouched', () => {
