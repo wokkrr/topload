@@ -75,3 +75,21 @@ describe('sealed tape — history rolls from day one (tcgquant study)', () => {
     expect(row).toEqual({ units: 1, best_ask_cents: 8999 });
   });
 });
+
+describe('inquiry listings are never asks (2026-07-23)', () => {
+  it('excludes listing_type=inquiry from the book ladder and depth', async () => {
+    const { buildSealedBook } = await import('../sealed.js');
+    const { openDb } = await import('../db.js');
+    const db = openDb(':memory:');
+    db.prepare(`INSERT INTO products (id, ip, name) VALUES ('pkmn-tp1', 'PKMN', 'Prismatic Evolutions Elite Trainer Box')`).run();
+    const ins = db.prepare(
+      `INSERT INTO gacha_listings (platform, external_id, item_name, grade, price_cents, currency, nft_address, product_id, listing_type, seen_at)
+       VALUES ('mnstr', ?, 'PE ETB', 'raw', ?, 'USDm', ?, 'pkmn-tp1', ?, '2026-07-23')`);
+    ins.run('m1', 7999, 'sA', 'inquiry');   // cheapest, but you cannot hit it
+    ins.run('m2', 9500, 'sB', null);
+    const book = buildSealedBook(db);
+    expect(book.length).toBe(1);
+    expect(book[0].units).toBe(1);
+    expect(book[0].best.price_cents).toBe(9500);   // the inquiry $79.99 never leads the box
+  });
+});

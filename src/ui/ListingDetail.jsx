@@ -139,6 +139,7 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             {listingLanguage(l) === 'Japanese' && <MetaChip>Japanese</MetaChip>}
             {l.category && <MetaChip>{l.category}</MetaChip>}
             <MetaChip>{platform}</MetaChip>
+            {l.listing_type === 'inquiry' && <MetaChip>Inquiry · 24h</MetaChip>}
             {l.listed_at && (
               <span style={{ font: `11px ${tokens.font.mono}`, color: tokens.color.inkMuted, marginLeft: 4, textTransform: 'uppercase' }}>
                 listed {String(l.listed_at).slice(0, 10)}
@@ -146,9 +147,21 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
             )}
           </div>
 
+          {/* INQUIRY PRICING (2026-07-23): intake-stage MNSTR items publish
+              only an ESTIMATED VALUE on their own page — the feed's list
+              price is a pre-negotiation placeholder their site doesn't show.
+              We display their public number, labeled as an estimate; the
+              vs-mark chip (computed off the placeholder ask) comes off. */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-            <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>{fmtUsd(l.price_cents)}</span>
-            {l.delta_pct != null && (
+            <span style={{ font: `34px ${tokens.font.mono}`, color: tokens.color.ink }}>
+              {fmtUsd(l.listing_type === 'inquiry' && l.fmv_usd ? Math.round(l.fmv_usd * 100) : l.price_cents)}
+            </span>
+            {l.listing_type === 'inquiry' && (
+              <span style={{ font: `13px ${tokens.font.mono}`, color: tokens.color.inkSecondary, textTransform: 'uppercase' }}>
+                {platform} est. value · price set by inquiry
+              </span>
+            )}
+            {l.delta_pct != null && l.listing_type !== 'inquiry' && (
               <span style={{
                 font: `600 13px ${tokens.font.mono}`, borderRadius: 4, padding: '3px 9px', textTransform: 'uppercase',
                 color: l.delta_pct <= 0 ? tokens.color.up : tokens.color.down,
@@ -163,13 +176,15 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
           </div>
 
           <div style={{ color: tokens.color.inkMuted, font: `11px ${tokens.font.body}`, marginTop: 10, lineHeight: 1.6, maxWidth: 460 }}>
-            {hasComp
-              ? l.delta_pct <= 0
-                ? `Asking ${fmtPct(Math.abs(l.delta_pct)).replace('+', '')} below our latest grade-matched oracle mark.`
-                : `Asking ${fmtPct(l.delta_pct)} above our latest grade-matched oracle mark.`
-              : l.comp_suspect
-                ? 'A comp exists but is wildly out of line with this ask — we don’t show numbers we don’t trust.'
-                : 'No grade-matched oracle comp for this card yet — comps appear as our sales history deepens.'}
+            {l.listing_type === 'inquiry'
+              ? `New ${platform} inventory in intake — no firm ask yet. The number above is ${platform}'s own value estimate; the final price is settled through their inquiry desk.`
+              : hasComp
+                ? l.delta_pct <= 0
+                  ? `Asking ${fmtPct(Math.abs(l.delta_pct)).replace('+', '')} below our latest grade-matched oracle mark.`
+                  : `Asking ${fmtPct(l.delta_pct)} above our latest grade-matched oracle mark.`
+                : l.comp_suspect
+                  ? 'A comp exists but is wildly out of line with this ask — we don’t show numbers we don’t trust.'
+                  : 'No grade-matched oracle comp for this card yet — comps appear as our sales history deepens.'}
             {' '}Asking prices never feed the oracle.
           </div>
 
@@ -184,17 +199,30 @@ export function ListingDetail({ listing: l, listings, navListings, onBack, onOpe
                 .tl-buy-now:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.18); filter: brightness(1.05); }
                 .tl-buy-now:active { transform: translateY(0); box-shadow: none; }
               `}</style>
+              {/* INQUIRY LANE (2026-07-23): MNSTR intake-stage inventory is
+                  negotiate-only (24h response), not instant checkout. A Buy
+                  Now that lands on an inquiry form is a lie against the North
+                  Star — the button says what actually happens. */}
               <a href={url} target="_blank" rel="noopener noreferrer" className="tl-buy-now" style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-                background: tokens.color.brass, color: tokens.color.bg, textDecoration: 'none',
+                background: l.listing_type === 'inquiry' ? tokens.color.ink : tokens.color.brass,
+                color: tokens.color.bg, textDecoration: 'none',
                 borderRadius: 8, padding: '13px 20px',
               }}>
-                <span style={{ font: `600 14px ${tokens.font.body}`, letterSpacing: '0.02em' }}>Buy Now</span>
-                <span style={{ font: `600 15px ${tokens.font.mono}` }}>{fmtUsd(l.price_cents)}</span>
+                <span style={{ font: `600 14px ${tokens.font.body}`, letterSpacing: '0.02em' }}>
+                  {l.listing_type === 'inquiry' ? `Inquire on ${platform}` : 'Buy Now'}
+                </span>
+                <span style={{ font: `600 15px ${tokens.font.mono}` }}>
+                  {l.listing_type === 'inquiry'
+                    ? `EST ${fmtUsd(l.fmv_usd ? Math.round(l.fmv_usd * 100) : l.price_cents)}`
+                    : fmtUsd(l.price_cents)}
+                </span>
               </a>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 7 }}>
                 <span style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkMuted }}>
-                  Checkout completes on {platform} for now
+                  {l.listing_type === 'inquiry'
+                    ? `Not instant checkout — ${platform} responds to inquiries within 24h`
+                    : `Checkout completes on ${platform} for now`}
                 </span>
                 <a href={url} target="_blank" rel="noopener noreferrer"
                    style={{ font: `10px ${tokens.font.body}`, color: tokens.color.inkSecondary, textDecoration: 'none' }}>

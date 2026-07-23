@@ -51,6 +51,7 @@ function migrate(db) {
   ensureColumn(db, 'gacha_listings', 'cert', 'TEXT');
   ensureColumn(db, 'gacha_listings', 'fmv_usd', 'REAL');        // platform-side ALT fair-market value (Phygitals/Beezie) → altfmv marks
   ensureColumn(db, 'gacha_listings', 'product_id', 'TEXT');     // sealed book: attribution to the products shelf (2026-07-23)
+  ensureColumn(db, 'gacha_listings', 'listing_type', 'TEXT');   // NULL = instant buy · 'inquiry' = negotiate/24h-response lane (MNSTR canBeSold:false, 2026-07-23) — never a live ask
   ensureColumn(db, 'cards', 'released_at', 'TEXT');             // set release date YYYY-MM-DD (tcgcsv publishedOn / PC release-date / ptcgdata)
   ensureColumn(db, 'latest_marks', 'is_top', 'INTEGER');        // per-card top-grade flag (lookup dedup)
   ensureColumn(db, 'latest_marks', 'grades_tracked', 'INTEGER');

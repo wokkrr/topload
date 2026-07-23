@@ -379,7 +379,7 @@ app.get('/api/platforms', (_req, res) => res.json(PLATFORMS));
 app.get('/api/gacha', (req, res) => {
   const rows = db.prepare(`
     SELECT g.platform, g.external_id, g.card_id, g.item_name, g.category, g.grade,
-           g.price_cents, g.currency, g.listed_at, g.nft_address, g.image_back, g.proof, g.cert,
+           g.price_cents, g.currency, g.listed_at, g.nft_address, g.image_back, g.proof, g.cert, g.listing_type, g.fmv_usd,
            COALESCE(g.image, c.image) AS image,
            CASE WHEN g.image IS NOT NULL THEN 'actual' WHEN c.image IS NOT NULL THEN 'art' END AS image_kind,
            c.name AS card_name, c.ip, c.language AS card_language,

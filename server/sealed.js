@@ -60,7 +60,9 @@ export function matchSealedToProducts(listings, products) {
 export function buildSealedBook(db) {
   const listings = db.prepare(
     `SELECT platform, external_id, item_name, price_cents, nft_address, product_id, image, proof, seen_at
-     FROM gacha_listings WHERE product_id IS NOT NULL`).all();
+     FROM gacha_listings
+     WHERE product_id IS NOT NULL
+       AND (listing_type IS NULL OR listing_type <> 'inquiry')`).all();   // a price you can't hit isn't an ask
   const byProduct = new Map();
   for (const l of listings) {
     (byProduct.get(l.product_id) ?? byProduct.set(l.product_id, []).get(l.product_id)).push(l);

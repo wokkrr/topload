@@ -85,3 +85,18 @@ describe('MNSTR listing mapper', () => {
     expect(CATEGORY_TO_IP.one_piece).toBe('OP');
   });
 });
+
+describe('inquiry lane — canBeSold:false is intake-stage inventory (Kaleb sighting 2026-07-23)', () => {
+  it('types canBeSold:false as inquiry; true/absent as instant-buy (null)', () => {
+    expect(mapListing(card({ canBeSold: false })).listing_type).toBe('inquiry');
+    expect(mapListing(card({ canBeSold: true })).listing_type).toBe(null);
+    const noField = card(); delete noField.canBeSold;
+    expect(mapListing(noField).listing_type).toBe(null);
+  });
+  it('inquiry rows still carry price + fmv (display), and graduation is just a re-map', () => {
+    const intake = mapListing(card({ canBeSold: false }));
+    expect(intake.price_cents).toBe(2684000);
+    expect(intake.fmv_usd).toBe(24000);
+    expect(mapListing(card({ canBeSold: true })).listing_type).toBe(null);   // next snapshot → buyable
+  });
+});

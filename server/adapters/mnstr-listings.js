@@ -64,6 +64,13 @@ export function mapListing(c, seenAt) {
   const serial = String(c.serialNumber ?? c.remoteId ?? '');
   return {
     platform: 'mnstr',
+    // INQUIRY LANE (Kaleb sighting 2026-07-23, cert 52112335): canBeSold:false
+    // items render "INQUIRE ABOUT THIS CARD" (24h response) on MNSTR — the
+    // intake stage for fresh inventory (no slab photos yet), which graduates
+    // to instant-buy later. Never a live ask, never a Buy Now on our desk.
+    // Full-snapshot refresh each cycle means graduation flips the type
+    // automatically.
+    listing_type: c.canBeSold === false ? 'inquiry' : null,
     external_id: `mnstr:${serial}`,
     item_name: c.title ?? '',
     category: IP_LABEL[ip] ?? c.category ?? null,
