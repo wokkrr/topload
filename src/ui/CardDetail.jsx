@@ -270,7 +270,7 @@ export function CardResearch({ cardId, initialGrade = null, embedded = false, on
           {/* Collector-first facts (Kaleb, 2026-07-23): release date replaces
               the internal-sounding "Marked as of" — a collector cares when
               the card came out, not when our oracle last wrote a row. */}
-          <Row k="IP" v={tokens.series[card.ip]?.label ?? card.ip} />
+          <Row k="TCG" v={tokens.series[card.ip]?.label ?? card.ip} />
           <Row k="Set" v={card.set_name ?? '—'} />
           {card.released_at && <Row k="Released" v={card.released_at} />}
           <Row k="Number" v={card.number ?? '—'} />

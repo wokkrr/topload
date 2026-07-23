@@ -138,7 +138,7 @@ export default function App() {
           </span>
           <span>
             <span style={{ display: 'block', font: `600 19px ${tokens.font.display}`, letterSpacing: '3px', lineHeight: 1 }}>TOPLOAD</span>
-            <span style={{ display: 'block', font: `9px ${tokens.font.mono}`, letterSpacing: '3.5px', color: tokens.color.inkMuted, marginTop: 3 }}>CARD TERMINAL</span>
+            <span style={{ display: 'block', font: `9px ${tokens.font.mono}`, letterSpacing: '3.5px', color: tokens.color.inkMuted, marginTop: 3 }}>CARD DESK</span>
           </span>
         </a>
         <nav style={{ display: 'flex', gap: 2, marginLeft: 'auto', alignItems: 'center' }}>
