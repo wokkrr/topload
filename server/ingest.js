@@ -11,7 +11,7 @@
  * → rules-based indexes. Idempotent throughout.
  */
 import { mkdirSync } from 'node:fs';
-import { timedFetch } from './net.js';
+import { fetchPcCsv } from './import-pc-retry.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { openDb } from './db.js';
@@ -135,10 +135,10 @@ async function runLive(db, today) {
   ].filter(([, url]) => url);
   for (const [ip, url] of csvSources) {
     try {
-      const res = await timedFetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      if (!text.slice(0, 200).includes('product-name')) throw new Error('response is not a price-guide CSV (check the URL)');
+      // Hardened fetch (2026-07-23): the global 30s timedFetch timeout killed
+      // the PKMN/YGO downloads (503s + timeouts on PC's rate-limited multi-MB
+      // files) and half the spine mint with them. Long timeout + retries.
+      const text = await fetchPcCsv(url);
       mkdirSync(join(__dirname, '..', 'data', 'imports'), { recursive: true });
       writeFileSync(join(__dirname, '..', 'data', 'imports', `${today}-${ip}.csv`), text);
       const r = importCsv(db, {
@@ -151,6 +151,9 @@ async function runLive(db, today) {
     } catch (e) {
       rollback();
       console.warn(`[ingest] pricecharting csv ${ip} failed: ${e.message}`);
+    }
+    if (ip !== csvSources[csvSources.length - 1]?.[0]) {
+      await new Promise(r => setTimeout(r, 15_000));   // duck PC's rate limiter between franchises
     }
   }
   // Language-tag any satellites the CSV import just created (set-name carries
