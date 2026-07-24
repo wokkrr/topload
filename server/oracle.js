@@ -113,26 +113,60 @@ export function computeMark(sales, asOf, opts = {}) {
 
 // ---------- DB plumbing ----------
 
-/** Re-run outlier detection for every (card, grade) series and persist flags. */
+/** Re-run outlier detection for every (card, grade) series and persist flags.
+ *
+ * TWO RULES, both re-derived on every refresh (this function unconditionally
+ * rewrites every flag — live lesson 2026-07-24: the one-shot repair pass's
+ * quarantine flags survived exactly 20 minutes before this stomped them, so
+ * the plausibility gate LIVES HERE now, permanently):
+ *   1. STATISTICAL — >2σ from the trailing-window median (misprints within a
+ *      series). Blind spot: whales that arrive FIRST or in agreeing clusters
+ *      define the median instead of violating it (three matching $150
+ *      misattributed sales pass; the honest $2 sale after them gets flagged).
+ *   2. PLAUSIBILITY — ≥8x above or ≤⅛ below the same-grade EXTERNAL anchor
+ *      (pricecharting > tcgplayer), $20 floor. The anchor is data whale
+ *      clusters cannot vote on, which is exactly what rule 1 lacks. Catches
+ *      the misattributed-sale disease: $1000 "raw Switch" on a $2 card.
+ *      8x not 5x: at 5x it also swept up consistent venue sales sitting
+ *      honestly below a stale guide value.
+ */
 export function refreshOutlierFlags(db, opts = {}) {
   const series = db.prepare(
     `SELECT DISTINCT card_id, grade FROM sales`
   ).all();
+  const anchors = new Map();
+  for (const r of db.prepare(
+    `SELECT card_id, grade, source, price_cents, MAX(as_of) AS as_of FROM external_marks
+     WHERE source IN ('pricecharting', 'tcgplayer') GROUP BY source, card_id, grade`).all()) {
+    const k = `${r.card_id}|${r.grade}`;
+    if (!anchors.has(k) || r.source === 'pricecharting') anchors.set(k, r);
+  }
+  const RATIO = opts.plausibilityRatio ?? 8;
+  const FLOOR = opts.plausibilityFloorCents ?? 2000;
   const upd = db.prepare(`UPDATE sales SET is_outlier = ?, outlier_reason = ? WHERE id = ?`);
-  let flagged = 0;
+  let flagged = 0, implausible = 0;
   db.exec('BEGIN');
   for (const { card_id, grade } of series) {
     const rows = db.prepare(
       `SELECT id, price_cents FROM sales WHERE card_id = ? AND grade = ? ORDER BY sold_at, id`
     ).all(card_id, grade);
     const flags = flagOutliers(rows, opts);
+    const anchor = anchors.get(`${card_id}|${grade}`);
     for (let i = 0; i < rows.length; i++) {
-      upd.run(flags[i] ? 1 : 0, flags[i] ? `>${opts.sigma ?? ORACLE_DEFAULTS.outlierSigma}σ from trailing median` : null, rows[i].id);
-      if (flags[i]) flagged++;
+      let reason = flags[i] ? `>${opts.sigma ?? ORACLE_DEFAULTS.outlierSigma}σ from trailing median` : null;
+      if (anchor?.price_cents > 0 && Math.max(rows[i].price_cents, anchor.price_cents) >= FLOOR) {
+        const r = rows[i].price_cents / anchor.price_cents;
+        if (r >= RATIO || r <= 1 / RATIO) {
+          reason = `price-implausible: ${r >= RATIO ? `${r.toFixed(1)}x above` : `${(1 / r).toFixed(1)}x below`} ${anchor.source} mark $${(anchor.price_cents / 100).toFixed(2)}`;
+          implausible++;
+        }
+      }
+      upd.run(reason ? 1 : 0, reason, rows[i].id);
+      if (reason) flagged++;
     }
   }
   db.exec('COMMIT');
-  return { series: series.length, flagged };
+  return { series: series.length, flagged, implausible };
 }
 
 /**

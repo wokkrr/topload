@@ -104,3 +104,35 @@ describe('CGC Pristine 10 is its own tier', () => {
     expect(gradeFromTitle('Umbreon CGC PRISTINE 10 Evolving Skies')).toBe('CGC10.5');
   });
 });
+
+describe('refreshOutlierFlags plausibility gate (permanent — survives every refresh)', async () => {
+  const { openDb: open2 } = await import('../db.js');
+  const { refreshOutlierFlags } = await import('../oracle.js');
+  it('flags anchor-violating whales even when they arrive first and agree with each other', () => {
+    const db = open2(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name, external_ids) VALUES ('c1', 'PKMN', 'Switch', '{}')`).run();
+    db.prepare(`INSERT INTO external_marks (source, card_id, grade, as_of, price_cents) VALUES ('pricecharting', 'c1', 'raw', '2026-07-23', 226)`).run();
+    const sale = db.prepare(`INSERT INTO sales (card_id, grade, price_cents, sold_at, source, external_id) VALUES ('c1', 'raw', ?, ?, 'phygitals', ?)`);
+    sale.run(13800, '2026-07-17', 'a');   // whale cluster arrives FIRST —
+    sale.run(15000, '2026-07-18', 'b');   // trailing-median rule alone would
+    sale.run(15900, '2026-07-19', 'c');   // bless it and flag the honest sale
+    sale.run(244, '2026-07-20', 'd');
+    const res = refreshOutlierFlags(db);
+    expect(res.implausible).toBe(3);
+    const rows = db.prepare(`SELECT price_cents, is_outlier, outlier_reason FROM sales ORDER BY price_cents`).all();
+    expect(rows[0]).toMatchObject({ price_cents: 244, is_outlier: 0 });
+    expect(rows[1].outlier_reason).toMatch(/price-implausible: .*above pricecharting mark \$2\.26/);
+    expect(rows[2].is_outlier).toBe(1);
+    expect(rows[3].is_outlier).toBe(1);
+  });
+  it('no anchor → statistical rule only; penny pairs under the floor stay unflagged', () => {
+    const db = open2(':memory:');
+    db.prepare(`INSERT INTO cards (id, ip, name, external_ids) VALUES ('c2', 'PKMN', 'X', '{}')`).run();
+    const sale = db.prepare(`INSERT INTO sales (card_id, grade, price_cents, sold_at, source, external_id) VALUES ('c2', 'raw', ?, ?, 'demo', ?)`);
+    sale.run(100, '2026-07-01', 'a');
+    sale.run(120, '2026-07-02', 'b');
+    const res = refreshOutlierFlags(db);
+    expect(res.implausible).toBe(0);
+    expect(db.prepare(`SELECT SUM(is_outlier) s FROM sales`).get().s).toBe(0);
+  });
+});
